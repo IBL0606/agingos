@@ -5,7 +5,14 @@ from db import SessionLocal
 from models.event import Event
 from models.db_event import EventDB
 
+from services.scheduler import scheduler, setup_scheduler
+
+from routes.rules import router as rules_router
+from routes.deviations import router as deviations_router
+
 app = FastAPI(title="AgingOS Backend")
+app.include_router(rules_router)
+app.include_router(deviations_router)
 
 
 @app.get("/health")
@@ -47,3 +54,15 @@ def list_events() -> List[Event]:
         ]
     finally:
         db.close()
+
+
+@app.on_event("startup")
+def on_startup():
+    setup_scheduler()
+    if not scheduler.running:
+        scheduler.start()
+
+
+@app.on_event("shutdown")
+def on_shutdown():
+    scheduler.shutdown()
