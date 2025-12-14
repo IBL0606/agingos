@@ -1,0 +1,9 @@
+{
+  "id": "d1f62a8d-2f9e-4c55-8e31-7c2b1a9c0f77",
+  "timestamp": "2025-12-14T06:30:00Z",
+  "category": "temperature",
+  "payload": {
+    "room": "living_room",
+    "celsius": 20.6
+  }
+}

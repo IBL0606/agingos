@@ -1,0 +1,9 @@
+{
+  "id": "2f6a7c1b-6d4b-4d2d-9c8a-1a0d5f3a9a10",
+  "timestamp": "2025-12-14T07:13:05Z",
+  "category": "door",
+  "payload": {
+    "state": "closed",
+    "location": "front_door"
+  }
+}

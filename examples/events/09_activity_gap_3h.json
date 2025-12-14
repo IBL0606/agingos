@@ -1,0 +1,8 @@
+{
+  "id": "c9e7f4d1-2a6b-4d90-b1f2-6f8e2c7a5d01",
+  "timestamp": "2025-12-14T12:00:00Z",
+  "category": "activity_gap",
+  "payload": {
+    "duration_minutes": 180
+  }
+}

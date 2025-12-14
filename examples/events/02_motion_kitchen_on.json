@@ -1,0 +1,9 @@
+{
+  "id": "e3b5c5d1-7b3b-4a4c-b0d5-0b6d3bcb4a21",
+  "timestamp": "2025-12-14T07:45:10Z",
+  "category": "motion",
+  "payload": {
+    "state": "on",
+    "room": "kitchen"
+  }
+}

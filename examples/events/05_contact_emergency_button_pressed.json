@@ -1,0 +1,9 @@
+{
+  "id": "b8f2c6a4-1a33-4d14-8e5d-8a2f01a3c0c8",
+  "timestamp": "2025-12-14T11:02:00Z",
+  "category": "button",
+  "payload": {
+    "action": "pressed",
+    "button": "emergency"
+  }
+}

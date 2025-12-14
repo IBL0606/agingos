@@ -1,0 +1,10 @@
+{
+  "id": "a0a9d2fd-1f8f-4f5c-9b42-6e09f5d6d4d3",
+  "timestamp": "2025-12-14T08:05:00Z",
+  "category": "power",
+  "payload": {
+    "device": "kettle",
+    "watts": 1450,
+    "state": "on"
+  }
+}

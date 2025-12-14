@@ -1,0 +1,8 @@
+{
+  "id": "3f2a9a1c-7c9d-4b21-8c2f-5f8d2e1a0b3c",
+  "timestamp": "2025-12-14T22:15:00Z",
+  "category": "bed",
+  "payload": {
+    "occupied": true
+  }
+}
