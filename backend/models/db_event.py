@@ -1,14 +1,13 @@
-from sqlalchemy import Column, Integer, String, DateTime
-from sqlalchemy.orm import declarative_base
-
-Base = declarative_base()
+# models/db_event.py
+from sqlalchemy import Column, Integer, String, DateTime, JSON
+from db import Base
 
 
 class EventDB(Base):
     __tablename__ = "events"
 
     id = Column(Integer, primary_key=True, index=True)
-    source = Column(String, nullable=False)
-    type = Column(String, nullable=False)
-    value = Column(String, nullable=True)
-    timestamp = Column(DateTime, nullable=False)
+    event_id = Column(String, nullable=False, index=True)
+    timestamp = Column(DateTime, nullable=False, index=True)
+    category = Column(String, nullable=False, index=True)
+    payload = Column(JSON, nullable=False)

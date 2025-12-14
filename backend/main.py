@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from typing import List
 
-from db import SessionLocal
+from db import SessionLocal, Base, engine
 from models.event import Event
 from models.db_event import EventDB
 
@@ -14,6 +14,7 @@ app = FastAPI(title="AgingOS Backend")
 app.include_router(rules_router)
 app.include_router(deviations_router)
 
+Base.metadata.create_all(bind=engine)
 
 @app.get("/health")
 def health():
@@ -25,10 +26,10 @@ def receive_event(event: Event):
     db = SessionLocal()
     try:
         db_event = EventDB(
-            source=event.source,
-            type=event.type,
-            value=event.value,
+            event_id=str(event.id),
             timestamp=event.timestamp,
+            category=event.category,
+            payload=event.payload,
         )
         db.add(db_event)
         db.commit()
@@ -38,22 +39,24 @@ def receive_event(event: Event):
     return {"received": True}
 
 
+
 @app.get("/events")
-def list_events() -> List[Event]:
+def list_events() -> list[Event]:
     db = SessionLocal()
     try:
         rows = db.query(EventDB).order_by(EventDB.id.desc()).all()
         return [
             Event(
-                source=r.source,
-                type=r.type,
-                value=r.value,
+                id=r.event_id,
                 timestamp=r.timestamp,
+                category=r.category,
+                payload=r.payload,
             )
             for r in rows
         ]
     finally:
         db.close()
+
 
 
 @app.on_event("startup")

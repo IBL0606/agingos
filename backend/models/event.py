@@ -1,9 +1,12 @@
-from datetime import datetime
+# models/event.py
 from pydantic import BaseModel, Field
+from typing import Any, Dict
+from uuid import UUID
+from datetime import datetime
 
 
 class Event(BaseModel):
-    source: str = Field(..., examples=["home_assistant"])
-    type: str = Field(..., examples=["motion", "door", "power"])
-    value: str | None = Field(default=None, examples=["on", "off", "open", "closed"])
+    id: UUID
     timestamp: datetime
+    category: str
+    payload: Dict[str, Any] = Field(default_factory=dict)
