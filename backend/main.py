@@ -10,6 +10,10 @@ from services.scheduler import scheduler, setup_scheduler
 from routes.rules import router as rules_router
 from routes.deviations import router as deviations_router
 
+from fastapi import Query
+from datetime import datetime
+from typing import Optional
+
 app = FastAPI(title="AgingOS Backend")
 app.include_router(rules_router)
 app.include_router(deviations_router)
@@ -41,10 +45,32 @@ def receive_event(event: Event):
 
 
 @app.get("/events")
-def list_events() -> list[Event]:
+def list_events(
+    category: Optional[str] = Query(default=None),
+    since: Optional[datetime] = Query(default=None),
+    until: Optional[datetime] = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=1000),
+) -> list[Event]:
     db = SessionLocal()
     try:
-        rows = db.query(EventDB).order_by(EventDB.id.desc()).all()
+        query = db.query(EventDB)
+
+        if category:
+            query = query.filter(EventDB.category == category)
+
+        if since:
+            query = query.filter(EventDB.timestamp >= since)
+
+        if until:
+            query = query.filter(EventDB.timestamp <= until)
+
+        rows = (
+            query
+            .order_by(EventDB.timestamp.desc())
+            .limit(limit)
+            .all()
+        )
+
         return [
             Event(
                 id=r.event_id,
@@ -56,6 +82,7 @@ def list_events() -> list[Event]:
         ]
     finally:
         db.close()
+
 
 
 
