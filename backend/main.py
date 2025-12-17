@@ -19,6 +19,8 @@ app = FastAPI(title="AgingOS Backend")
 app.include_router(rules_router)
 app.include_router(deviations_router)
 
+from models.deviation_v1_db import DeviationV1DB  # noqa: F401
+
 Base.metadata.create_all(bind=engine)
 
 @app.get("/health")
