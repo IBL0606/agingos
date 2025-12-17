@@ -41,6 +41,7 @@ from typing import List
 
 from schemas.deviation_v1 import DeviationV1
 from services.rules.r001 import eval_r001_no_motion
+from services.rules.r002 import eval_r002_front_door_open_at_night
 
 @router.get("/evaluate", response_model=List[DeviationV1])
 def evaluate_deviations(
@@ -49,4 +50,12 @@ def evaluate_deviations(
     db: Session = Depends(get_db),
 ):
     now = datetime.now(timezone.utc)
-    return eval_r001_no_motion(db, since=since, until=until, now=now)
+
+    devs: List[DeviationV1] = []
+    devs += eval_r001_no_motion(db, since=since, until=until, now=now)
+    devs += eval_r002_front_door_open_at_night(db, since=since, until=until, now=now)
+
+    return devs
+
+
+

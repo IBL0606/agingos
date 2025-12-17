@@ -2,12 +2,17 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 from services.rule_engine import run_rules
+from db import SessionLocal
 
 scheduler = BackgroundScheduler()
 
 
 def run_rule_engine_job():
-    run_rules()
+    db = SessionLocal()       
+    try:
+        run_rules(db)         
+    finally:
+        db.close() 
 
     
 def setup_scheduler():
