@@ -145,5 +145,44 @@ def persist_deviations(
         expire_after_minutes=DEFAULT_EXPIRE_AFTER_MINUTES,
     )
 
+@router.get("/summary")
+def deviations_summary(
+    subject_key: str = Query(default="default"),
+    db: Session = Depends(get_db),
+):
+    open_count = (
+        db.query(DeviationV1DB)
+        .filter(DeviationV1DB.subject_key == subject_key)
+        .filter(DeviationV1DB.status == DeviationV1Status.OPEN)
+        .count()
+    )
+
+    ack_count = (
+        db.query(DeviationV1DB)
+        .filter(DeviationV1DB.subject_key == subject_key)
+        .filter(DeviationV1DB.status == DeviationV1Status.ACK)
+        .count()
+    )
+
+    by_rule = (
+        db.query(DeviationV1DB.rule_id)
+        .filter(DeviationV1DB.subject_key == subject_key)
+        .filter(DeviationV1DB.status.in_([DeviationV1Status.OPEN, DeviationV1Status.ACK]))
+        .all()
+    )
+
+    # by_rule er liste av tuples (rule_id,)
+    rule_counts = {}
+    for (rid,) in by_rule:
+        rule_counts[rid] = rule_counts.get(rid, 0) + 1
+
+    return {
+        "subject_key": subject_key,
+        "open": open_count,
+        "ack": ack_count,
+        "active_total": open_count + ack_count,
+        "active_by_rule": rule_counts,
+    }
+
     db.commit()
     return {"created": result.created, "updated": result.updated, "reopened": result.reopened, "closed": closed}
