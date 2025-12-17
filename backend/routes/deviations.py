@@ -2,6 +2,7 @@
 
 from datetime import datetime, timezone
 from typing import List
+from config import DEFAULT_EXPIRE_AFTER_MINUTES
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -16,7 +17,6 @@ from services.rules.r003 import eval_r003_front_door_open_no_motion_after
 
 router = APIRouter(prefix="/deviations", tags=["deviations"])
 
-DEFAULT_EXPIRE_AFTER_MINUTES = 60
 RULE_IDS = ["R-001", "R-002", "R-003"]
 
 
