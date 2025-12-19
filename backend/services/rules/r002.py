@@ -4,19 +4,41 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from schemas.deviation_v1 import DeviationV1, Window
+from config.rule_config import load_rule_config
 from models.db_event import EventDB
+from schemas.deviation_v1 import DeviationV1, Window
 
 RULE_ID = "R-002"
 
-# Natt: 23:00 -> 06:00 (går over midnatt)
-NIGHT_START = time(23, 0, 0)
-NIGHT_END = time(6, 0, 0)
+
+def _night_window() -> tuple[time, time]:
+    """
+    Reads night window from config:
+      rules.R-002.params.night_window.start_local_time
+      rules.R-002.params.night_window.end_local_time
+
+    Falls back to sim-baseline defaults (23:00:00 -> 06:00:00).
+    """
+    cfg = load_rule_config()
+    params = cfg.rule_params(RULE_ID)
+
+    w = params.get("night_window", {}) if isinstance(params, dict) else {}
+    start_s = w.get("start_local_time", "23:00:00")
+    end_s = w.get("end_local_time", "06:00:00")
+
+    return time.fromisoformat(start_s), time.fromisoformat(end_s)
 
 
 def _is_night(ts: datetime) -> bool:
+    start_t, end_t = _night_window()
     t = ts.time()
-    return (t >= NIGHT_START) or (t < NIGHT_END)
+
+    # If the window crosses midnight (e.g. 23:00 -> 06:00)
+    if start_t > end_t:
+        return (t >= start_t) or (t < end_t)
+
+    # Normal same-day window
+    return start_t <= t < end_t
 
 
 def eval_r002_front_door_open_at_night(

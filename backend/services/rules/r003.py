@@ -4,17 +4,32 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from schemas.deviation_v1 import DeviationV1, Window
+from config.rule_config import load_rule_config
 from models.db_event import EventDB
+from schemas.deviation_v1 import DeviationV1, Window
 
 RULE_ID = "R-003"
 
-FOLLOWUP_MINUTES = 10
+
+def _followup_minutes() -> int:
+    """
+    Reads follow-up window from config:
+      rules.R-003.params.followup_minutes
+
+    Falls back to sim-baseline default (10).
+    """
+    cfg = load_rule_config()
+    params = cfg.rule_params(RULE_ID)
+    if isinstance(params, dict):
+        return int(params.get("followup_minutes", 10))
+    return 10
 
 
 def eval_r003_front_door_open_no_motion_after(
     session: Session, since: datetime, until: datetime, now: datetime
 ) -> List[DeviationV1]:
+    follow_minutes = _followup_minutes()
+
     # Finn dør-events i evalueringsvinduet
     door_rows = (
         session.query(EventDB)
@@ -39,9 +54,9 @@ def eval_r003_front_door_open_no_motion_after(
         if state != "open" or door_name != "front":
             continue
 
-        follow_until = d.timestamp + timedelta(minutes=FOLLOWUP_MINUTES)
+        follow_until = d.timestamp + timedelta(minutes=follow_minutes)
 
-        # Finn motion-events i de neste 10 minuttene etter dør-eventet
+        # Finn motion-events i de neste N minuttene etter dør-eventet
         motion_rows = (
             session.query(EventDB)
             .filter(EventDB.timestamp >= d.timestamp)
@@ -80,8 +95,8 @@ def eval_r003_front_door_open_no_motion_after(
             severity="MEDIUM",
             title="Mulig uvanlig hendelse etter dør",
             explanation=(
-                "Døren ble åpnet, men systemet registrerte ingen bevegelse i de neste 10 minuttene. "
-                "Det kan være at personen gikk ut, falt, eller at sensorer ikke registrerte aktivitet."
+                f"Døren ble åpnet, men systemet registrerte ingen bevegelse i de neste {follow_minutes} minuttene. "
+                    "Det kan være at personen gikk ut, falt, eller at sensorer ikke registrerte aktivitet."
             ),
             evidence=evidence,  # kan være tom
             window=Window(since=since, until=until),

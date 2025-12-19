@@ -23,6 +23,3 @@ services:
 
 volumes:
   pgdata:
-
-environment:
-  - PYTHONDONTWRITEBYTECODE=1
