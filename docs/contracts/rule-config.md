@@ -4,6 +4,9 @@
 Samle alle runtime-parametre for scheduler og regler (lookback, expire, terskler og tidsvinduer) i én struktur per regel, slik at slike verdier ikke hardkodes i regelkode.
 
 ## Kilde til sannhet
+
+**Status:** T-0102 implementert: scheduler og R-002/R-003 leser parametre fra `backend/config/rules.yaml` via `backend/config/rule_config.py`.
+
 - Denne configen er “source of truth” for domeneparametre i regler og scheduler-policy.
 - Regelkode skal ikke ha “magiske tall” for tidsvinduer/terskler (f.eks. nattvindu, follow-up minutter) uten at disse kommer fra config.
 

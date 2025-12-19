@@ -80,6 +80,9 @@ Rule-parametre (lookback, expire, terskler/tidsvinduer) er samlet i:
 Kontrakt/schema er dokumentert i:
 - `docs/contracts/rule-config.md`
 
+**Status:** Implementert: scheduler og R-002/R-003 leser parametre fra `backend/config/rules.yaml`.
+
+
 ### Feltoversikt
 
 | Felt | Type | Eksempel | Effekt |
