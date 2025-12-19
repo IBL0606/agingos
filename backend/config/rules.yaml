@@ -1,0 +1,51 @@
+# Formål:
+#   Samle runtime-parametre for scheduler og regler (lookback, expire, terskler/tidsvinduer) på ett sted.
+#
+# Kilde til sannhet:
+#   Denne filen er “source of truth” for domeneparametre. Regelkode skal ikke hardkode terskler/tider.
+#
+# Retningslinjer for endring:
+#   - Endres via PR.
+#   - Oppdater docs/contracts/rule-config.md og README ved endringer.
+#   - Defaults skal speile sim-baseline-v1 med mindre annet er eksplisitt besluttet.
+
+scheduler:
+  interval_minutes: 1
+  default_subject_key: "default"
+
+defaults:
+  lookback_minutes: 60
+  expire_after_minutes: 60
+
+rules:
+  R-001:
+    enabled_in_scheduler: false
+    lookback_minutes: 60
+    expire_after_minutes: 60
+    params: {}
+
+  R-002:
+    enabled_in_scheduler: true
+    lookback_minutes: 60
+    expire_after_minutes: 60
+    params:
+      category: "door"
+      payload_state_keys: ["state", "value"]
+      trigger_value: "open"
+      night_window:
+        start_local_time: "23:00:00"
+        end_local_time: "06:00:00"
+
+  R-003:
+    enabled_in_scheduler: true
+    lookback_minutes: 60
+    expire_after_minutes: 60
+    params:
+      door_category: "door"
+      motion_category: "motion"
+      payload_state_keys: ["state", "value"]
+      door_name_keys: ["door", "name"]
+      required_door_name: "front"
+      door_open_value: "open"
+      motion_on_value: "on"
+      followup_minutes: 10
