@@ -1,3 +1,4 @@
+import os
 #backend/main.py
 from fastapi import FastAPI
 from typing import List
@@ -89,11 +90,13 @@ def list_events(
 
 @app.on_event("startup")
 def on_startup():
+    if os.getenv("SCHEDULER_ENABLED", "1").lower() in ("0", "false", "no", "off"):
+        # Scheduler kan slås av lokalt ved behov (f.eks. under manuell testing)
+        return
+
     setup_scheduler()
     if not scheduler.running:
         scheduler.start()
-
-
 @app.on_event("shutdown")
 def on_shutdown():
     scheduler.shutdown()

@@ -28,7 +28,7 @@ Dette er implementert i queries i reglene (`timestamp >= since` og `timestamp < 
 ### Per regel (`rules.<RULE_ID>`)
 | Felt | Type | Default | Effekt |
 |---|---|---:|---|
-| `enabled_in_scheduler` | bool | per regel (se nedenfor) | Om regelen kjøres i scheduler/persist-flow |
+| `enabled_in_scheduler` | bool | per regel (se nedenfor) | Om regelen kjøres i scheduler/persist-flow (persist til DB) |
 | `lookback_minutes` | int | 60 | Hvor langt tilbake scheduler/persist typisk evaluerer |
 | `expire_after_minutes` | int | 60 | Når et OPEN/ACK avvik anses “stale” og kan lukkes hvis ikke sett i nye kjøringer |
 | `params` | object | `{}` | Regelspesifikke parametre (terskler/tidsvinduer, kategorier, payload-regler) |
@@ -45,6 +45,13 @@ Dette er implementert i queries i reglene (`timestamp >= since` og `timestamp < 
 - R-002 og R-003: i scheduler/persist-flow
 
 Dette uttrykkes via `enabled_in_scheduler` per regel.
+
+## Semantikk: enabled_in_scheduler
+- `true`: Regelen inngår i scheduler/persist-flow. Scheduler kaller rule engine, evaluerer regelen i et lookback-vindu og kan opprette/oppdatere OPEN avvik i DB.
+- `false`: Regelen kjøres ikke av scheduler og gir dermed ingen persisterte avvik via scheduler. Regelen kan fortsatt evalueres manuelt via API (f.eks. `GET /deviations/evaluate`).
+
+**Ekstra dokumentasjonssetning:** Semantikken for `enabled_in_scheduler` dokumenteres her i `docs/contracts/rule-config.md` (kontrakt). Begrunnelse, status og eventuelle unntak (f.eks. at R-001 er av i scheduler) føres i Master arbeidslogg.
+
 
 ## Eksempel-konfigurasjon (YAML)
 

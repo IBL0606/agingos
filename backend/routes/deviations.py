@@ -8,11 +8,9 @@ from typing import List
 from models.deviation import Deviation, DeviationStatus
 from db import get_db
 
-from schemas.deviation_v1 import DeviationV1
-from services.rules.r001 import eval_r001_no_motion
-from services.rules.r002 import eval_r002_front_door_open_at_night
-from services.rules.r003 import eval_r003_front_door_open_no_motion_after
+from services.rule_engine import evaluate_rules
 
+from schemas.deviation_v1 import DeviationV1
 router = APIRouter(prefix="/deviations", tags=["deviations"])
 
 
@@ -49,9 +47,6 @@ def evaluate_deviations(
 ):
     now = datetime.now(timezone.utc)
 
-    devs: List[DeviationV1] = []
-    devs += eval_r001_no_motion(db, since=since, until=until, now=now)
-    devs += eval_r002_front_door_open_at_night(db, since=since, until=until, now=now)
-    devs += eval_r003_front_door_open_no_motion_after(db, since=since, until=until, now=now)
+    devs = evaluate_rules(db, since=since, until=until, now=now)
 
     return devs

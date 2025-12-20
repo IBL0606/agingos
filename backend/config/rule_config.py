@@ -17,6 +17,28 @@ class RuleConfig:
     def scheduler_interval_minutes(self) -> int:
         return int(self.raw.get("scheduler", {}).get("interval_minutes", 1))
 
+    def scheduler_default_subject_key(self) -> str:
+        return str(self.raw.get("scheduler", {}).get("default_subject_key", "default"))
+
+    def defaults_lookback_minutes(self) -> int:
+        defaults = self.raw.get("defaults", {}) if isinstance(self.raw, dict) else {}
+        return int(defaults.get("lookback_minutes", 60))
+
+    def rule_enabled_in_scheduler(self, rule_id: str) -> bool:
+        # Semantikk: default False hvis ikke satt (regelen er "off" i scheduler/persist-flow).
+        r = self.rule(rule_id)
+        return bool(r.get("enabled_in_scheduler", False))
+
+    def rule_lookback_minutes(self, rule_id: str) -> int:
+        # Semantikk: rule.lookback_minutes -> defaults.lookback_minutes -> 60
+        r = self.rule(rule_id)
+        if "lookback_minutes" in r:
+            try:
+                return int(r["lookback_minutes"])
+            except Exception:
+                pass
+        return self.defaults_lookback_minutes()
+
     def rule(self, rule_id: str) -> Dict[str, Any]:
         return dict(self.raw.get("rules", {}).get(rule_id, {}))
 
