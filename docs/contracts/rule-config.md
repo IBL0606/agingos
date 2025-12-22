@@ -38,6 +38,10 @@ Dette er implementert i queries i reglene (`timestamp >= since` og `timestamp < 
 ### Globale defaults
 - `lookback_minutes`: 60 (fra `DEFAULT_LOOKBACK_MINUTES`)
 - `expire_after_minutes`: 60 (fra `DEFAULT_EXPIRE_AFTER_MINUTES`)
+  - **Semantikk:** Ved hver scheduler-kjøring vurderes alle avvik med status `OPEN` eller `ACK` for aktuell `subject_key`.
+    Et avvik lukkes (settes til `CLOSED`) når `last_seen_at < now - expire_after_minutes`.
+  - **Per-regel:** Verdien kan overstyres per regel i `rules.<id>.expire_after_minutes`. Hvis ikke satt, brukes `defaults.expire_after_minutes`.
+  - **Merk:** `CLOSED` regnes ikke som aktivt avvik. Dersom regelen trigger igjen etter at et avvik er lukket, opprettes en ny `OPEN` (ny episode).
 - `scheduler.interval_minutes`: 1 (fra `IntervalTrigger(minutes=1)` i scheduler)
 
 ### Scheduler-policy (baseline)
