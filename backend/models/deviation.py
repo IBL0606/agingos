@@ -57,8 +57,10 @@ Index(
 )
 
 Index(
-    "ix_deviations_rule_subject_open",
+    "uq_deviations_active_rule_subject",
     Deviation.rule_id,
     Deviation.subject_key,
-    Deviation.status
+    unique=True,
+    postgresql_where=Deviation.status.in_([DeviationStatus.OPEN, DeviationStatus.ACK]),
 )
+
