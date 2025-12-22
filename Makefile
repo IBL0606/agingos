@@ -1,3 +1,4 @@
+PYTHON := .venv/bin/python
 .PHONY: up down logs smoke statusflow help
 
 up:
@@ -13,7 +14,7 @@ smoke:
 	./examples/scripts/smoke_test.sh
 
 statusflow:
-	PYTHONPATH=backend DATABASE_URL="postgresql://agingos:agingos@localhost:5432/agingos" python3 -m pytest -q backend/tests/test_status_flow_open_ack_close_reopen.py
+	PYTHONPATH=backend DATABASE_URL="postgresql://agingos:agingos@localhost:5432/agingos" $(PYTHON) -m pytest -q backend/tests/test_status_flow_open_ack_close_reopen.py
 
 
 
