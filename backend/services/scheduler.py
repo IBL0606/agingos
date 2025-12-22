@@ -3,7 +3,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 import logging
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from services.rule_engine import evaluate_rules_for_scheduler
 from db import SessionLocal
@@ -27,7 +27,7 @@ def _severity_str_to_int(s: str) -> int:
     return 2
 
 
-def _get_or_create_rule_row(db: SessionLocal.__annotations__.get('return', object), rule_key: str) -> Rule:
+def _get_or_create_rule_row(db: SessionLocal.__annotations__.get("return", object), rule_key: str) -> Rule:
     # Vi bruker Rule.name som string-key ("R-002", osv.) og mapper til FK via Rule.id.
     existing = db.query(Rule).filter(Rule.name == rule_key).one_or_none()
     if existing:
@@ -48,7 +48,7 @@ def _get_or_create_rule_row(db: SessionLocal.__annotations__.get('return', objec
 
 
 def _upsert_open_deviation(
-    db: SessionLocal.__annotations__.get('return', object),
+    db: SessionLocal.__annotations__.get("return", object),
     rule_row: Rule,
     subject_key: str,
     now: datetime,
@@ -56,7 +56,7 @@ def _upsert_open_deviation(
 ) -> None:
     existing = (
         db.query(Deviation)
-        .filter(Deviation.rule_id == rule_row.id)   
+        .filter(Deviation.rule_id == rule_row.id)
         .filter(Deviation.subject_key == subject_key)
         .filter(Deviation.status.in_([DeviationStatus.OPEN, DeviationStatus.ACK]))
         .one_or_none()
@@ -96,6 +96,46 @@ def _upsert_open_deviation(
     db.add(dev)
 
 
+def _close_stale_deviations(
+    db: SessionLocal.__annotations__.get("return", object),
+    *,
+    subject_key: str,
+    now: datetime,
+) -> int:
+    """
+    Close deviations that have not been seen within expire_after_minutes.
+
+    Policy:
+    - Applies to status OPEN or ACK.
+    - Only for the current subject_key (thin-slice: default subject).
+    - Uses per-rule expire_after_minutes from rules.yaml via RuleConfig.
+    """
+    cfg = load_rule_config()
+    closed_count = 0
+
+    candidates = (
+        db.query(Deviation)
+        .filter(Deviation.subject_key == subject_key)
+        .filter(Deviation.status.in_([DeviationStatus.OPEN, DeviationStatus.ACK]))
+        .all()
+    )
+
+    for dev in candidates:
+        # rules.yaml keys are the rule "key" like "R-002". In DB that is Rule.name.
+        rule_key = dev.rule.name if dev.rule else None
+        if not rule_key:
+            continue
+
+        expire_minutes = cfg.rule_expire_after_minutes(rule_key)
+        cutoff = now - timedelta(minutes=expire_minutes)
+
+        if dev.last_seen_at < cutoff:
+            dev.status = DeviationStatus.CLOSED
+            closed_count += 1
+
+    return closed_count
+
+
 def run_rule_engine_job():
     db = SessionLocal()
     try:
@@ -106,7 +146,7 @@ def run_rule_engine_job():
         devs = evaluate_rules_for_scheduler(db, now=now)
         logger.info(f"Scheduler run: computed {len(devs)} deviation(s)")
 
-        # Persist: upsert OPEN deviation per (rule_key, subject_key)
+        # Persist: upsert OPEN/ACK deviation per (rule_key, subject_key)
         for d in devs:
             # d er DeviationV1 (pydantic). Vi jobber med dict for JSON-feltene i DB.
             dct = d.model_dump(mode="json")
@@ -115,11 +155,13 @@ def run_rule_engine_job():
             rule_row = _get_or_create_rule_row(db, rule_key=rule_key)
             _upsert_open_deviation(db, rule_row=rule_row, subject_key=subject_key, now=now, deviation_v1=dct)
 
+        closed = _close_stale_deviations(db, subject_key=subject_key, now=now)
+        if closed:
+            logger.info(f"Scheduler run: closed {closed} stale deviation(s)")
+
         db.commit()
     finally:
         db.close()
-
-
 
 
 def setup_scheduler():
