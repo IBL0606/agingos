@@ -125,6 +125,8 @@ Sjekkliste:
 - Hvis du filtrerer events/deviations med `since/until`, bruk alltid `...Z` (UTC).
 
 Eksempel (gyldig):
+```bash
 curl -sS "http://localhost:8000/deviations/evaluate?since=2025-12-22T10:00:00Z&until=2025-12-22T11:00:00Z"
+```
 
 Ekstra dokumentasjonssetning: Policy ligger i `docs/policies/time-and-timezone.md`, kontraktkrav i `docs/contracts/event-v1.md`, og praktisk feilsøking i `README.md`.
