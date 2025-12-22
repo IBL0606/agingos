@@ -37,6 +37,8 @@ Dette steget implementerer en tynn vertikal slice:
 
 ## Avvik v1 (API-kontrakt)
 
+Kontraktkrav for event-timestamps (UTC, ISO 8601) er dokumentert i: `docs/contracts/event-v1.md`.
+
 ### Avvik-livssyklus (OPEN/ACK/CLOSED + expire)
 - Scheduler kan persistere avvik som `OPEN` når en regel trigger (for regler med `enabled_in_scheduler: true`).
 - Et `OPEN` avvik kan settes til `ACK` via API for å markere at det er sett, men avviket regnes fortsatt som aktivt.
@@ -112,4 +114,17 @@ Kontrakt/schema er dokumentert i:
 | `rules.<id>.expire_after_minutes` | int | `60` | Stale-threshold for closing (OPEN/ACK) |
 | `rules.<id>.params.*` | object | `{...}` | Regelspesifikke terskler/tidsvinduer |
 
+---
 
+## Troubleshooting: Hvis tider virker feil
+
+Sjekkliste:
+- Bekreft at du sender **UTC-aware** timestamps (ISO 8601 med `Z` eller `+00:00`). Naive timestamps uten timezone blir avvist.
+- Verifiser vinduskontrakten: `[since, until)` der `until` er eksklusiv.
+- Sjekk DB-timezone: `docker compose exec db psql -U agingos -d agingos -c "SHOW timezone;"`
+- Hvis du filtrerer events/deviations med `since/until`, bruk alltid `...Z` (UTC).
+
+Eksempel (gyldig):
+curl -sS "http://localhost:8000/deviations/evaluate?since=2025-12-22T10:00:00Z&until=2025-12-22T11:00:00Z"
+
+Ekstra dokumentasjonssetning: Policy ligger i `docs/policies/time-and-timezone.md`, kontraktkrav i `docs/contracts/event-v1.md`, og praktisk feilsøking i `README.md`.

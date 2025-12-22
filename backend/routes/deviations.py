@@ -11,6 +11,7 @@ from db import get_db
 from services.rule_engine import evaluate_rules
 
 from schemas.deviation_v1 import DeviationV1
+from util.time import require_utc_aware
 router = APIRouter(prefix="/deviations", tags=["deviations"])
 
 
@@ -50,6 +51,12 @@ def evaluate_deviations(
     until: datetime = Query(..., description="ISO 8601"),
     db: Session = Depends(get_db),
 ):
+    try:
+        since = require_utc_aware(since, "since")
+        until = require_utc_aware(until, "until")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     now = datetime.now(timezone.utc)
 
     devs = evaluate_rules(db, since=since, until=until, now=now)
