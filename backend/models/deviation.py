@@ -3,7 +3,7 @@ import enum
 from datetime import datetime
 from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, JSON, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from util.time import utcnow_db
+from util.time import utcnow
 from models.db_event import Base
 
 class DeviationStatus(str, enum.Enum):
@@ -29,16 +29,14 @@ class Deviation(Base):
 
     severity: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
 
-    started_at: Mapped[datetime] = mapped_column(
-        DateTime,
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
         nullable=False,
-        default=utcnow_db
+        default=utcnow
     )
 
-    last_seen_at: Mapped[datetime] = mapped_column(
-        DateTime,
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
         nullable=False,
-        default=utcnow_db
+        default=utcnow
     )
 
     subject_key: Mapped[str] = mapped_column(

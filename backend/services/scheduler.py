@@ -5,7 +5,7 @@ import logging
 
 from datetime import datetime, timezone, timedelta
 
-from util.time import to_db_utc_naive, utcnow
+from util.time import utcnow
 from services.rule_engine import evaluate_rules_for_scheduler
 from db import SessionLocal
 from config.rule_config import load_rule_config
@@ -143,7 +143,6 @@ def run_rule_engine_job():
         cfg = load_rule_config()
         subject_key = cfg.scheduler_default_subject_key()
         now = utcnow()
-        now_db = to_db_utc_naive(now, "now")
         devs = evaluate_rules_for_scheduler(db, now=now)
         logger.info(f"Scheduler run: computed {len(devs)} deviation(s)")
 
@@ -154,9 +153,9 @@ def run_rule_engine_job():
             rule_key = dct["rule_id"]
 
             rule_row = _get_or_create_rule_row(db, rule_key=rule_key)
-            _upsert_open_deviation(db, rule_row=rule_row, subject_key=subject_key, now=now_db, deviation_v1=dct)
+            _upsert_open_deviation(db, rule_row=rule_row, subject_key=subject_key, now=now, deviation_v1=dct)
 
-        closed = _close_stale_deviations(db, subject_key=subject_key, now=now_db)
+        closed = _close_stale_deviations(db, subject_key=subject_key, now=now)
         if closed:
             logger.info(f"Scheduler run: closed {closed} stale deviation(s)")
 
