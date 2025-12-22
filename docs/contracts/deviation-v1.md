@@ -3,6 +3,8 @@
 ## Formål
 Definerer minimumskontrakten for persisterte avvik (deviations) og hvordan systemet identifiserer “samme” aktive avvik over tid.
 
+**Status:** Avvik v1 er gjeldende; modellen ligger i `backend/models/deviation.py` og brukes av både API (`/deviations`) og scheduler.
+
 ## Deviation key-policy (aktivt avvik)
 Et **aktivt avvik** identifiseres av:
 - `rule_id` (FK til `rules.id`)
