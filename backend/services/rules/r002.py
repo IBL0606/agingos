@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from config.rule_config import load_rule_config
 from models.db_event import EventDB
+from util.time import to_db_utc_naive
 from schemas.deviation_v1 import DeviationV1, Window
 
 RULE_ID = "R-002"
@@ -44,10 +45,12 @@ def _is_night(ts: datetime) -> bool:
 def eval_r002_front_door_open_at_night(
     session: Session, since: datetime, until: datetime, now: datetime
 ) -> List[DeviationV1]:
+    since_db = to_db_utc_naive(since, "since")
+    until_db = to_db_utc_naive(until, "until")
     rows = (
         session.query(EventDB)
-        .filter(EventDB.timestamp >= since)
-        .filter(EventDB.timestamp < until)  # until eksklusiv
+        .filter(EventDB.timestamp >= since_db)
+        .filter(EventDB.timestamp < until_db)  # until eksklusiv
         .filter(EventDB.category == "door")
         .order_by(EventDB.timestamp.asc())
         .all()
