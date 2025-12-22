@@ -26,7 +26,6 @@ Postgres uses `timestamp with time zone` (`timestamptz`) for time columns.
 - The application passes UTC-aware datetimes directly to the DB driver.
 - Comparisons and ordering in SQL are done on instants in time.
 
-
 ## Naive vs aware rules
 - **Naive** datetime: no timezone info (`tzinfo=None`). Not allowed in API input.
 - **Aware** datetime: has timezone info. Required for API input and used for API output.
