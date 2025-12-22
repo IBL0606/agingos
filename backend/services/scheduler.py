@@ -5,7 +5,7 @@ import logging
 
 from datetime import datetime, timezone, timedelta
 
-from util.time import to_db_utc_naive
+from util.time import to_db_utc_naive, utcnow
 from services.rule_engine import evaluate_rules_for_scheduler
 from db import SessionLocal
 from config.rule_config import load_rule_config
@@ -142,7 +142,7 @@ def run_rule_engine_job():
     try:
         cfg = load_rule_config()
         subject_key = cfg.scheduler_default_subject_key()
-        now = datetime.now(timezone.utc)
+        now = utcnow()
         now_db = to_db_utc_naive(now, "now")
         devs = evaluate_rules_for_scheduler(db, now=now)
         logger.info(f"Scheduler run: computed {len(devs)} deviation(s)")

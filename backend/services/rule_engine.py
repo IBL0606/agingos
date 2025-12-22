@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta, timezone
 
+from util.time import utcnow
+
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger("rule_engine")
@@ -81,7 +83,7 @@ def evaluate_rules(
       - Liste med DeviationV1, aggregerte i registry-rekkefølge (rule_ids hvis gitt).
     """
     if now is None:
-        now = datetime.now(timezone.utc)
+        now = utcnow()
 
     selected = rule_ids or list(RULE_REGISTRY.keys())
 
@@ -111,7 +113,7 @@ def evaluate_rules_for_scheduler(
       - Liste med DeviationV1 (ingen persist her; kun beregning)
     """
     if now is None:
-        now = datetime.now(timezone.utc)
+        now = utcnow()
 
     cfg = load_rule_config()
 
