@@ -37,6 +37,22 @@ Dette steget implementerer en tynn vertikal slice:
 
 ## Avvik v1 (API-kontrakt)
 
+### Avvik-livssyklus (OPEN/ACK/CLOSED + expire)
+- Scheduler kan persistere avvik som `OPEN` når en regel trigger (for regler med `enabled_in_scheduler: true`).
+- Et `OPEN` avvik kan settes til `ACK` via API for å markere at det er sett, men avviket regnes fortsatt som aktivt.
+- Når regelen fortsatt trigger, oppdateres samme aktive avvik (OPEN/ACK) med ny `last_seen_at` og oppdatert kontekst/evidens.
+- Et aktivt avvik (`OPEN` eller `ACK`) lukkes automatisk som `CLOSED` når det ikke har blitt sett igjen innen `expire_after_minutes`.
+- Hvis regelen trigger igjen etter at avviket er `CLOSED`, opprettes en ny `OPEN` (ny episode).
+
+Eksempel (liste OPEN avvik):
+```bash
+curl -sS "http://localhost:8000/deviations?status=OPEN&subject_key=default&limit=50" | jq .
+```
+Eksempel (sortert severity først):
+```bash
+curl -sS "http://localhost:8000/deviations" | jq -r '.[] | "\(.severity) \(.last_seen_at) \(.status) \(.rule_id) \(.subject_key)"' | head
+```
+
 Felt:
 - `deviation_id` (UUID)
 - `rule_id` (f.eks. "R-001")

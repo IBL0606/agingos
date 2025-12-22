@@ -16,7 +16,12 @@ router = APIRouter(prefix="/deviations", tags=["deviations"])
 
 @router.get("")
 def list_deviations(db: Session = Depends(get_db)):
-    return db.query(Deviation).order_by(Deviation.last_seen_at.desc()).all()
+    return (
+        db.query(Deviation)
+        .order_by(Deviation.severity.desc(), Deviation.last_seen_at.desc())
+        .all()
+    )
+
 
 
 @router.patch("/{deviation_id}")

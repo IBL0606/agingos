@@ -3,6 +3,8 @@
 ## Formål
 Definerer minimumskontrakten for persisterte avvik (deviations) og hvordan systemet identifiserer “samme” aktive avvik over tid.
 
+**Status:** Avvik v1 er gjeldende; modellen ligger i `backend/models/deviation.py` og brukes av både API (`/deviations`) og scheduler.
+
 ## Deviation key-policy (aktivt avvik)
 Et **aktivt avvik** identifiseres av:
 - `rule_id` (FK til `rules.id`)
@@ -32,4 +34,21 @@ Kontrakten utvides senere med eksplisitt identifikator for bolig/enhet, f.eks.:
 
 Ved innføring av slike felter skal key-policy revurderes og versjoneres.
 
+## API: sortering for GET /deviations
+`GET /deviations` returnerer avvik sortert slik:
+
+1) **Primær:** `severity` synkende (HIGH > MEDIUM > LOW)
+2) **Sekundær:** `last_seen_at` synkende (nyeste først innen samme severity)
+
+### Eksempel (illustrativt)
+```json
+[
+  { "severity": 3, "last_seen_at": "2025-12-22T10:05:00Z", "status": "OPEN", "rule_id": 2, "subject_key": "default" },
+  { "severity": 2, "last_seen_at": "2025-12-22T10:04:00Z", "status": "ACK",  "rule_id": 1, "subject_key": "default" },
+  { "severity": 1, "last_seen_at": "2025-12-22T09:59:00Z", "status": "OPEN", "rule_id": 3, "subject_key": "default" }
+]
+```
+
 **Ekstra dokumentasjonssetning:** Kontrakt dokumenteres i `docs/contracts/deviation-v1.md`, mens begrunnelse/valg dokumenteres i `docs/adr/` og lenkes fra Master arbeidslogg.
+**Ekstra dokumentasjonssetning:** API-garantier (inkl. sortering) ligger i `docs/contracts/deviation-v1.md`, mens praktisk bruk (curl) ligger i `README.md`.
+
