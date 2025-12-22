@@ -20,11 +20,12 @@ Rejected examples:
 - `2025-12-22T10:00:00` (no timezone)
 
 ## Database note (current implementation)
-The current Postgres schema uses `timestamp without time zone` for time columns. To keep the system consistent while enforcing strict UTC at the API boundary:
-- Incoming UTC-aware timestamps are validated and then stored as **naive UTC** (timezone removed) in the database.
-- When reading from the database, naive timestamps are interpreted as **UTC**.
+Postgres uses `timestamp with time zone` (`timestamptz`) for time columns.
 
-This is a temporary adapter until the schema is migrated to `timestamp with time zone` (`timestamptz`).
+- The API receives and returns timezone-aware UTC timestamps.
+- The application passes UTC-aware datetimes directly to the DB driver.
+- Comparisons and ordering in SQL are done on instants in time.
+
 
 ## Naive vs aware rules
 - **Naive** datetime: no timezone info (`tzinfo=None`). Not allowed in API input.

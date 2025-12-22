@@ -17,7 +17,7 @@ from datetime import datetime
 from typing import Optional
 
 
-from util.time import to_db_utc_naive, from_db_utc_naive
+from util.time import require_utc_aware
 app = FastAPI(title="AgingOS Backend")
 app.include_router(rules_router)
 app.include_router(deviations_router)
@@ -35,7 +35,7 @@ def receive_event(event: Event):
     try:
         db_event = EventDB(
             event_id=str(event.id),
-            timestamp=to_db_utc_naive(event.timestamp, "timestamp"),
+            timestamp=event.timestamp,
             category=event.category,
             payload=event.payload,
         )
@@ -63,16 +63,16 @@ def list_events(
             query = query.filter(EventDB.category == category)
         if since:
             try:
-                since_db = to_db_utc_naive(since, "since")
+                since_utc = require_utc_aware(since, "since")
             except Exception as e:
                 raise HTTPException(status_code=400, detail=str(e))
-            query = query.filter(EventDB.timestamp >= since_db)
+            query = query.filter(EventDB.timestamp >= since_utc)
         if until:
             try:
-                until_db = to_db_utc_naive(until, "until")
+                until_utc = require_utc_aware(until, "until")
             except Exception as e:
                 raise HTTPException(status_code=400, detail=str(e))
-            query = query.filter(EventDB.timestamp < until_db)
+            query = query.filter(EventDB.timestamp < until_utc)
 
         rows = (
             query
@@ -84,7 +84,7 @@ def list_events(
         return [
             Event(
                 id=r.event_id,
-                timestamp=from_db_utc_naive(r.timestamp),
+                timestamp=r.timestamp,
                 category=r.category,
                 payload=r.payload,
             )

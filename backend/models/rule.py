@@ -2,7 +2,7 @@ import enum
 from datetime import datetime
 from sqlalchemy import Boolean, DateTime, Enum, Integer, String, JSON
 from sqlalchemy.orm import Mapped, mapped_column
-from util.time import utcnow_db
+from util.time import utcnow
 from models.db_event import Base
 
 class RuleType(str, enum.Enum):
@@ -25,5 +25,5 @@ class Rule(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
-        default=utcnow_db
+        default=utcnow
     )
