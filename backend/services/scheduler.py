@@ -56,9 +56,9 @@ def _upsert_open_deviation(
 ) -> None:
     existing = (
         db.query(Deviation)
-        .filter(Deviation.rule_id == rule_row.id)
+        .filter(Deviation.rule_id == rule_row.id)   
         .filter(Deviation.subject_key == subject_key)
-        .filter(Deviation.status == DeviationStatus.OPEN)
+        .filter(Deviation.status.in_([DeviationStatus.OPEN, DeviationStatus.ACK]))
         .one_or_none()
     )
 
