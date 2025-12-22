@@ -48,6 +48,10 @@ Eksempel (liste OPEN avvik):
 ```bash
 curl -sS "http://localhost:8000/deviations?status=OPEN&subject_key=default&limit=50" | jq .
 ```
+Eksempel (sortert severity først):
+```bash
+curl -sS "http://localhost:8000/deviations" | jq -r '.[] | "\(.severity) \(.last_seen_at) \(.status) \(.rule_id) \(.subject_key)"' | head
+```
 
 Felt:
 - `deviation_id` (UUID)
