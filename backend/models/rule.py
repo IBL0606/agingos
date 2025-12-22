@@ -22,8 +22,7 @@ class Rule(Base):
 
     params: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     severity: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime,
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
         nullable=False,
         default=utcnow
     )

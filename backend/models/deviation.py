@@ -29,14 +29,12 @@ class Deviation(Base):
 
     severity: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
 
-    started_at: Mapped[datetime] = mapped_column(
-        DateTime,
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
         nullable=False,
         default=utcnow
     )
 
-    last_seen_at: Mapped[datetime] = mapped_column(
-        DateTime,
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
         nullable=False,
         default=utcnow
     )
