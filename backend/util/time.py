@@ -36,6 +36,11 @@ def from_db_utc_naive(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc)
+
+def utcnow() -> datetime:
+    """Returns timezone-aware UTC now (used for now-injection in tests)."""
+    return datetime.now(timezone.utc)
+
 def utcnow_db() -> datetime:
     """
     Returns "now" as naive UTC for writing into DB columns that are

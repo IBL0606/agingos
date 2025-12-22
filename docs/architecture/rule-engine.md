@@ -34,6 +34,10 @@ Rule engine og alle regler følger vinduskontrakt **[since, until)**:
 
 Dette sikrer deterministisk grensesnitt og unngår “dobbeltelling” når man evaluerer tilstøtende vinduer.
 
+## Now-injection (determinisme)
+For deterministiske tester og simulering brukes en felles “now provider” (`utcnow()`), slik at “nå” kan kontrolleres i test.
+Se: `docs/testing/determinism.md`.
+
 ## Hvordan registry fungerer
 Registry inneholder mapping fra `rule_id` (f.eks. "R-002") til eval-funksjon for regelen.
 Rule engine bruker registry til å kalle hver regel med standardisert signatur (db, since, until, now).

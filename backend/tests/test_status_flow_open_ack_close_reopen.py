@@ -34,7 +34,8 @@ def test_status_flow_open_ack_stale_close_trigger_reopens():
 
         # Given: en regel finnes, og et aktivt OPEN avvik finnes i DB
         rule_row = _ensure_rule(db, rule_key)
-        now = datetime.now(timezone.utc)
+        from util.time import utcnow
+        now = utcnow()
 
         dev = Deviation(
             rule_id=rule_row.id,
