@@ -1,0 +1,22 @@
+# Purpose: Anti-regression: R-003 skal IKKE trigge når det finnes motion=on i follow-up vinduet etter front door open.
+# Rules covered: R-003 (negative test), samt støy/overlapp.
+# Catalog: docs/testing/scenario-catalog.md
+# Anti-regression: Sikrer at motion innen follow-up forhindrer falsk R-003.
+
+id: sc_r003_no_trigger_with_motion_followup
+description: "Anti-regression: motion=on i follow-up skal forhindre R-003"
+events:
+  - id: "44444444-4444-4444-4444-444444444444"
+    timestamp: "2025-12-23T12:00:00Z"
+    category: "door"
+    payload: { name: "front", state: "open" }
+  - id: "55555555-5555-5555-5555-555555555555"
+    timestamp: "2025-12-23T12:03:00Z"
+    category: "motion"
+    payload: { state: "on" }
+evaluate:
+  since: "2025-12-23T11:55:00Z"
+  until: "2025-12-23T12:20:00Z"
+expect:
+  pass_condition: exact
+  deviations: []

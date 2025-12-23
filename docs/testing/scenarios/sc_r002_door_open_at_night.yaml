@@ -1,0 +1,29 @@
+# Purpose: Verifiserer at R-002 trigges når en door-event med state=open skjer i nattetid.
+# Rules covered: R-002
+# Catalog: docs/testing/scenario-catalog.md
+# Edge cases: Evidence i R-002 er "best effort" og kan være tom (DB id er ikke UUID), derfor matcher vi ikke evidence her.
+
+id: sc_r002_door_open_at_night
+description: "R-002: Ytterdør åpnet på natt skal gi avvik"
+events:
+  - id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    timestamp: "2025-12-23T23:10:00Z"
+    category: "motion"
+    payload: {}
+  - id: "22222222-2222-2222-2222-222222222222"
+    timestamp: "2025-12-23T23:30:00Z"
+    category: "door"
+    payload: { state: "open" }
+evaluate:
+  since: "2025-12-23T23:00:00Z"
+  until: "2025-12-24T00:00:00Z"
+expect:
+  pass_condition: contains
+  deviations:
+    - rule_id: "R-002"
+      severity: "HIGH"
+      title: "Ytterdør åpnet på natt"
+      explanation_contains: "ytterdør"
+      window:
+        since: "2025-12-23T23:00:00Z"
+        until: "2025-12-24T00:00:00Z"

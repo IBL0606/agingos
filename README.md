@@ -7,6 +7,23 @@
 
 ---
 
+## Testing / Scenario
+
+Scenario-formatet er en **kontrakt for testing** og brukes av scenario runneren til å poste events og verifisere beregnede avvik via `GET /deviations/evaluate`.
+
+- Format (schema + eksempler): `docs/testing/scenario-format.md`
+
+Kjør scenario smoke-test:
+```bash
+make scenario
+``` 
+Kjør et spesifikt scenario (YAML/JSON):
+
+./examples/scripts/scenario_runner.py docs/testing/scenarios/<filnavn>.yaml
+
+Longrun-simulering (runbook): `docs/ops/longrun-sim.md`
+
+
 ## AgingOS – Sim-baseline: Regler R-001–R-003 + Avvik v1
 
 Dette steget implementerer en tynn vertikal slice:

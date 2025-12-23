@@ -1,0 +1,22 @@
+# Purpose: Anti-regression: R-002 skal IKKE trigge når door åpnes utenfor nattvinduet.
+# Rules covered: R-002 (negative test)
+# Catalog: docs/testing/scenario-catalog.md
+# Anti-regression: Sikrer at dagtid door-open ikke feilaktig gir R-002.
+
+id: sc_r002_no_trigger_daytime
+description: "Anti-regression: door open på dagtid skal ikke gi R-002"
+events:
+  - id: "66666666-6666-6666-6666-666666666666"
+    timestamp: "2025-12-23T12:01:00Z"
+    category: "motion"
+    payload: {}
+  - id: "77777777-7777-7777-7777-777777777777"
+    timestamp: "2025-12-23T12:02:00Z"
+    category: "door"
+    payload: { state: "open" }
+evaluate:
+  since: "2025-12-23T12:00:00Z"
+  until: "2025-12-23T12:10:00Z"
+expect:
+  pass_condition: exact
+  deviations: []

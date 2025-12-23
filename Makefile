@@ -16,7 +16,15 @@ smoke:
 statusflow:
 	PYTHONPATH=backend DATABASE_URL="postgresql://agingos:agingos@localhost:5432/agingos" $(PYTHON) -m pytest -q backend/tests/test_status_flow_open_ack_close_reopen.py
 
+.PHONY: scenario-reset
 
+scenario-reset:
+	docker compose exec db psql -U agingos -d agingos -c "TRUNCATE TABLE events, deviations_v1, deviations RESTART IDENTITY CASCADE;"
+
+.PHONY: scenario
+
+scenario:
+	./examples/scripts/scenario_runner.py docs/testing/scenarios/sc_empty_no_devs.yaml
 
 help:
 	@echo "Targets:"
