@@ -1,0 +1,20 @@
+# Purpose: Verifiserer at R-001 trigges når det ikke finnes motion-events i evalueringsvinduet.
+# Rules covered: R-001
+# Catalog: docs/testing/scenario-catalog.md
+
+id: sc_r001_no_motion
+description: "R-001: Ingen motion i vinduet skal gi avvik"
+events: []
+evaluate:
+  since: "2025-12-23T10:00:00Z"
+  until: "2025-12-23T10:05:00Z"
+expect:
+  pass_condition: contains
+  deviations:
+    - rule_id: "R-001"
+      severity: "MEDIUM"
+      title: "Ingen bevegelse registrert i valgt tidsvindu"
+      evidence_contains: []
+      window:
+        since: "2025-12-23T10:00:00Z"
+        until: "2025-12-23T10:05:00Z"
