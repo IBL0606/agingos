@@ -12,6 +12,7 @@ from services.rule_engine import evaluate_rules
 
 from schemas.deviation_v1 import DeviationV1
 from util.time import require_utc_aware, utcnow
+
 router = APIRouter(prefix="/deviations", tags=["deviations"])
 
 
@@ -22,7 +23,6 @@ def list_deviations(db: Session = Depends(get_db)):
         .order_by(Deviation.severity.desc(), Deviation.last_seen_at.desc())
         .all()
     )
-
 
 
 @router.patch("/{deviation_id}")

@@ -5,12 +5,15 @@ from db import get_db
 
 router = APIRouter(prefix="/rules", tags=["rules"])
 
+
 @router.get("")
 def list_rules(db: Session = Depends(get_db)):
     return db.query(Rule).order_by(Rule.id.desc()).all()
 
+
 from fastapi import HTTPException
 from models.rule import RuleType
+
 
 @router.post("")
 def create_rule(payload: dict, db: Session = Depends(get_db)):

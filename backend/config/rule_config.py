@@ -38,10 +38,10 @@ class RuleConfig:
             except Exception:
                 pass
         return self.defaults_lookback_minutes()
-    
+
     def defaults_expire_after_minutes(self) -> int:
         return int(self.data.get("defaults", {}).get("expire_after_minutes", 60))
-    
+
     def rule_expire_after_minutes(self, rule_id: str) -> int:
         rule = self.data.get("rules", {}).get(rule_id, {})
         if "expire_after_minutes" in rule:

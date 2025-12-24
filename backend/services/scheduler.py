@@ -28,7 +28,9 @@ def _severity_str_to_int(s: str) -> int:
     return 2
 
 
-def _get_or_create_rule_row(db: SessionLocal.__annotations__.get("return", object), rule_key: str) -> Rule:
+def _get_or_create_rule_row(
+    db: SessionLocal.__annotations__.get("return", object), rule_key: str
+) -> Rule:
     # Vi bruker Rule.name som string-key ("R-002", osv.) og mapper til FK via Rule.id.
     existing = db.query(Rule).filter(Rule.name == rule_key).one_or_none()
     if existing:
@@ -153,7 +155,13 @@ def run_rule_engine_job():
             rule_key = dct["rule_id"]
 
             rule_row = _get_or_create_rule_row(db, rule_key=rule_key)
-            _upsert_open_deviation(db, rule_row=rule_row, subject_key=subject_key, now=now, deviation_v1=dct)
+            _upsert_open_deviation(
+                db,
+                rule_row=rule_row,
+                subject_key=subject_key,
+                now=now,
+                deviation_v1=dct,
+            )
 
         closed = _close_stale_deviations(db, subject_key=subject_key, now=now)
         if closed:

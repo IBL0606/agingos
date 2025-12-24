@@ -34,6 +34,7 @@ class RuleSpec:
     - eval_fn: funksjon som evaluerer regelen og returnerer en liste med DeviationV1
     - description: kort menneskelig beskrivelse (for docs/feilsøking)
     """
+
     rule_id: str
     eval_fn: Callable[[Session, datetime, datetime, datetime], List[DeviationV1]]
     description: str
@@ -133,10 +134,10 @@ def evaluate_rules_for_scheduler(
     return devs
 
 
-
 # ---------------------------------------------------------------------------
 # Backward compatibility
 # ---------------------------------------------------------------------------
+
 
 def run_rules(db: Session, now: datetime | None = None) -> list[DeviationV1]:
     """
@@ -150,4 +151,3 @@ def run_rules(db: Session, now: datetime | None = None) -> list[DeviationV1]:
       - Liste med beregnede DeviationV1 for scheduler-enabled regler (enabled_in_scheduler=true).
     """
     return evaluate_rules_for_scheduler(db, now=now)
-

@@ -5,6 +5,7 @@ Revises: 32bf5b5e9e5f
 Create Date: 2025-12-22 21:13:28.133312
 
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -12,8 +13,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '06a6a5dc2ab1'
-down_revision: Union[str, None] = '32bf5b5e9e5f'
+revision: str = "06a6a5dc2ab1"
+down_revision: Union[str, None] = "32bf5b5e9e5f"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -68,4 +69,3 @@ def downgrade() -> None:
         ALTER COLUMN created_at TYPE timestamp without time zone
         USING (created_at AT TIME ZONE 'UTC');
     """)
-

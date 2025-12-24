@@ -1,5 +1,6 @@
 import os
-#backend/main.py
+
+# backend/main.py
 from fastapi import FastAPI, HTTPException
 from typing import List
 
@@ -18,11 +19,13 @@ from typing import Optional
 
 
 from util.time import require_utc_aware
+
 app = FastAPI(title="AgingOS Backend")
 app.include_router(rules_router)
 app.include_router(deviations_router)
 
 Base.metadata.create_all(bind=engine)
+
 
 @app.get("/health")
 def health():
@@ -45,7 +48,6 @@ def receive_event(event: Event):
         db.close()
 
     return {"received": True}
-
 
 
 @app.get("/events")
@@ -74,12 +76,7 @@ def list_events(
                 raise HTTPException(status_code=400, detail=str(e))
             query = query.filter(EventDB.timestamp < until_utc)
 
-        rows = (
-            query
-            .order_by(EventDB.timestamp.desc())
-            .limit(limit)
-            .all()
-        )
+        rows = query.order_by(EventDB.timestamp.desc()).limit(limit).all()
 
         return [
             Event(
@@ -94,8 +91,6 @@ def list_events(
         db.close()
 
 
-
-
 @app.on_event("startup")
 def on_startup():
     if os.getenv("SCHEDULER_ENABLED", "1").lower() in ("0", "false", "no", "off"):
@@ -105,6 +100,8 @@ def on_startup():
     setup_scheduler()
     if not scheduler.running:
         scheduler.start()
+
+
 @app.on_event("shutdown")
 def on_shutdown():
     scheduler.shutdown()
