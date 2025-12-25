@@ -7,7 +7,10 @@ from models.db_event import EventDB
 
 RULE_ID = "R-001"
 
-def eval_r001_no_motion(session: Session, since: datetime, until: datetime, now: datetime) -> List[DeviationV1]:
+
+def eval_r001_no_motion(
+    session: Session, since: datetime, until: datetime, now: datetime
+) -> List[DeviationV1]:
     rows = (
         session.query(EventDB)
         .filter(EventDB.timestamp >= since)

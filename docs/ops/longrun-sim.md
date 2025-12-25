@@ -65,7 +65,7 @@ Eksempel på enkle observasjonskommandoer:
 docker compose exec db psql -U agingos -d agingos -c "select count(*) from events;"
 docker compose exec db psql -U agingos -d agingos -c "select count(*) from deviations_v1;"
 docker compose exec db psql -U agingos -d agingos -c "select count(*) from deviations;"
-``` 
+```
 ### Scheduler-cadence (dersom scheduler er aktiv)
 - Loggene viser periodisk evaluering uten error-spam.
 - Avvik opprettes/oppdateres i forventet takt i tråd med regler og lookback.
@@ -78,7 +78,7 @@ Eksempler på “sunn kjøring” (illustrativt):
 
 (Erstatt gjerne med faktiske logglinjer fra ditt miljø når de er verifisert.)
 
-Stoppkriterier (hvis noe går galt)
+## Stoppkriterier (hvis noe går galt)
 
 ### Stopp kjøringen og feilsøk hvis ett eller flere av disse inntreffer:
 

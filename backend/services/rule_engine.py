@@ -1,21 +1,14 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from util.time import utcnow
 
 from sqlalchemy.orm import Session
 
-logger = logging.getLogger("rule_engine")
-
-
-# ---------------------------------------------------------------------------
-# Thin-slice rule engine (registry) - én sannhet for beregning av avvik (Avvik v1)
-# ---------------------------------------------------------------------------
-
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List
 
 from config.rule_config import load_rule_config
 from schemas.deviation_v1 import DeviationV1
@@ -23,6 +16,13 @@ from schemas.deviation_v1 import DeviationV1
 from services.rules.r001 import eval_r001_no_motion
 from services.rules.r002 import eval_r002_front_door_open_at_night
 from services.rules.r003 import eval_r003_front_door_open_no_motion_after
+
+logger = logging.getLogger("rule_engine")
+
+
+# ---------------------------------------------------------------------------
+# Thin-slice rule engine (registry) - én sannhet for beregning av avvik (Avvik v1)
+# ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
@@ -34,6 +34,7 @@ class RuleSpec:
     - eval_fn: funksjon som evaluerer regelen og returnerer en liste med DeviationV1
     - description: kort menneskelig beskrivelse (for docs/feilsøking)
     """
+
     rule_id: str
     eval_fn: Callable[[Session, datetime, datetime, datetime], List[DeviationV1]]
     description: str
@@ -133,10 +134,10 @@ def evaluate_rules_for_scheduler(
     return devs
 
 
-
 # ---------------------------------------------------------------------------
 # Backward compatibility
 # ---------------------------------------------------------------------------
+
 
 def run_rules(db: Session, now: datetime | None = None) -> list[DeviationV1]:
     """
@@ -150,4 +151,3 @@ def run_rules(db: Session, now: datetime | None = None) -> list[DeviationV1]:
       - Liste med beregnede DeviationV1 for scheduler-enabled regler (enabled_in_scheduler=true).
     """
     return evaluate_rules_for_scheduler(db, now=now)
-

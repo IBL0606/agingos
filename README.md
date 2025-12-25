@@ -1,5 +1,8 @@
 # AgingOS — dokumentasjon, struktur og kode
 
+[![CI](https://github.com/IBL0606/agingos/actions/workflows/ci.yml/badge.svg?event=push)](https://github.com/IBL0606/agingos/actions/workflows/ci.yml)
+
+
 ## Quick verification (Smoke test)
 1. `make up` (evt `docker compose up -d --build`)
 2. `make smoke` (evt `./examples/scripts/smoke_test.sh`)
@@ -22,6 +25,22 @@ Kjør et spesifikt scenario (YAML/JSON):
 ./examples/scripts/scenario_runner.py docs/testing/scenarios/<filnavn>.yaml
 
 Longrun-simulering (runbook): `docs/ops/longrun-sim.md`
+
+## Lint/format (lokalt)
+
+Formatter:
+- `ruff format .`
+
+Formatter-check (samme som CI):
+- `ruff format --check .`
+
+Lint:
+- `ruff check .`
+
+Lint med auto-fix (der det er trygt):
+- `ruff check --fix .`
+
+Ekstra dokumentasjonssetning: Kommandoer dokumenteres i README, mens rationale/valg fremgår av kommentarer i config og evt. kort notat i Master arbeidslogg når innført.
 
 
 ## AgingOS – Sim-baseline: Regler R-001–R-003 + Avvik v1
@@ -105,7 +124,7 @@ En event som skjer eksakt på `until` teller ikke med i dette vinduet.
 ### Helse
 ```bash
 curl -s http://localhost:8000/health
-
+```
 
 ## Konfigurasjon: regler (rule-config)
 
@@ -147,3 +166,12 @@ curl -sS "http://localhost:8000/deviations/evaluate?since=2025-12-22T10:00:00Z&u
 ```
 
 Ekstra dokumentasjonssetning: Policy ligger i `docs/policies/time-and-timezone.md`, kontraktkrav i `docs/contracts/event-v1.md`, og praktisk feilsøking i `README.md`.
+
+## CI (GitHub Actions)
+
+Repoet kjører CI på hver push og pull request:
+
+- Lint/format (fail fast): `ruff format --check` og `ruff check`
+- Docker-baserte tester: `make up` → `make smoke` → `make scenario` → `make down`
+
+Daglig “hvordan lese CI” ligger i README.md, mens feilsøking og detaljer ligger i docs/ops/ci.md.

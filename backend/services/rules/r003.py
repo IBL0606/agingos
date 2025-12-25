@@ -96,7 +96,7 @@ def eval_r003_front_door_open_no_motion_after(
             title="Mulig uvanlig hendelse etter dør",
             explanation=(
                 f"Døren ble åpnet, men systemet registrerte ingen bevegelse i de neste {follow_minutes} minuttene. "
-                    "Det kan være at personen gikk ut, falt, eller at sensorer ikke registrerte aktivitet."
+                "Det kan være at personen gikk ut, falt, eller at sensorer ikke registrerte aktivitet."
             ),
             evidence=evidence,  # kan være tom
             window=Window(since=since, until=until),
