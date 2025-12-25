@@ -3,7 +3,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 import logging
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 
 from util.time import utcnow
 from services.rule_engine import evaluate_rules_for_scheduler

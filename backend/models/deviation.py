@@ -2,7 +2,7 @@
 import enum
 from datetime import datetime
 from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, JSON, Index
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 from util.time import utcnow
 from models.db_event import Base
 

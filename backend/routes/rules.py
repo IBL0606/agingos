@@ -3,16 +3,15 @@ from sqlalchemy.orm import Session
 from models.rule import Rule
 from db import get_db
 
+from fastapi import HTTPException
+from models.rule import RuleType
+
 router = APIRouter(prefix="/rules", tags=["rules"])
 
 
 @router.get("")
 def list_rules(db: Session = Depends(get_db)):
     return db.query(Rule).order_by(Rule.id.desc()).all()
-
-
-from fastapi import HTTPException
-from models.rule import RuleType
 
 
 @router.post("")

@@ -6,7 +6,7 @@ Scenario navn: "status_flow_open_ack_close_reopen"
 Given/When/Then er skrevet eksplisitt i testen for å gjøre livssyklusreglene etterprøvbare.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 from backend.db import SessionLocal
 from backend.models.rule import Rule, RuleType

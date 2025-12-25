@@ -2,7 +2,6 @@ import os
 
 # backend/main.py
 from fastapi import FastAPI, HTTPException
-from typing import List
 
 from db import SessionLocal, Base, engine
 from models.event import Event
