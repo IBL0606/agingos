@@ -24,7 +24,6 @@ app.include_router(rules_router)
 app.include_router(deviations_router)
 
 
-
 @app.get("/health")
 def health():
     return {"status": "ok"}
