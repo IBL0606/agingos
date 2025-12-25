@@ -60,6 +60,43 @@ Juster:
 - `scheduler.interval_minutes` i `backend/config/rules.yaml`
 Restart backend for at ny verdi skal tas i bruk.
 
+## Failure modes (minimum) og forventet oppførsel
+
+1) DB utilgjengelig
+- Symptomer: connect timeout, auth-feil, “could not connect”
+- Forventet oppførsel:
+  - Logg `ERROR` på run-nivå (f.eks. `event=scheduler_run_end`) med `error`-detaljer
+  - Run avsluttes tidlig, neste run prøver igjen ved neste intervall
+
+2) Enkeltregel/persist-feil (error isolation)
+- Symptomer: exception ved upsert/persist for én regel/ett avvik
+- Forventet oppførsel:
+  - Logg `ERROR` med `event=scheduler_rule_error` og `rule_id`
+  - Fortsett med neste element i samme run (ikke stopp hele scheduler-run)
+
+3) Konfigurasjonsfeil
+- Symptomer: manglende/ugyldige config-verdier (f.eks. `scheduler.interval_minutes`)
+- Forventet oppførsel:
+  - Logg `ERROR` med tydelig hvilke felt som er ugyldige
+  - Run avsluttes, og vil fortsette å feile til config er rettet
+
+4) Tid/UTC-feil
+- Symptomer: naive timestamps, parsing-feil, eller uventede tidsverdier
+- Forventet oppførsel:
+  - Logg `ERROR` på run-nivå med `error`-detaljer
+  - Run avsluttes, neste run prøver igjen
+
+## Operasjonelle tellere (minstekrav)
+Per scheduler-run skal følgende summeres og logges:
+- `rules_total`
+- `rules_ok`
+- `rules_failed`
+- `deviations_upserted`
+- `deviations_closed`
+
+## Incident note template (feltpilot)
+Bruk `docs/ops/incident-template.md` som minimumsformat.
+
 ## Konfigurasjon
 - `backend/config/rules.yaml` (source of truth for intervall og rule enablement)
 - `backend/config/rule_config.py` (lesing av config)

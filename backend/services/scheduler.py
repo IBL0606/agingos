@@ -1,21 +1,71 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
+import json
 import logging
+import sys
+import time
+import traceback
+import uuid
 
 from datetime import datetime, timedelta
+from typing import Any
 
 from util.time import utcnow
-from services.rule_engine import evaluate_rules_for_scheduler
 from db import SessionLocal
+from services.rule_engine import RULE_REGISTRY
 from config.rule_config import load_rule_config
 
 from models.rule import Rule, RuleType
 from models.deviation import Deviation, DeviationStatus
 
+
 scheduler = BackgroundScheduler()
 
 logger = logging.getLogger("scheduler")
+
+# Ensure JSONL (message-only) output for this logger, without duplicate propagation.
+if not logger.handlers:
+    _h = logging.StreamHandler(sys.stdout)
+    _h.setFormatter(logging.Formatter("%(message)s"))
+    logger.addHandler(_h)
+logger.setLevel(logging.INFO)
+logger.propagate = False
+
+
+def _utc_iso(dt: datetime) -> str:
+    # Expecting aware UTC datetimes from utcnow(); keep a stable "Z" format.
+    s = dt.isoformat()
+    return s.replace("+00:00", "Z")
+
+
+def _log_event(
+    *,
+    level: str,
+    event: str,
+    run_id: str,
+    msg: str,
+    **fields: Any,
+) -> None:
+    payload: dict[str, Any] = {
+        "ts": _utc_iso(utcnow()),
+        "level": level,
+        "component": "scheduler",
+        "event": event,
+        "run_id": run_id,
+        "msg": msg,
+    }
+    payload.update(fields)
+
+    line = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+    lvl = (level or "").upper()
+    if lvl == "ERROR":
+        logger.error(line)
+    elif lvl == "WARN" or lvl == "WARNING":
+        logger.warning(line)
+    else:
+        logger.info(line)
 
 
 def _severity_str_to_int(s: str) -> int:
@@ -140,34 +190,152 @@ def _close_stale_deviations(
 
 
 def run_rule_engine_job():
+    run_id = str(uuid.uuid4())
+    t0 = time.monotonic()
+
     db = SessionLocal()
     try:
         cfg = load_rule_config()
+        interval_minutes = cfg.scheduler_interval_minutes()
         subject_key = cfg.scheduler_default_subject_key()
+
         now = utcnow()
-        devs = evaluate_rules_for_scheduler(db, now=now)
-        logger.info(f"Scheduler run: computed {len(devs)} deviation(s)")
+        until = now
+        since = now - timedelta(minutes=interval_minutes)
 
-        # Persist: upsert OPEN/ACK deviation per (rule_key, subject_key)
-        for d in devs:
-            # d er DeviationV1 (pydantic). Vi jobber med dict for JSON-feltene i DB.
-            dct = d.model_dump(mode="json")
-            rule_key = dct["rule_id"]
+        _log_event(
+            level="INFO",
+            event="scheduler_run_start",
+            run_id=run_id,
+            msg="scheduler run started",
+            interval_minutes=interval_minutes,
+            since=_utc_iso(since),
+            until=_utc_iso(until),
+        )
 
-            rule_row = _get_or_create_rule_row(db, rule_key=rule_key)
-            _upsert_open_deviation(
-                db,
-                rule_row=rule_row,
+
+        # Finn hvilke regler som faktisk kjøres av scheduler (enabled_in_scheduler=true)
+        enabled_rule_ids = [
+            rid for rid in RULE_REGISTRY.keys() if cfg.rule_enabled_in_scheduler(rid)
+        ]
+
+        deviations_upserted = 0
+
+
+        for rid in enabled_rule_ids:
+            t_rule0 = time.monotonic()
+
+            lookback = cfg.rule_lookback_minutes(rid)
+            r_since = now - timedelta(minutes=lookback)
+            r_until = now
+
+            _log_event(
+                level="INFO",
+                event="scheduler_rule_start",
+                run_id=run_id,
+                msg="rule evaluation started",
+                rule_id=rid,
                 subject_key=subject_key,
-                now=now,
-                deviation_v1=dct,
+                since=_utc_iso(r_since),
+                until=_utc_iso(r_until),
             )
 
+            try:
+                upserted_for_rule = 0
+
+                with db.begin_nested():
+                    spec = RULE_REGISTRY[rid]
+                    rule_devs = spec.eval_fn(db, since=r_since, until=r_until, now=now)
+
+                    # Persist alle avvik fra regelen (kan være 0..N)
+                    rule_row = _get_or_create_rule_row(db, rule_key=rid)
+
+                    for d in rule_devs:
+                        dct = d.model_dump(mode="json")
+                        _upsert_open_deviation(
+                            db,
+                            rule_row=rule_row,
+                            subject_key=subject_key,
+                            now=now,
+                            deviation_v1=dct,
+                        )
+                        upserted_for_rule += 1
+
+                deviations_upserted += upserted_for_rule
+                rules_ok += 1
+
+                duration_ms = int((time.monotonic() - t_rule0) * 1000)
+
+                _log_event(
+                    level="INFO",
+                    event="scheduler_rule_result",
+                    run_id=run_id,
+                    msg="rule evaluation finished",
+                    rule_id=rid,
+                    duration_ms=duration_ms,
+                    counts={
+                        "evaluated": 1,
+                        "deviations_upserted": upserted_for_rule,
+                        "deviations_closed": 0,
+                    },
+                )
+            except Exception as e:
+                rules_failed += 1
+                duration_ms = int((time.monotonic() - t_rule0) * 1000)
+
+                _log_event(
+                    level="ERROR",
+                    event="scheduler_rule_error",
+                    run_id=run_id,
+                    msg="rule evaluation failed",
+                    rule_id=rid,
+                    subject_key=subject_key,
+                    duration_ms=duration_ms,
+                    error={
+                        "type": type(e).__name__,
+                        "message": str(e),
+                        "stacktrace": traceback.format_exc(),
+                    },
+                )
+                continue
+
         closed = _close_stale_deviations(db, subject_key=subject_key, now=now)
-        if closed:
-            logger.info(f"Scheduler run: closed {closed} stale deviation(s)")
 
         db.commit()
+
+
+        duration_ms = int((time.monotonic() - t0) * 1000)
+
+        _log_event(
+            level="INFO",
+            event="scheduler_run_end",
+            run_id=run_id,
+            msg="scheduler run finished",
+            duration_ms=duration_ms,
+            counts={
+                "rules_total": rules_total,
+                "rules_ok": rules_ok,
+                "rules_failed": rules_failed,
+                "deviations_upserted": deviations_upserted,
+                "deviations_closed": closed,
+            },
+        )
+
+    except Exception as e:
+        db.rollback()
+        duration_ms = int((time.monotonic() - t0) * 1000)
+        _log_event(
+            level="ERROR",
+            event="scheduler_run_end",
+            run_id=run_id,
+            msg="scheduler run failed",
+            duration_ms=duration_ms,
+            error={
+                "type": type(e).__name__,
+                "message": str(e),
+                "stacktrace": traceback.format_exc(),
+            },
+        )
     finally:
         db.close()
 
@@ -175,7 +343,16 @@ def run_rule_engine_job():
 def setup_scheduler():
     cfg = load_rule_config()
     interval_minutes = cfg.scheduler_interval_minutes()
-    logger.info(f"Scheduler configured: interval_minutes={interval_minutes}")
+
+    # This is still useful on startup.
+    run_id = "startup"
+    _log_event(
+        level="INFO",
+        event="scheduler_configured",
+        run_id=run_id,
+        msg="scheduler configured",
+        interval_minutes=interval_minutes,
+    )
 
     scheduler.add_job(
         run_rule_engine_job,

@@ -10,6 +10,28 @@
 
 ---
 
+## Logs (hvor finner jeg logs)
+All runtime-logg går til container stdout/stderr.
+
+Se logg for alle services:
+```bash
+docker compose logs -f
+```
+
+Se logg for backend (API + scheduler):
+```bash
+docker compose logs -f backend
+```
+
+Tips:
+- Filtrer på `run_id` for å se én scheduler-kjøring ende-til-ende.
+- Loggkontrakt og felter er dokumentert i docs/ops/logging.md.
+- Scheduler failure modes og incident-template: `docs/ops/scheduler.md` og `docs/ops/incident-template.md`.
+
+Ekstra dokumentasjonssetning: Loggkontrakt og felt dokumenteres i docs/ops/logging.md, mens “hvor finner jeg logs” dokumenteres i README.
+
+---
+
 ## Testing / Scenario
 
 Scenario-formatet er en **kontrakt for testing** og brukes av scenario runneren til å poste events og verifisere beregnede avvik via `GET /deviations/evaluate`.
