@@ -23,7 +23,6 @@ app = FastAPI(title="AgingOS Backend")
 app.include_router(rules_router)
 app.include_router(deviations_router)
 
-Base.metadata.create_all(bind=engine)
 
 
 @app.get("/health")

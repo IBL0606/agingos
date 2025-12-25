@@ -29,7 +29,9 @@ statusflow:
 .PHONY: scenario-reset
 
 scenario-reset:
-	docker compose exec db psql -U agingos -d agingos -c "TRUNCATE TABLE events, deviations_v1, deviations RESTART IDENTITY CASCADE;"
+	docker compose exec -T db psql -U agingos -d agingos -c "TRUNCATE TABLE events RESTART IDENTITY CASCADE;" >/dev/null 2>&1 || true
+	docker compose exec -T db psql -U agingos -d agingos -c "TRUNCATE TABLE deviations_v1 RESTART IDENTITY CASCADE;" >/dev/null 2>&1 || true
+	docker compose exec -T db psql -U agingos -d agingos -c "TRUNCATE TABLE deviations RESTART IDENTITY CASCADE;" >/dev/null 2>&1 || true
 
 .PHONY: scenario
 
