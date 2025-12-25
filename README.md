@@ -26,6 +26,22 @@ Kjør et spesifikt scenario (YAML/JSON):
 
 Longrun-simulering (runbook): `docs/ops/longrun-sim.md`
 
+## Lint/format (lokalt)
+
+Formatter:
+- `ruff format .`
+
+Formatter-check (samme som CI):
+- `ruff format --check .`
+
+Lint:
+- `ruff check .`
+
+Lint med auto-fix (der det er trygt):
+- `ruff check --fix .`
+
+Ekstra dokumentasjonssetning: Kommandoer dokumenteres i README, mens rationale/valg fremgår av kommentarer i config og evt. kort notat i Master arbeidslogg når innført.
+
 
 ## AgingOS – Sim-baseline: Regler R-001–R-003 + Avvik v1
 
