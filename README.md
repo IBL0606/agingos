@@ -24,6 +24,30 @@ Detaljer, verifikasjon og feilsøking: `docs/ops/backup-restore.md`.
 
 Ekstra dokumentasjonssetning: Kommandoer og “happy path” ligger i README, mens detaljer/feilsøking ligger i `docs/ops/backup-restore.md`.
 
+## Retention (data retention policy)
+
+Default retention (minstekrav) er dokumentert i: `docs/policies/retention.md`.
+
+- `events`: beholdes i **30 dager**
+- `deviations`: beholdes i **180 dager** (typisk kun historikk; aktive OPEN/ACK skal ikke slettes)
+
+**Status:** Policy er dokumentert, men det finnes ikke en automatisk “retention job” i denne repo-versjonen. Sletting gjøres manuelt ved behov.
+
+Manuell sletting (eksempler):
+```bash
+# Slett events eldre enn 30 dager
+docker compose exec -T db psql -U agingos -d agingos -c \
+"DELETE FROM events WHERE timestamp < (NOW() AT TIME ZONE 'utc') - INTERVAL '30 days';"
+
+# Slett CLOSED deviations eldre enn 180 dager (beholder OPEN/ACK)
+docker compose exec -T db psql -U agingos -d agingos -c \
+"DELETE FROM deviations WHERE status = 'CLOSED' AND last_seen_at < (NOW() AT TIME ZONE 'utc') - INTERVAL '180 days';"
+```
+
+Ekstra dokumentasjonssetning: Default retention og hvordan man sletter manuelt dokumenteres i README, mens policy/rationale og endringer dokumenteres i `docs/policies/retention.md`.
+
+---
+
 ## Logs (hvor finner jeg logs)
 All runtime-logg går til container stdout/stderr.
 
