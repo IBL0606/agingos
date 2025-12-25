@@ -213,14 +213,15 @@ def run_rule_engine_job():
             until=_utc_iso(until),
         )
 
-
         # Finn hvilke regler som faktisk kjøres av scheduler (enabled_in_scheduler=true)
         enabled_rule_ids = [
             rid for rid in RULE_REGISTRY.keys() if cfg.rule_enabled_in_scheduler(rid)
         ]
 
         deviations_upserted = 0
-
+        rules_total = len(enabled_rule_ids)
+        rules_ok = 0
+        rules_failed = 0
 
         for rid in enabled_rule_ids:
             t_rule0 = time.monotonic()
@@ -302,7 +303,6 @@ def run_rule_engine_job():
         closed = _close_stale_deviations(db, subject_key=subject_key, now=now)
 
         db.commit()
-
 
         duration_ms = int((time.monotonic() - t0) * 1000)
 
