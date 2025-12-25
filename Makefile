@@ -3,6 +3,8 @@ PYTHON := .venv/bin/python
 
 up:
 	docker compose up -d --build
+	@echo "Running migrations..."
+	docker compose exec -T backend alembic -c alembic.ini upgrade head
 
 down:
 	docker compose down

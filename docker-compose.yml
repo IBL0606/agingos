@@ -9,10 +9,6 @@ services:
       - DATABASE_URL=postgresql://agingos:agingos@db:5432/agingos
     depends_on:
       - db
-    command: >
-      sh -lc 'set -e;
-      alembic -c alembic.ini upgrade head;
-      uvicorn main:app --host 0.0.0.0 --port 8000'
 
   db:
     image: postgres:16
