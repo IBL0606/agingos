@@ -9,6 +9,20 @@
 3. `make down` (evt `docker compose down`)
 
 ---
+## DB backup/restore (lokal)
+Backup:
+```bash
+make backup-db
+```
+
+Restore (velg fil fra `./backups/`):
+```bash
+make restore-db FILE=backups/<fil>.sql
+```
+
+Detaljer, verifikasjon og feilsøking: `docs/ops/backup-restore.md`.
+
+Ekstra dokumentasjonssetning: Kommandoer og “happy path” ligger i README, mens detaljer/feilsøking ligger i `docs/ops/backup-restore.md`.
 
 ## Logs (hvor finner jeg logs)
 All runtime-logg går til container stdout/stderr.

@@ -1,5 +1,5 @@
 PYTHON := .venv/bin/python
-.PHONY: up down logs smoke statusflow help
+.PHONY: up down logs smoke statusflow help backup-db restore-db
 
 up:
 	docker compose up -d --build
@@ -38,6 +38,29 @@ scenario-reset:
 scenario:
 	./examples/scripts/scenario_runner.py docs/testing/scenarios/sc_empty_no_devs.yaml
 
+backup-db:
+	@mkdir -p backups
+	@ts=$$(date -u +"%Y%m%dT%H%M%SZ"); \
+	out="backups/agingos_$${ts}.sql"; \
+	echo "Creating backup: $${out}"; \
+	docker compose exec -T db pg_dump -U agingos -d agingos > "$${out}"; \
+	echo "OK: wrote $${out}"
+
+restore-db:
+	@if [ -z "$$FILE" ]; then \
+	  echo "Usage: make restore-db FILE=backups/<file>.sql"; \
+	  echo "Available backups:"; \
+	  ls -1 backups 2>/dev/null || true; \
+	  exit 2; \
+	fi
+	@echo "Restoring from $$FILE"
+	@echo "Resetting schema (DROP SCHEMA public CASCADE; CREATE SCHEMA public;)"
+	docker compose exec -T db psql -U agingos -d agingos -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+	docker compose exec -T db psql -U agingos -d agingos < "$$FILE"
+	@echo "OK: restore complete"
+
+
+
 help:
 	@echo "Targets:"
 	@echo "  make up         - start services"
@@ -45,3 +68,6 @@ help:
 	@echo "  make logs       - follow logs"
 	@echo "  make smoke      - run smoke test"
 	@echo "  make statusflow - run status flow test (T-0303)"
+	@echo "  make backup-db  - create a local SQL backup in ./backups"
+	@echo "  make restore-db - restore DB from FILE=backups/<file>.sql"
+
