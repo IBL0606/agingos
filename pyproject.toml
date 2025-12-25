@@ -1,0 +1,16 @@
+[tool.ruff]
+# Intention: minimal lint/format regime ("fail fast"), not perfection.
+
+[tool.ruff.lint]
+# Minimal baseline:
+# - F: Pyflakes
+# - E4/E7/E9: core pycodestyle checks (low-noise, bug-prone patterns)
+select = ["F", "E4", "E7", "E9"]
+
+# We intentionally do NOT fail on line length at this stage (keeps churn/noise down).
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# Alembic templates commonly place imports after config/env setup; do not fail CI on that.
+"backend/alembic/env.py" = ["E402"]
+"backend/alembic/versions/*.py" = ["E402"]
