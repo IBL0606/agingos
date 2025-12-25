@@ -13,8 +13,13 @@ fail() {
   exit 1
 }
 
+echo "[0/8] DB ready (docker compose db)"
+docker compose exec -T db psql -U agingos -d agingos -c "select 1;" >/dev/null
+echo "OK"
+
 # (Recommended) deterministic run: clear events so fixed IDs always work
 docker compose exec -T db psql -U agingos -d agingos -c "TRUNCATE TABLE events;" >/dev/null || true
+
 
 # 1) Health
 echo "[1/8] GET /health"
