@@ -6,6 +6,7 @@
 ## Quick verification (Smoke test)
 1. `make up` (evt `docker compose up -d --build`)
 2. `make smoke` (evt `./examples/scripts/smoke_test.sh`)
+   * Hvis API-auth er aktivert: `AGINGOS_API_KEY=... make smoke`
 3. `make down` (evt `docker compose down`)
 
 ---
