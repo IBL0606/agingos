@@ -1,13 +1,14 @@
 import os
 
 # backend/main.py
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 
 from db import SessionLocal
 from models.event import Event
 from models.db_event import EventDB
 
 from services.scheduler import scheduler, setup_scheduler
+from services.auth import require_api_key, validate_auth_config_on_startup
 
 from routes.rules import router as rules_router
 from routes.deviations import router as deviations_router
@@ -16,10 +17,13 @@ from fastapi import Query
 from datetime import datetime
 from typing import Optional
 
-
 from util.time import require_utc_aware
 
-app = FastAPI(title="AgingOS Backend")
+app = FastAPI(
+    title="AgingOS Backend",
+    dependencies=[Depends(require_api_key)],
+)
+
 app.include_router(rules_router)
 app.include_router(deviations_router)
 
@@ -90,6 +94,9 @@ def list_events(
 
 @app.on_event("startup")
 def on_startup():
+    # Fail fast on bad auth config
+    validate_auth_config_on_startup()
+
     if os.getenv("SCHEDULER_ENABLED", "1").lower() in ("0", "false", "no", "off"):
         # Scheduler kan slås av lokalt ved behov (f.eks. under manuell testing)
         return
