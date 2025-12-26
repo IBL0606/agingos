@@ -70,6 +70,23 @@ Ekstra dokumentasjonssetning: Loggkontrakt og felt dokumenteres i docs/ops/loggi
 
 ---
 
+## Debug-mode (payload logging) — kun lokal dev
+
+Default: AgingOS logger ikke rå payload (av personvern- og sikkerhetsgrunner).
+
+Policy for hva som er lov/ikke lov å logge:
+- `docs/policies/privacy-logging.md`
+
+Ved lokal feilsøking kan du aktivere mer detaljert logging med:
+
+    AGINGOS_DEBUG_LOG_PAYLOADS=true
+
+ADVARSEL:
+- Ikke bruk dette i produksjon eller feltpilot.
+- Autentiseringsdata (API keys/tokens) og secrets skal aldri logges, heller ikke i debug.
+
+---
+
 ## Testing / Scenario
 
 Scenario-formatet er en **kontrakt for testing** og brukes av scenario runneren til å poste events og verifisere beregnede avvik via `GET /deviations/evaluate`.
@@ -185,6 +202,19 @@ En event som skjer eksakt på `until` teller ikke med i dette vinduet.
 ```bash
 curl -s http://localhost:8000/health
 ```
+
+## API authentication (feltpilot minimum)
+
+Driftsoppsett, rotasjon og detaljer:
+- `docs/ops/security-minimum.md`
+
+Eksempel (autentisert kall):
+
+    export AGINGOS_API_KEY="...sett-nøkkel..."
+    curl -sS \
+      -H "X-API-Key: ${AGINGOS_API_KEY}" \
+      "http://localhost:8000/health"
+
 
 ## Konfigurasjon: regler (rule-config)
 
