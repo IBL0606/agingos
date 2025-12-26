@@ -34,7 +34,9 @@ def require_api_key(
 
     keys = _api_keys()
     if not keys:
-        raise RuntimeError("AGINGOS_API_KEYS must be set when AGINGOS_AUTH_MODE=api_key")
+        raise RuntimeError(
+            "AGINGOS_API_KEYS must be set when AGINGOS_AUTH_MODE=api_key"
+        )
 
     if not x_api_key or x_api_key not in keys:
         raise HTTPException(
@@ -47,4 +49,6 @@ def validate_auth_config_on_startup() -> None:
     """Fail fast on invalid auth configuration."""
     mode = _auth_mode()
     if mode == "api_key" and not _api_keys():
-        raise RuntimeError("AGINGOS_API_KEYS must be set when AGINGOS_AUTH_MODE=api_key")
+        raise RuntimeError(
+            "AGINGOS_API_KEYS must be set when AGINGOS_AUTH_MODE=api_key"
+        )
