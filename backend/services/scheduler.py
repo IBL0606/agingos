@@ -12,6 +12,8 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Any
 
+from sqlalchemy.orm import Session
+
 from util.time import utcnow
 from db import SessionLocal
 from services.rule_engine import RULE_REGISTRY
@@ -153,9 +155,7 @@ def _severity_str_to_int(s: str) -> int:
     return 2
 
 
-def _get_or_create_rule_row(
-    db: SessionLocal.__annotations__.get("return", object), rule_key: str
-) -> Rule:
+def _get_or_create_rule_row(db: Session, rule_key: str) -> Rule:
     # Vi bruker Rule.name som string-key ("R-002", osv.) og mapper til FK via Rule.id.
     existing = db.query(Rule).filter(Rule.name == rule_key).one_or_none()
     if existing:
@@ -176,7 +176,7 @@ def _get_or_create_rule_row(
 
 
 def _upsert_open_deviation(
-    db: SessionLocal.__annotations__.get("return", object),
+    db: Session,
     rule_row: Rule,
     subject_key: str,
     now: datetime,
@@ -225,7 +225,7 @@ def _upsert_open_deviation(
 
 
 def _close_stale_deviations(
-    db: SessionLocal.__annotations__.get("return", object),
+    db: Session,
     *,
     subject_key: str,
     now: datetime,
