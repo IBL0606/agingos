@@ -1,7 +1,7 @@
-# backend/services/auth.py
 from __future__ import annotations
 
 import os
+
 from fastapi import Header, HTTPException, status
 
 
@@ -44,9 +44,7 @@ def require_api_key(
 
 
 def validate_auth_config_on_startup() -> None:
-    """
-    Fail fast on invalid auth configuration.
-    """
+    """Fail fast on invalid auth configuration."""
     mode = _auth_mode()
     if mode == "api_key" and not _api_keys():
         raise RuntimeError("AGINGOS_API_KEYS must be set when AGINGOS_AUTH_MODE=api_key")
