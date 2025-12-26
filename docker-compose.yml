@@ -6,7 +6,9 @@ services:
     volumes:
       - ./backend:/app
     environment:
-      - DATABASE_URL=postgresql://agingos:agingos@db:5432/agingos
+      DATABASE_URL: postgresql://agingos:agingos@db:5432/agingos
+      AGINGOS_AUTH_MODE: ${AGINGOS_AUTH_MODE:-off}
+      AGINGOS_API_KEYS: ${AGINGOS_API_KEYS:-}
     depends_on:
       - db
 
