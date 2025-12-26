@@ -3,6 +3,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 import json
 import logging
+import os
 import sys
 import time
 import traceback
@@ -33,6 +34,64 @@ logger.setLevel(logging.INFO)
 logger.propagate = False
 
 
+# Debug toggle: allow more verbose logging locally, but still never log secrets.
+_DEBUG_LOG_PAYLOADS = os.getenv("AGINGOS_DEBUG_LOG_PAYLOADS", "false").lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
+
+# Deny-list of keys that should never be logged raw.
+_DENY_KEYS = {
+    "payload",
+    "body",
+    "request_body",
+    "headers",
+    "authorization",
+    "x-api-key",
+    "api_key",
+    "token",
+    "password",
+    "secret",
+    "database_url",
+}
+
+
+def _truncate_str(s: str, max_len: int = 800) -> str:
+    return s if len(s) <= max_len else s[:max_len] + "...<truncated>"
+
+
+def _sanitize_value(v: Any, depth: int = 0, max_depth: int = 3) -> Any:
+    """
+    Best-effort sanitizer to avoid huge logs and accidental leakage.
+    Note: deny-list keys are handled by _log_event() itself.
+    """
+    if depth > max_depth:
+        return "<max_depth>"
+
+    if v is None or isinstance(v, (int, float, bool)):
+        return v
+
+    if isinstance(v, str):
+        return _truncate_str(v)
+
+    if isinstance(v, list):
+        return [_sanitize_value(x, depth + 1, max_depth) for x in v[:50]]
+
+    if isinstance(v, dict):
+        out: dict[str, Any] = {}
+        for k, vv in v.items():
+            lk = str(k).lower()
+            if lk in _DENY_KEYS:
+                out[str(k)] = "<redacted>"
+            else:
+                out[str(k)] = _sanitize_value(vv, depth + 1, max_depth)
+        return out
+
+    return _truncate_str(str(v))
+
+
 def _utc_iso(dt: datetime) -> str:
     # Expecting aware UTC datetimes from utcnow(); keep a stable "Z" format.
     s = dt.isoformat()
@@ -55,7 +114,23 @@ def _log_event(
         "run_id": run_id,
         "msg": msg,
     }
-    payload.update(fields)
+
+    safe_fields: dict[str, Any] = {}
+    for k, v in fields.items():
+        lk = str(k).lower()
+
+        # Never log deny-list fields in normal drift.
+        if lk in _DENY_KEYS and not _DEBUG_LOG_PAYLOADS:
+            continue
+
+        # Even in debug, do not log raw deny-list values.
+        if lk in _DENY_KEYS:
+            safe_fields[k] = "<redacted>"
+            continue
+
+        safe_fields[k] = _sanitize_value(v)
+
+    payload.update(safe_fields)
 
     line = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
 
