@@ -1,5 +1,6 @@
 [tool.ruff]
 # Intention: minimal lint/format regime ("fail fast"), not perfection.
+required-version = "0.14.10"
 
 [tool.ruff.lint]
 # Minimal baseline:
