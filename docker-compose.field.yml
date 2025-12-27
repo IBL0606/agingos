@@ -1,0 +1,12 @@
+services:
+  backend:
+    # Field/pilot profile: immutable container (no source mount), no auto-reload
+    volumes: []
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      # Recommended defaults for field
+      AGINGOS_AUTH_MODE: ${AGINGOS_AUTH_MODE:-api_key}
+
+  db:
+    # Do not expose Postgres port externally by default in field deployments
+    ports: []

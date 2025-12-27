@@ -250,7 +250,7 @@ def _close_stale_deviations(
 
     for dev in candidates:
         # rules.yaml keys are the rule "key" like "R-002". In DB that is Rule.name.
-        rule_key = dev.rule.name if dev.rule else None
+        rule_key = getattr(dev, "rule_id", None) or getattr(dev, "rule_key", None)
         if not rule_key:
             continue
 

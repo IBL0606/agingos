@@ -9,3 +9,8 @@ __pycache__/
 *.pyc
 
 backups/
+# Local dev secrets
+.env
+
+# Local artifacts
+agingos_repo.zip

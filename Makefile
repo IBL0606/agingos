@@ -1,5 +1,5 @@
 PYTHON := .venv/bin/python
-.PHONY: up down logs smoke statusflow help backup-db restore-db
+.PHONY: field-up field-down field-logs up down logs smoke statusflow help backup-db restore-db
 
 up:
 	docker compose up -d --build
@@ -17,6 +17,28 @@ up:
 down:
 	docker compose down
 
+
+field-up:
+	docker compose -f docker-compose.yml -f docker-compose.field.yml up -d --build db
+	@echo "Waiting for db..."
+	@for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do \
+	  if docker compose -f docker-compose.yml -f docker-compose.field.yml exec -T db pg_isready -U agingos -d agingos >/dev/null 2>&1; then \
+	    echo "DB is ready"; \
+	    break; \
+	  fi; \
+	  sleep 1; \
+	done
+	@echo "Running migrations..."
+	docker compose -f docker-compose.yml -f docker-compose.field.yml run --rm backend alembic -c alembic.ini upgrade head
+	@echo "Starting backend..."
+	docker compose -f docker-compose.yml -f docker-compose.field.yml up -d --build backend
+
+
+field-down:
+	docker compose -f docker-compose.yml -f docker-compose.field.yml down
+
+field-logs:
+	docker compose -f docker-compose.yml -f docker-compose.field.yml logs -f
 logs:
 	docker compose logs -f
 
@@ -63,11 +85,15 @@ restore-db:
 
 help:
 	@echo "Targets:"
-	@echo "  make up         - start services"
-	@echo "  make down       - stop services"
-	@echo "  make logs       - follow logs"
-	@echo "  make smoke      - run smoke test"
-	@echo "  make statusflow - run status flow test (T-0303)"
-	@echo "  make backup-db  - create a local SQL backup in ./backups"
-	@echo "  make restore-db - restore DB from FILE=backups/<file>.sql"
+	@echo "  make up          - start services (dev)"
+	@echo "  make down        - stop services (dev)"
+	@echo "  make logs        - follow logs (dev)"
+	@echo "  make field-up    - start services (field profile)"
+	@echo "  make field-down  - stop services (field profile)"
+	@echo "  make field-logs  - follow logs (field profile)"
+	@echo "  make smoke       - run smoke test"
+	@echo "  make statusflow  - run status flow test (T-0303)"
+	@echo "  make backup-db   - create a local SQL backup in ./backups"
+	@echo "  make restore-db  - restore DB from FILE=backups/<file>.sql"
+
 

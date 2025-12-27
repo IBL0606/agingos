@@ -5,7 +5,9 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     environment:
+      PYTHONDONTWRITEBYTECODE: "1"
       DATABASE_URL: postgresql://agingos:agingos@db:5432/agingos
       AGINGOS_AUTH_MODE: ${AGINGOS_AUTH_MODE:-off}
       AGINGOS_API_KEYS: ${AGINGOS_API_KEYS:-}
