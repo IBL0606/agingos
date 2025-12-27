@@ -19,15 +19,20 @@ router = APIRouter(prefix="/deviations", tags=["deviations"])
 from fastapi import Query  # hvis ikke allerede importert
 from typing import List
 
-from models.deviation import Deviation, DeviationStatus  # sørg for at DeviationStatus finnes her
+from models.deviation import (
+    Deviation,
+    DeviationStatus,
+)  # sørg for at DeviationStatus finnes her
 from schemas.deviation_persisted import DeviationPersisted  # filen du sa er ferdig
+
 
 def _severity_str_from_score(score: int) -> str:
     return {1: "LOW", 2: "MEDIUM", 3: "HIGH"}.get(int(score or 2), "MEDIUM")
 
+
 def _serialize_persisted(dev: Deviation) -> dict:
     ctx = dev.context or {}
-    window = (ctx.get("window") or {})
+    window = ctx.get("window") or {}
 
     evidence_ids = (dev.evidence or {}).get("event_ids", []) or []
 
@@ -54,6 +59,7 @@ def _serialize_persisted(dev: Deviation) -> dict:
             "until": window.get("until"),
         },
     }
+
 
 @router.get("", response_model=List[DeviationPersisted])
 def list_deviations(

@@ -12,8 +12,8 @@ class Window(BaseModel):
 class DeviationPersisted(BaseModel):
     deviation_id: int
     rule_id: str  # f.eks. "R-003"
-    status: str   # "OPEN" / "ACK" / "CLOSED"
-    severity: str # "LOW" / "MEDIUM" / "HIGH"
+    status: str  # "OPEN" / "ACK" / "CLOSED"
+    severity: str  # "LOW" / "MEDIUM" / "HIGH"
 
     title: str
     explanation: str
