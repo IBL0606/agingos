@@ -3,6 +3,71 @@
 [![CI](https://github.com/IBL0606/agingos/actions/workflows/ci.yml/badge.svg?event=push)](https://github.com/IBL0606/agingos/actions/workflows/ci.yml)
 
 
+## Hvordan kjøre systemet (dev + felt)
+
+Denne seksjonen er “source of truth” for oppstart/stopp, migrering, feilsøking og backup før HW.
+
+### Dev (lokalt, Docker Compose)
+Start:
+```bash
+make up
+```
+
+Se logger:
+```bash
+make logs
+```
+
+Stopp:
+```bash
+make down
+```
+
+### Migrering / DB schema (robust standard)
+Standardløpet bruker **Alembic migrations** (versjonerte migrasjoner):
+
+- `make up` venter på DB og kjører deretter `alembic upgrade head` automatisk.
+
+Kjør migrasjoner manuelt (ved behov):
+```bash
+docker compose exec -T backend alembic -c alembic.ini upgrade head
+```
+
+**Merk om `create_all`:** `backend/init_db.py` finnes for dev/engangshjelp (`Base.metadata.create_all(...)`), men dette er **ikke** anbefalt som primær migreringsmekanisme i et sluttprodukt (det håndterer ikke schema-endringer over tid).
+
+### Felt (pilot/HW, robust profil)
+Feltprofilen kjører uten auto-reload og uten source-mount (immutable container). Den bruker Compose-overstyring i `docker-compose.field.yml`.
+
+1) Sett auth for felt (anbefalt):
+- `AGINGOS_AUTH_MODE=api_key`
+- `AGINGOS_API_KEYS` = komma-separert liste (f.eks. `key1,key2`)
+
+Eksempel `.env` (i repo-root):
+```bash
+AGINGOS_AUTH_MODE=api_key
+AGINGOS_API_KEYS=change-me-1,change-me-2
+```
+
+2) Start feltprofil + migrasjoner:
+```bash
+make field-up
+```
+
+3) Logger:
+```bash
+make field-logs
+```
+
+4) Stopp:
+```bash
+make field-down
+```
+
+(Alternativ uten Makefile: `docker compose -f docker-compose.yml -f docker-compose.field.yml ...`)
+
+---
+
+
 ## Quick verification (Smoke test)
 1. `make up` (evt `docker compose up -d --build`)
 2. `make smoke` (evt `./examples/scripts/smoke_test.sh`)
@@ -162,22 +227,40 @@ Kontraktkrav for event-timestamps (UTC, ISO 8601) er dokumentert i: `docs/contra
 
 Eksempel (liste OPEN avvik):
 ```bash
-curl -sS "http://localhost:8000/deviations?status=OPEN&subject_key=default&limit=50" | jq .
-```
-Eksempel (sortert severity først):
-```bash
-curl -sS "http://localhost:8000/deviations" | jq -r '.[] | "\(.severity) \(.last_seen_at) \(.status) \(.rule_id) \(.subject_key)"' | head
+export AGINGOS_API_KEY="...sett-nøkkel..."
+
+curl -sS \
+  -H "X-API-Key: ${AGINGOS_API_KEY}" \
+  "http://localhost:8000/deviations?status=OPEN&subject_key=default&limit=50" \
+  | jq .
 ```
 
-Felt:
-- `deviation_id` (UUID)
-- `rule_id` (f.eks. "R-001")
-- `timestamp` (tidspunktet avviket ble generert)
-- `severity` ("LOW" / "MEDIUM" / "HIGH")
+Eksempel (sortert severity først):
+
+```bash
+export AGINGOS_API_KEY="...sett-nøkkel..."
+
+curl -sS \
+  -H "X-API-Key: ${AGINGOS_API_KEY}" \
+  "http://localhost:8000/deviations" \
+  | jq -r '.[] | "\(.severity) \(.last_seen_at) \(.status) \(.rule_id) \(.subject_key)"' \
+  | head
+```
+
+Felt (persisted `/deviations`):
+
+- `deviation_id` (int)
+- `rule_id` (f.eks. `"R-003"`)
+- `status` (`"OPEN"` / `"ACK"` / `"CLOSED"`)
+- `severity` (`"LOW"` / `"MEDIUM"` / `"HIGH"`)
 - `title`
-- `explanation` (1–2 setninger, for mennesker)
-- `evidence` (liste av event-id; kan være tom ved fravær av events)
-- `window` (alltid satt):
+- `explanation`
+- `timestamp` (tidspunkt avviket ble generert)
+- `started_at`
+- `last_seen_at`
+- `subject_key`
+- `evidence` (liste av event-id; kan være tom)
+- `window`:
   - `since`
   - `until`
 
@@ -243,12 +326,28 @@ Kontrakt/schema er dokumentert i:
 
 ---
 
-## Troubleshooting: Hvis tider virker feil
+## Troubleshooting (feilsøking)
 
-Sjekkliste:
+Sjekkliste (vanligste):
+- **API svarer ikke:** `docker compose ps` og `docker compose logs -f backend`
+- **DB ikke klar / migrering feiler:** sjekk `docker compose logs -f db`, og kjør migrasjoner manuelt:
+  ```bash
+  docker compose exec -T backend alembic -c alembic.ini upgrade head
+  ```
+- **401 Unauthorized:** hvis `AGINGOS_AUTH_MODE=api_key`, send `X-API-Key`:
+  ```bash
+  curl -sS -H "X-API-Key: <key>" "http://localhost:8000/health"
+  ```
+- **Port-konflikt:** 8000 (API) eller 5432 (Postgres) er allerede i bruk – stopp andre tjenester eller endre ports i compose.
+- **Tider virker feil (UTC):** se egen sjekkliste under.
+
+### Hvis tider virker feil (UTC)
 - Bekreft at du sender **UTC-aware** timestamps (ISO 8601 med `Z` eller `+00:00`). Naive timestamps uten timezone blir avvist.
 - Verifiser vinduskontrakten: `[since, until)` der `until` er eksklusiv.
-- Sjekk DB-timezone: `docker compose exec db psql -U agingos -d agingos -c "SHOW timezone;"`
+- Sjekk DB-timezone:
+  ```bash
+  docker compose exec db psql -U agingos -d agingos -c "SHOW timezone;"
+  ```
 - Hvis du filtrerer events/deviations med `since/until`, bruk alltid `...Z` (UTC).
 
 Eksempel (gyldig):
@@ -257,6 +356,8 @@ curl -sS "http://localhost:8000/deviations/evaluate?since=2025-12-22T10:00:00Z&u
 ```
 
 Ekstra dokumentasjonssetning: Policy ligger i `docs/policies/time-and-timezone.md`, kontraktkrav i `docs/contracts/event-v1.md`, og praktisk feilsøking i `README.md`.
+
+
 
 ## CI (GitHub Actions)
 

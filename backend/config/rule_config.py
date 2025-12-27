@@ -40,12 +40,13 @@ class RuleConfig:
         return self.defaults_lookback_minutes()
 
     def defaults_expire_after_minutes(self) -> int:
-        return int(self.data.get("defaults", {}).get("expire_after_minutes", 60))
+        defaults = self.raw.get("defaults", {}) if isinstance(self.raw, dict) else {}
+        return int(defaults.get("expire_after_minutes", 60))
 
     def rule_expire_after_minutes(self, rule_id: str) -> int:
-        rule = self.data.get("rules", {}).get(rule_id, {})
-        if "expire_after_minutes" in rule:
-            return int(rule["expire_after_minutes"])
+        r = self.rule(rule_id)
+        if "expire_after_minutes" in r:
+            return int(r["expire_after_minutes"])
         return self.defaults_expire_after_minutes()
 
     def rule(self, rule_id: str) -> Dict[str, Any]:
