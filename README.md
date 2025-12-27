@@ -246,7 +246,9 @@ curl -sS \
   | jq -r '.[] | "\(.severity) \(.last_seen_at) \(.status) \(.rule_id) \(.subject_key)"' \
   | head
 ```
+
 Felt (persisted `/deviations`):
+
 - `deviation_id` (int)
 - `rule_id` (f.eks. `"R-003"`)
 - `status` (`"OPEN"` / `"ACK"` / `"CLOSED"`)
@@ -261,6 +263,7 @@ Felt (persisted `/deviations`):
 - `window`:
   - `since`
   - `until`
+
 ---
 
 ## API

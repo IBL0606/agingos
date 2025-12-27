@@ -1,5 +1,22 @@
 PYTHON := .venv/bin/python
-.PHONY: field-up field-down field-logs up down logs smoke statusflow help backup-db restore-db
+
+RUFF_VERSION ?= 0.14.10
+RUFF_IMAGE := ghcr.io/astral-sh/ruff:$(RUFF_VERSION)
+
+.PHONY: fmt fmt-check lint lint-fix
+fmt:
+	docker run --rm -v "$(PWD)":/work -w /work $(RUFF_IMAGE) format .
+
+fmt-check:
+	docker run --rm -v "$(PWD)":/work -w /work $(RUFF_IMAGE) format --check .
+
+lint:
+	docker run --rm -v "$(PWD)":/work -w /work $(RUFF_IMAGE) check .
+
+lint-fix:
+	docker run --rm -v "$(PWD)":/work -w /work $(RUFF_IMAGE) check --fix .
+
+.PHONY: field-up field-down field-logs up down logs smoke statusflow help backup-db restore-db scenario-reset scenario
 
 up:
 	docker compose up -d --build
@@ -17,7 +34,6 @@ up:
 down:
 	docker compose down
 
-
 field-up:
 	docker compose -f docker-compose.yml -f docker-compose.field.yml up -d --build db
 	@echo "Waiting for db..."
@@ -33,12 +49,12 @@ field-up:
 	@echo "Starting backend..."
 	docker compose -f docker-compose.yml -f docker-compose.field.yml up -d --build backend
 
-
 field-down:
 	docker compose -f docker-compose.yml -f docker-compose.field.yml down
 
 field-logs:
 	docker compose -f docker-compose.yml -f docker-compose.field.yml logs -f
+
 logs:
 	docker compose logs -f
 
@@ -48,14 +64,10 @@ smoke:
 statusflow:
 	PYTHONPATH=backend DATABASE_URL="postgresql://agingos:agingos@localhost:5432/agingos" $(PYTHON) -m pytest -q backend/tests/test_status_flow_open_ack_close_reopen.py
 
-.PHONY: scenario-reset
-
 scenario-reset:
 	docker compose exec -T db psql -U agingos -d agingos -c "TRUNCATE TABLE events RESTART IDENTITY CASCADE;" >/dev/null 2>&1 || true
 	docker compose exec -T db psql -U agingos -d agingos -c "TRUNCATE TABLE deviations_v1 RESTART IDENTITY CASCADE;" >/dev/null 2>&1 || true
 	docker compose exec -T db psql -U agingos -d agingos -c "TRUNCATE TABLE deviations RESTART IDENTITY CASCADE;" >/dev/null 2>&1 || true
-
-.PHONY: scenario
 
 scenario:
 	./examples/scripts/scenario_runner.py docs/testing/scenarios/sc_empty_no_devs.yaml
@@ -81,8 +93,6 @@ restore-db:
 	docker compose exec -T db psql -U agingos -d agingos < "$$FILE"
 	@echo "OK: restore complete"
 
-
-
 help:
 	@echo "Targets:"
 	@echo "  make up          - start services (dev)"
@@ -93,7 +103,10 @@ help:
 	@echo "  make field-logs  - follow logs (field profile)"
 	@echo "  make smoke       - run smoke test"
 	@echo "  make statusflow  - run status flow test (T-0303)"
+	@echo "  make scenario    - run scenario smoke"
 	@echo "  make backup-db   - create a local SQL backup in ./backups"
 	@echo "  make restore-db  - restore DB from FILE=backups/<file>.sql"
-
-
+	@echo "  make fmt         - format code (ruff via docker)"
+	@echo "  make fmt-check   - check formatting (same as CI)"
+	@echo "  make lint        - lint (ruff via docker)"
+	@echo "  make lint-fix    - lint with auto-fix (ruff via docker)"

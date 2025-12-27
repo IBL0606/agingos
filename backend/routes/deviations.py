@@ -11,19 +11,10 @@ from db import get_db
 from services.rule_engine import evaluate_rules
 
 from schemas.deviation_v1 import DeviationV1
+from schemas.deviation_persisted import DeviationPersisted
 from util.time import require_utc_aware, utcnow
 
 router = APIRouter(prefix="/deviations", tags=["deviations"])
-
-
-from fastapi import Query  # hvis ikke allerede importert
-from typing import List
-
-from models.deviation import (
-    Deviation,
-    DeviationStatus,
-)  # sørg for at DeviationStatus finnes her
-from schemas.deviation_persisted import DeviationPersisted  # filen du sa er ferdig
 
 
 def _severity_str_from_score(score: int) -> str:
@@ -85,7 +76,7 @@ def list_deviations(
     return [_serialize_persisted(d) for d in devs]
 
 
-@router.patch("/{deviation_id}")
+@router.patch("/{deviation_id}", response_model=DeviationPersisted)
 def patch_deviation(deviation_id: int, payload: dict, db: Session = Depends(get_db)):
     dev = db.get(Deviation, deviation_id)
     if not dev:
@@ -99,7 +90,7 @@ def patch_deviation(deviation_id: int, payload: dict, db: Session = Depends(get_
 
     db.commit()
     db.refresh(dev)
-    return dev
+    return _serialize_persisted(dev)
 
 
 #
