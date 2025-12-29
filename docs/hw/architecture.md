@@ -28,24 +28,14 @@ Sensors → (Zigbee/Matter/HomeKit lokalt i HA) → Home Assistant automasjoner/
 - **Mini-PC**
   - Ansvar: system-of-record (Postgres), regel-/avvik-evaluering, scheduler, drift/logg/backup.
 
-## Event-kontrakt (pilot)
-HA skal sende Event v1 til `POST /event`. Pilot definerer følgende minimum:
-- `timestamp`: UTC, ISO 8601
-- `category`: en av: `presence`, `door`, `environment`, `assist_button`
-- `payload`:
-  - `source`: `"homeassistant"`
-  - `room`: kontrollert romlabel (f.eks. `"stue_kjokken"`, `"gang"`, `"bad"`, `"soverom_1"`, `"soverom_2"`)
-  - `entity_id`: HA entity_id
-  - `state`: normalisert state
-  - sensor-spesifikke felt:
-    - `environment`: `temperature_c`, `humidity_pct`, `illuminance_lux` (der tilgjengelig)
-    - `door`: `open|closed`
-    - `presence`: `on|off`
-    - `assist_button`: `single|double|hold`
+## Event-kontrakt og mapping (pilot)
 
-**Rate limiting (pilot)**
-- `presence`: kun transitions (`off→on`, `on→off`) + optional heartbeat (f.eks. hvert 10. minutt) hvis ønsket.
-- `environment`: sampling (f.eks. hvert 5.–15. minutt), ikke hvert state-change.
+For å unngå dobbelt-/trippeldokumentasjon er event-format og mapping dokumentert ett sted:
+
+- **Event v1 kontrakt (normativ):** `docs/contracts/event-v1.md`
+- **Sensor→Event mapping + kategori-register (normativ):** `docs/mapping/sensor-event-mapping.md`
+
+Pilot-spesifikke anbefalinger (rate-limit/debounce osv.) dokumenteres i mapping-dokumentet og/eller i HA-konfig (ikke i docx).
 
 ## Bølgeplan (aktivering)
 Bølger brukes for å redusere feilsøkingsflate. Innkjøp kan være “aggressivt”, men aktivering gjøres trinnvis.
