@@ -1,73 +1,88 @@
 # Ordliste (Glossary)
 
-Status: **GUIDANCE**
-Formål: Felles definisjoner av begreper brukt i AgingOS.
+Status: **GUIDANCE**  
+Formål: Felles definisjoner av begreper brukt i AgingOS (docs + kode). Hold forklaringene korte og praktiske.
 
-## Endpoint
-Et endpoint er en fast adresse i et system der man kan sende data til eller hente data fra.
+---
 
-## ISO 8601
-ISO 8601 er en internasjonal standard for hvordan dato og tid skrives som tekst, slik at både mennesker og datamaskiner forstår det likt
-.
-2025-12-14T19:30:00
+## API / data
 
-## UUID
-En UUID er en universelt unik identifikator – et langt, tilfeldig generert ID-nummer som er ekstremt lite sannsynlig å bli likt et annet.
+### Endpoint
+En fast adresse i API-et der du kan sende data til eller hente data fra (f.eks. `POST /event`).
 
+### JSON
+Et tekstformat for data som brukes i API-kall (nøkler og verdier). Eksempel:
+{ "category": "motion", "payload": { "state": "on" } }
+
+### ISO 8601 (timestamp)
+Standard måte å skrive dato og tid på, f.eks.:
+2025-12-29T21:44:34Z  
+I AgingOS brukes UTC (slutter ofte med Z).
+
+### UUID
+En unik ID i standardformat, f.eks.:
 550e8400-e29b-41d4-a716-446655440000
 
-## Payload
-Payload er selve innholdet i eventet – detaljene som forteller hva som faktisk ble målt eller rapportert.
+---
 
-Eksempler:
-{ "state": "motion" }
-{ "battery": 82 }
-{ "status": "started" }
+## Event / kontrakter
 
-## Category
-Category er en overordnet klassifisering av hva slags type hendelse dette er, uavhengig av detaljer.
+### Event (Event v1)
+En enkelt hendelse som sendes inn i AgingOS (f.eks. bevegelse eller dør åpnet).  
+Se: `docs/contracts/event-v1.md`
 
-sensor
-Hendelser som kommer direkte fra fysiske sensorer
-(f.eks. bevegelse, dør, temperatur)
-system
-Hendelser generert av selve systemet
-(f.eks. oppstart, feil, statusendringer)
-user
-Hendelser utløst direkte av et menneske
-(f.eks. knappetrykk, manuell handling)
-derived
-Hendelser som er avledet fra andre events
-(f.eks. “ingen bevegelse på 4 timer”)
+### Category
+Overordnet type for eventet (hvilken “klasse” hendelsen tilhører).  
+Eksempler implementert i kode v1:
+- `motion`
+- `door`
 
-## Derived
-Derived betyr avledet.
-Et derived event er ikke noe som skjedde direkte i verden, men noe systemet har konkludert med basert på andre events.
-Eksempel:
-Sensor-events:
- “Bevegelse registrert kl 08:12”
- “Bevegelse registrert kl 08:30”
+Planlagt for pilot (når implementert i kode):
+- `presence`
+- `environment`
+- `assist_button`
 
-Derived event:
- “Ingen bevegelse mellom 09:00 og 13:00”
+### Payload
+Detaljene i eventet. Innholdet avhenger av `category`. Eksempel:
+{ "state": "on", "room": "gang" }
 
-Viktig:
-Derived events er fortsatt events
+### State
+Normalisert tilstand brukt i regler.
+- `motion`: "on" / "off"
+- `door`: "open" / "closed"
 
-De er rå resultater, ikke alarmer eller varsler
+### Room
+Kontrollert romlabel (f.eks. `gang`, `stue_kjokken`). Anbefales sendt i `payload.room`.
 
-De brukes videre av regler og avvik
+### Entity ID
+Identifikator fra Home Assistant (f.eks. `binary_sensor.front_door_contact`). Anbefales sendt i `payload.entity_id`.
 
-I AgingOS er derived en måte å:
-gjøre mønstre eksplisitte
+### Source
+Hvor eventet kom fra (f.eks. `homeassistant`). Anbefales sendt i `payload.source`.
 
-uten å blande tolkning inn i rå sensor-data
+---
 
-## Event (Event v1)
-En enkelt hendelse som sendes inn i AgingOS (f.eks. bevegelse eller dør åpnet). Se: `docs/contracts/event-v1.md`.
+## Regelmotor / avvik
 
-## Deviation (avvik)
-Et oppdaget avvik fra forventet mønster, produsert av regelmotoren og eventuelt persistert i DB. Se: `docs/contracts/deviation-v1.md`.
+### Rule engine
+Komponenten som evaluerer regler mot events og produserer avvik.
 
-## Rule engine
-Komponenten som evaluerer regler mot event-strøm og produserer avvik.
+### Deviation (avvik)
+Et oppdaget avvik fra forventet mønster (fra regelmotoren) og kan persisteres i DB.  
+Se: `docs/contracts/deviation-v1.md`
+
+### Scheduler
+Bakgrunnsjobb som kjører periodisk evaluering/vedlikehold (f.eks. regel-evaluering).
+
+---
+
+## Dokumentstyring
+
+### NORMATIVE
+Må følges. Brukes for kontrakter, policies og sjekklister.
+
+### GUIDANCE
+Forklaring/oppskrift. Hjelper deg å bruke systemet, men er ikke en format-kontrakt.
+
+### SNAPSHOT (LEGACY)
+Historisk dokument. Skal ikke oppdateres som sannhet. Se `docs/_legacy/README.md`.
