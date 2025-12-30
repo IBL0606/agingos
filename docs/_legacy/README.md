@@ -21,7 +21,7 @@ Regel: Disse dokumentene er historikk. Gjeldende sannhet ligger i `README.md` og
 > Dette dokumentet er et historisk snapshot og skal ikke oppdateres som “sannhet”.  
 > Gjeldende (living) dokumentasjon finnes i repo: `README.md` og `docs/`.  
 > For riktig oppdateringssted, se `docs/INDEX.md`.  
-> Sist frosset: 2025-12-29.
+> Sist frosset: 2025-12-30.
 
 Merk: Banneret er lagt inn på alle `.docx` i denne mappen, og `.xlsx` har egen `INFO`-fane.
 
