@@ -80,3 +80,12 @@ Denne BOM-en dekker innkjøp for Pilot #1 basert på besluttet arkitektur:
 - Soveromsdører står normalt åpne → dørkontakt på soverom er utelatt.
 - Balkongdør er inkludert pga. høy informasjonsverdi (sikkerhet/kontekst).
 - Aqara-app aksepteres som serviceverktøy for oppsett, ikke som runtime-krav.
+
+
+### Notat: lokal lagring (valgfritt)
+- For RPi/HA kan en liten **USB SSD** være aktuelt hvis du vil unngå SD-kort-slitasje.
+- For Mini-PC kan en ekstern SSD brukes for enkel backup/restore eller logg-eksport.
+
+
+### Notat: Zigbee-koordinator
+- Hvis du trenger egen Zigbee-koordinator på RPi/HA: en USB-dongle (f.eks. Sonoff Zigbee 3.0) er et vanlig valg.

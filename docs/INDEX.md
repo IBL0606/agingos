@@ -3,7 +3,7 @@
 Status: **NORMATIVE**  
 Formål: Dette er **startpunktet**. Hvis du lurer på “hvor skal jeg oppdatere dette?”, så er svaret alltid her.
 
-## Regler (v1)
+## Dokumentasjonsregler (v1)
 - **Én sannhet:** Levende teknisk dokumentasjon ligger i `README.md` og `docs/`.
 - **Ingen duplisering:** Hvert tema har **ett** “hjemmedokument”. Andre steder lenker vi dit.
 - **Legacy er read-only:** `.docx/.xlsx` beholdes kun som historikk (snapshot) og skal ikke konkurrere med repo-dokumentasjonen.
@@ -33,6 +33,25 @@ Formål: Dette er **startpunktet**. Hvis du lurer på “hvor skal jeg oppdatere
 ## Arkitektur
 - Rule engine: `architecture/rule-engine.md`
 - Beslutninger (ADR): `adr/`
+
+---
+
+## Prosjekt (scope og status)
+- Visjon og produktmål: `project/vision.md`
+- MVP-scope: `project/mvp.md`
+- Prosjektstatus/avgrensninger: `project/status.md`
+- Stopp-kriterier: `project/stop-criteria.md`
+- Arbeidsform/backlog: `project/working-method.md`
+
+---
+
+## API
+- HTTP API (endepunkter): `api/http-api.md`
+
+---
+
+## Regler
+- Rule catalog: `rules/rule-catalog.md`
 
 ---
 

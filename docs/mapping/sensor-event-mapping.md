@@ -133,3 +133,8 @@ curl -sS \
 ```
 
 Merk: I feltprofil med API-key må du sende `X-API-Key`-header på alle kall.
+
+
+### Optional: `payload.raw` (debug)
+- Kan brukes av upstream (HA/script) for å lagre originalt rå-payload (best effort).
+- **Skal ikke brukes i regler** eller som del av kontrakt/semantikk (kun feilsøking).
