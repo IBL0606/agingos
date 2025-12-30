@@ -111,6 +111,11 @@ I eldre dokumenter kan du se `payload.location`. Vi standardiserer på `payload.
 
 ## Rate limiting / støy (pilot-anbefaling)
 
+**Støytest (lokal, P0):** 600/600 OK @ 20 eps (p95 7.2 ms), 1500/1500 OK @ 50 eps (p95 14.8 ms), 3000/3000 OK @ 100 eps (p95 13.2 ms). Merk: klientscriptet er synkront og nådde ikke eksakt mål-rate, men backend håndterte volumet uten feil.
+
+**Anbefalt rate-limit for pilot:** motion = kun transitions (on/off) per sensor, med maks ~1 eps per sensor i steady-state; korte bursts tolereres, men bør dempes (dedupe/cooldown) hvis access-logger blir støyende.
+
+
 Dette er operative retningslinjer som normalt settes i HA (ikke i AgingOS):
 - `motion`/presence: send kun transitions (`off→on`, `on→off`) + evt. heartbeat (f.eks. hver 10. min) hvis du trenger “system lever”-signal.
 - `environment` (når innført): sampling hvert 5–15 min (ikke hvert state-change).
