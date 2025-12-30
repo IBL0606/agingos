@@ -52,3 +52,26 @@ Ved innføring av slike felter skal key-policy revurderes og versjoneres.
 **Ekstra dokumentasjonssetning:** Kontrakt dokumenteres i `docs/contracts/deviation-v1.md`, mens begrunnelse/valg dokumenteres i `docs/adr/` og lenkes fra Master arbeidslogg.
 **Ekstra dokumentasjonssetning:** API-garantier (inkl. sortering) ligger i `docs/contracts/deviation-v1.md`, mens praktisk bruk (curl) ligger i `README.md`.
 
+---
+
+## Computed deviations (DeviationV1) — `/deviations/evaluate`
+I tillegg til persisterte avvik finnes “computed” avvik som returneres av `GET /deviations/evaluate`.
+Disse er et **beregningsresultat** (ikke nødvendigvis persistert).
+
+### Felter (DeviationV1)
+- `deviation_id` (UUID)
+- `rule_id` (string, f.eks. `R-002`)
+- `timestamp` (UTC, når avviket ble generert)
+- `severity` (`LOW` | `MEDIUM` | `HIGH`)
+- `title` (kort)
+- `explanation` (1–2 setninger, menneskelig forklaring)
+- `evidence` (liste av event-id’er som støtter konklusjonen; kan være tom ved fravær-av-events)
+- `window` (`since`/`until`, ISO 8601, UTC) – **skal alltid settes**
+
+### Presiseringer (normativt)
+- `timestamp` er tidspunktet avviket ble generert (ikke nødvendigvis tidspunktet for trigger-eventet).
+- `window` viser tidsrommet som ble evaluert.
+- `evidence` kan være tom liste når avviket handler om fravær av events (f.eks. R-001).
+
+Kilde: sammenfattet fra legacy logikkspes (`docs/_legacy/AgingOS - Logikkspesifikasjon.docx`).
+

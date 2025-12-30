@@ -36,6 +36,24 @@ Formål: Dette er **startpunktet**. Hvis du lurer på “hvor skal jeg oppdatere
 
 ---
 
+## Prosjekt (scope og status)
+- Visjon og produktmål: `project/vision.md`
+- MVP-scope: `project/mvp.md`
+- Prosjektstatus/avgrensninger: `project/status.md`
+- Stopp-kriterier: `project/stop-criteria.md`
+- Arbeidsform/backlog: `project/working-method.md`
+
+---
+
+## API
+- HTTP API (endepunkter): `api/http-api.md`
+
+---
+
+## Regler
+- Rule catalog: `rules/rule-catalog.md`
+
+
 ## Drift (runbooks)
 - Logging: `ops/logging.md`
 - Scheduler: `ops/scheduler.md`
