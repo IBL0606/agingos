@@ -78,6 +78,7 @@ Formål: Dette er **startpunktet**. Hvis du lurer på “hvor skal jeg oppdatere
 - Scenario-format: `testing/scenario-format.md`
 - Scenario-katalog: `testing/scenario-catalog.md`
 - Status-flow: `testing/status-flow.md`
+- Nattvindu-eksempel: `testing/night-window-example.md`
 - Scenario-filer: `testing/scenarios/`
 
 ---
