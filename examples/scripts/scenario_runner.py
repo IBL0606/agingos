@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -63,9 +64,15 @@ def _iso(dt_str: str) -> str:
     return dt_str
 
 
+
+def _auth_headers() -> Dict[str, str]:
+    api_key = os.getenv("AGINGOS_API_KEY", "")
+    return {"X-API-Key": api_key} if api_key else {}
+
+
 def _post_event(base_url: str, ev: Dict[str, Any], timeout_s: int) -> None:
     url = f"{base_url.rstrip('/')}/event"
-    r = requests.post(url, json=ev, timeout=timeout_s)
+    r = requests.post(url, json=ev, headers=_auth_headers(), timeout=timeout_s)
     if r.status_code >= 400:
         raise RuntimeError(
             f"POST /event failed ({r.status_code}): {r.text}\nEvent: {json.dumps(ev, ensure_ascii=False)}"
@@ -77,7 +84,7 @@ def _get_deviations(
 ) -> List[Dict[str, Any]]:
     url = f"{base_url.rstrip('/')}/deviations/evaluate"
     params = {"since": since, "until": until}
-    r = requests.get(url, params=params, timeout=timeout_s)
+    r = requests.get(url, params=params, headers=_auth_headers(), timeout=timeout_s)
     if r.status_code >= 400:
         raise RuntimeError(
             f"GET /deviations/evaluate failed ({r.status_code}): {r.text}\n"
