@@ -3,7 +3,7 @@
 Status: **NORMATIVE**  
 Formål: Dette er **startpunktet**. Hvis du lurer på “hvor skal jeg oppdatere dette?”, så er svaret alltid her.
 
-## Regler (v1)
+## Dokumentasjonsregler (v1)
 - **Én sannhet:** Levende teknisk dokumentasjon ligger i `README.md` og `docs/`.
 - **Ingen duplisering:** Hvert tema har **ett** “hjemmedokument”. Andre steder lenker vi dit.
 - **Legacy er read-only:** `.docx/.xlsx` beholdes kun som historikk (snapshot) og skal ikke konkurrere med repo-dokumentasjonen.
@@ -53,6 +53,7 @@ Formål: Dette er **startpunktet**. Hvis du lurer på “hvor skal jeg oppdatere
 ## Regler
 - Rule catalog: `rules/rule-catalog.md`
 
+---
 
 ## Drift (runbooks)
 - Logging: `ops/logging.md`
