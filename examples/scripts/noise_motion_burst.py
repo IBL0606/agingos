@@ -18,8 +18,12 @@ def auth_headers() -> dict:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Post many motion events to test throughput/logging.")
-    ap.add_argument("--base-url", default=os.getenv("BASE_URL", "http://localhost:8000"))
+    ap = argparse.ArgumentParser(
+        description="Post many motion events to test throughput/logging."
+    )
+    ap.add_argument(
+        "--base-url", default=os.getenv("BASE_URL", "http://localhost:8000")
+    )
     ap.add_argument("--rate", type=float, default=20.0, help="events per second")
     ap.add_argument("--seconds", type=int, default=30)
     ap.add_argument("--room", default="gang")
@@ -75,6 +79,7 @@ def main() -> int:
     elapsed = time.perf_counter() - t0
 
     lat_ms_sorted = sorted(lat_ms)
+
     def pct(p: float) -> float:
         if not lat_ms_sorted:
             return float("nan")

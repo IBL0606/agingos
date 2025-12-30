@@ -64,7 +64,6 @@ def _iso(dt_str: str) -> str:
     return dt_str
 
 
-
 def _auth_headers() -> Dict[str, str]:
     api_key = os.getenv("AGINGOS_API_KEY", "")
     return {"X-API-Key": api_key} if api_key else {}
