@@ -1,5 +1,31 @@
 # Security minimum (feltpilot) — AgingOS
 
+## Hurtigguide (30 sek)
+API-key er et hemmelig passord som Home Assistant (HA) må sende med hver event.
+
+1) Sett nøkkel i `.env` (repo-root):
+   
+    AGINGOS_AUTH_MODE=api_key
+    AGINGOS_API_KEYS=DIN_HEMMELIGE_NØKKEL
+
+2) Start feltprofil:
+
+    make field-up
+
+3) HA får lov til å poste events når den sender headeren:
+
+    X-API-Key: DIN_HEMMELIGE_NØKKEL
+
+Bytte nøkkel (rotasjon, kort):
+- Sett begge: `AGINGOS_API_KEYS=GAMMEL,NY` → restart backend
+- Bytt HA til NY
+- Fjern GAMMEL → restart backend
+
+Viktig:
+- Ikke legg nøkkelen i git, README eller logger.
+
+---
+
 ## Formål
 Etablere et minimum av tilgangskontroll før feltpilot/reell bruk, uten tung IAM.
 
