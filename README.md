@@ -7,6 +7,9 @@
 
 Denne seksjonen er “source of truth” for oppstart/stopp, migrering, feilsøking og backup før HW.
 
+For en helt konkret steg-for-steg-oppskrift (for ikke-utviklere), se:
+- `docs/ops/runbook.md`
+
 ### Dev (lokalt, Docker Compose)
 Start:
 ```bash
