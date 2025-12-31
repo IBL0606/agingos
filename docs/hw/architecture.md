@@ -30,6 +30,8 @@ Sensors → (Zigbee/Matter/HomeKit lokalt i HA) → Home Assistant automasjoner/
 
 ## Event-kontrakt og mapping (pilot)
 
+### Normative docs (pilot)
+
 For å unngå dobbelt-/trippeldokumentasjon er event-format og mapping dokumentert ett sted:
 
 - **Event v1 kontrakt (normativ):** `docs/contracts/event-v1.md`
@@ -46,31 +48,33 @@ Bølger brukes for å redusere feilsøkingsflate. Innkjøp kan være “aggressi
 - Brannmur: kun RPi → TCP 8000
 
 Akseptkriterier:
-- `/event` kan nås fra RPi
+- /event kan nås fra RPi
 - Logging viser mottatt request
 - Ingen errors i compose logs
 
-### Bølge 1 – Kjerne (lav støy, høy verdi)
+### Bølge 1 – Pilot-scope (første rom + ytterdør)
+- Sjekkliste og HA→Event v1-detaljer: docs/mapping/ha-mini-plan-p1.md
 - FP2: stue/kjøkken (presence)
-- Door/Window: inngang + bad + balkong
-- Assist-knapp
-- FP300: bad (presence + environment)
+- Door/Window: inngangsdør (ytterdør)
 
 Akseptkriterier:
-- Minst 24 timer uten “event drop” (event kommer inn ved reelle triggere)
-- Ingen vedvarende “flapping” uten at det håndteres via rate-limit/debounce
-- Avvik kan evalueres manuelt og persisteres (minst én test-deviation)
+- Kun transitions sendes (door open/closed, motion on/off)
+- Event v1 payload inkluderer room/source/entity_id/state
+- Minst 24 timer uten “chatty” spam (evt. debounce i HA)
 
-### Bølge 2 – Dekning
-- FP300: gang
-- FP300: soverom 1
+### Bølge 2 – Utvidelse
+- Door/Window: bad + balkong
+- Assist-knapp
+- FP300: bad (presence + environment)
 
 Akseptkriterier:
 - Minst 48 timer stabil drift
 - Noisy entities ekskluderes fra HA recorder hvis nødvendig
 - Ingen regressjoner i avvikslivssyklus (stale/close)
 
-### Bølge 3 – Full dekning (valgfritt)
+### Bølge 3 – Dekning / full (valgfritt)
+- FP300: gang
+- FP300: soverom 1
 - FP300: soverom 2
 
 Akseptkriterier:

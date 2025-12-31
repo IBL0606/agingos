@@ -5,7 +5,7 @@ Formål: Kort, løpende logg over beslutninger og status. Dette erstatter “lev
 Regel: Hvis kontrakter/ops/pilot-kriterier endres, legg inn 5–10 linjer her + lenker.
 
 ## Format (per entry)
-- Dato (YYYY-MM-DD)
+- ### Dato (YYYY-MM-DD) -- Overskrift
 - Hva endret seg
 - Hvor er sannheten nå (lenker)
 - Neste steg
@@ -54,6 +54,21 @@ Regel: Hvis kontrakter/ops/pilot-kriterier endres, legg inn 5–10 linjer her + 
   - Backup/restore (detaljer + verifikasjon): `docs/ops/backup-restore.md`
   - API-key (setup + rotasjon): `docs/ops/security-minimum.md`
   - README (inngangspunkt): `README.md`
+
+### 2025-12-31 -- P1: HA→AgingOS mini-plan + bølgeplan (uten HW)
+- Hva endret seg
+  - Opprettet mini-plan for HA→AgingOS: docs/mapping/ha-mini-plan-p1.md (forventede entity_id-er, payload-felter, transitions-only rate-limit, sjekkliste).
+  - Oppdatert bølgeplan i docs/hw/architecture.md slik at Bølge 1 matcher faktisk første installasjon: FP2 (stue/kjøkken) + ytterdør (inngangsdør).
+  - Lagt inn eksplisitt lenke under Bølge 1 til mini-planen (sjekkliste/verifisering).
+  - Oppdatert docs/INDEX.md slik at mini-planen er synlig i dokumentasjonsindeksen.
+- Hvor er sannheten nå (lenker)
+  - Mini-plan (P1): docs/mapping/ha-mini-plan-p1.md
+  - HW arkitektur + bølgeplan: docs/hw/architecture.md
+  - Sensor→Event mapping (normativ): docs/mapping/sensor-event-mapping.md
+  - Event v1 (normativ): docs/contracts/event-v1.md
+  - Dokumentasjonsindeks (normativ): docs/INDEX.md
+- Neste steg
+  - Når HW er på bordet: implementer HA automasjoner/rest_command for ytterdør + FP2 i stue/kjøkken, og verifiser end-to-end iht mini-planen. Legg inn debounce/dedupe i HA ved behov.
 
 ### YYYY-MM-DD — <Tittel>
 - Endring:

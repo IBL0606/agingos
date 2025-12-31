@@ -27,6 +27,7 @@ Formål: Dette er **startpunktet**. Hvis du lurer på “hvor skal jeg oppdatere
 
 ## Mapping (integrasjoner → Event v1)
 - Sensor → Event mapping (inkl. kategori-register og payload-konvensjoner): `mapping/sensor-event-mapping.md`
+- Home Assistant → AgingOS mini-plan (P1, uten HW): `mapping/ha-mini-plan-p1.md`
 
 ---
 
