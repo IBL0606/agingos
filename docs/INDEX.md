@@ -63,6 +63,7 @@ Formål: Dette er **startpunktet**. Hvis du lurer på “hvor skal jeg oppdatere
 - Incident template: `ops/incident-template.md`
 - Longrun-sim: `ops/longrun-sim.md`
 - Security minimum: `ops/security-minimum.md`
+- Runbook: `ops/runbook.md`
 
 ---
 

@@ -43,6 +43,18 @@ Regel: Hvis kontrakter/ops/pilot-kriterier endres, legg inn 5–10 linjer her + 
   - API-endepunkter: `docs/api/http-api.md`
 - Legacy `.docx/.xlsx` beholdes kun som historikk i `docs/_legacy/`.
 
+### 2025-12-31 - Installasjonsklart + runbook for feltpilot
+- Hva endret seg:
+  - Laget en amatørevennlig runbook (`docs/ops/runbook.md`) som “source of truth” for oppstart/stopp, smoke, logs, backup/restore og feltprofil.
+  - Forbedret ops-dok slik at det kan følges uten å “huske” ting: logging (hurtigguide + fullført kontrakt), backup/restore (amatør-proof), security minimum (30-sekunders forklaring + rotasjon)
+  - Verifisert i praksis: dev-profil fungerer end-to-end (up → smoke → backup/restore → down). Feltprofil fungerer med API-key (inkl. rotasjon med overlapp).
+- Hvor er sannheten nå (lenker):
+  - Runbook (amatør steg-for-steg): `docs/ops/runbook.md`
+  - Logging (hurtigguide + kontrakt): `docs/ops/logging.md`
+  - Backup/restore (detaljer + verifikasjon): `docs/ops/backup-restore.md`
+  - API-key (setup + rotasjon): `docs/ops/security-minimum.md`
+  - README (inngangspunkt): `README.md`
+
 ### YYYY-MM-DD — <Tittel>
 - Endring:
 - Lenker:
