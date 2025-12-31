@@ -1,9 +1,14 @@
 # DB backup/restore (lokal)
 
 ## Formål
-Gi en enkel og robust lokal prosedyre for å ta backup og restore av Postgres-databasen som kjører i `docker compose`, slik at feltpilot/utvikling kan:
+Dette er en enkel og robust oppskrift for å ta backup og restore av Postgres-databasen som kjører i Docker Compose, slik at du kan:
 - gjenopprette en kjent tilstand
-- dele en reproduksjon (backup-fil) ved behov
+- dele en backup-fil ved behov
+
+For en komplett “steg-for-steg” oppskrift (inkl. oppstart/stopp), se:
+- `docs/ops/runbook.md`
+
+---
 
 ## Hvor backup lagres
 Backuper lagres i repo-root under:
@@ -12,58 +17,79 @@ Backuper lagres i repo-root under:
 Filnavn-format:
 - `agingos_<UTC-timestamp>.sql` (UTC, f.eks. `agingos_20251225T120000Z.sql`)
 
+---
+
 ## Backup (happy path)
-Forutsetninger:
-- `docker compose`-stacken kjører (`make up`)
-- db-service heter `db` (som i `docker-compose.yml`)
-- database: `agingos`, bruker: `agingos`
+Forutsetning:
+- Systemet må kjøre (enten `make up` eller `make field-up`).
 
 Kjør:
-```bash
-make backup-db
-```
+
+    make backup-db
+
 Forventet resultat:
-- ny fil i ./backups/
-- kommandoen skriver ut hvilken fil som ble laget
+- Det kommer en ny fil i `./backups/`
+- Kommandoen skriver normalt ut hvilken fil som ble laget
+
+Valgfritt: se siste backupfiler:
+
+    ls -lh backups | tail
+
+---
 
 ## Restore (happy path)
-
 VIKTIG:
-- Restore overskriver data i databasen (det du restore’r inn erstatter nåværende state).
-- `make restore-db` resetter schema ved å kjøre `DROP SCHEMA public CASCADE; CREATE SCHEMA public;` før restore.
+- Restore overskriver databasen (det du restore’r inn erstatter nåværende state).
+- `make restore-db` resetter schema før restore (DROP/CREATE), så dette er ment som en “start på nytt fra backup”.
 
+Forutsetning:
+- Systemet må kjøre (db må være oppe). Start med `make up` eller `make field-up`.
 
-1. Finn ønsket backup-fil:
-```bash
-ls -1 backups
-```
-2. Restore fra fil:
-```bash
-make restore-db FILE=backups/<din_fil>.sql
-```
+1) Finn ønsket backup-fil:
+
+    ls -1 backups
+
+2) Restore fra fil (velg en ekte fil fra lista):
+
+    make restore-db FILE=backups/<din_fil>.sql
+
 Forventet resultat:
-- psql returnerer uten feil
-- data i DB samsvarer med backup
+- Kommandoen fullfører uten feil
+- Data i databasen samsvarer med backup
+
+Anbefaling:
+- Hvis du er usikker: ta en ny backup først (`make backup-db`) før du restore’r.
+
+---
 
 ## Verifikasjon (minimum)
-Etter restore, verifiser at DB svarer og at tabeller finnes:
-1. List tabeller:
-```bash
-docker compose exec -T db psql -U agingos -d agingos -c "\dt"
-```
-2. Sample counts (tilpass ved behov):
-```bash
-docker compose exec -T db psql -U agingos -d agingos -c "select count(*) as events from events;"
-docker compose exec -T db psql -U agingos -d agingos -c "select count(*) as deviations from deviations;"
-```
+Etter restore kan du sjekke at databasen svarer og at tabeller finnes.
+
+1) List tabeller:
+
+    docker compose exec -T db psql -U agingos -d agingos -c "\dt"
+
+2) Enkle “telleprøver” (kan feile hvis tabellene ikke finnes i din versjon – da er det i seg selv et signal):
+
+    docker compose exec -T db psql -U agingos -d agingos -c "select count(*) as events from events;"
+    docker compose exec -T db psql -U agingos -d agingos -c "select count(*) as deviations from deviations;"
+
+---
+
 ## Failure modes / feilsøking
-- docker compose exec ... feiler: sjekk at stacken kjører (make up) og at db-service er oppe.
-- Auth/DB-navn feil: verifiser docker-compose.yml (bruker, passord, db).
-- Restore feiler midt i: backup-filen kan være korrupt eller ufullstendig. Prøv en annen fil og verifiser at make backup-db fullfører uten feil.
-- Du vil se tilgjengelige backuper:
-    - make restore-db uten FILE=... lister tilgjengelige filer og viser korrekt usage.
+- “docker compose exec …” feiler:
+  - Sjekk at stacken kjører: `make up` (dev) eller `make field-up` (felt)
+  - Sjekk logger: `make logs` eller `make field-logs`
+
+- Restore feiler midt i:
+  - Backup-filen kan være korrupt/ufullstendig. Prøv en annen fil.
+  - Verifiser at `make backup-db` fullfører uten feil.
+
+- Du husker ikke riktig FILE=…:
+  - Kjør `make restore-db` uten `FILE=...` for å se usage og hvilke filer som finnes i `./backups/`.
+
+---
 
 ## Dokumentasjon
-Kommandoer og “happy path” står i README.md.
-Detaljer, verifikasjon og feilsøking står i denne filen: docs/ops/backup-restore.md.
-
+- “Steg-for-steg for amatører”: `docs/ops/runbook.md`
+- Detaljer/verifikasjon/feilsøking: denne filen (`docs/ops/backup-restore.md`)
