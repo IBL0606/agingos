@@ -120,22 +120,22 @@ Ekstra dokumentasjonssetning: Default retention og hvordan man sletter manuelt d
 ## Logs (hvor finner jeg logs)
 All runtime-logg går til container stdout/stderr.
 
-Se logg for alle services:
-```bash
-docker compose logs -f
-```
+Dev:
+- Se alle services: `docker compose logs -f`
+- Se backend: `docker compose logs -f backend`
+- Alternativ (Makefile): `make logs`
 
-Se logg for backend (API + scheduler):
-```bash
-docker compose logs -f backend
-```
+Feltprofil:
+- Alternativ (Makefile): `make field-logs`
 
-Tips:
-- Filtrer på `run_id` for å se én scheduler-kjøring ende-til-ende.
-- Loggkontrakt og felter er dokumentert i docs/ops/logging.md.
-- Scheduler failure modes og incident-template: `docs/ops/scheduler.md` og `docs/ops/incident-template.md`.
+Detaljert loggkontrakt + “hurtigguide for amatører”:
+- `docs/ops/logging.md`
 
-Ekstra dokumentasjonssetning: Loggkontrakt og felt dokumenteres i docs/ops/logging.md, mens “hvor finner jeg logs” dokumenteres i README.
+Se også:
+- `docs/ops/scheduler.md`
+- `docs/ops/incident-template.md`
+
+Ekstra dokumentasjonssetning: “hvor finner jeg logs” dokumenteres i README, mens loggkontrakt, felter og feilsøkingsguide dokumenteres i `docs/ops/logging.md`.
 
 ---
 
