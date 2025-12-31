@@ -42,6 +42,7 @@ Hvis felt-auth er aktiv (API-key), kjør:
 
 Hvis du får 401/403:
 - Nøkkelen er feil, eller du glemte `AGINGOS_API_KEY=...`.
+- Sjekk at `.env` inneholder riktig `AGINGOS_API_KEYS=...` (feltprofil) og at du bruker samme nøkkel i smoke.
 
 ### A4. Stopp systemet
 Kjør:
@@ -61,6 +62,9 @@ Lag/oppdater `.env` i repo-root med:
 Viktig:
 - `.env` skal ikke committes til git.
 - Bruk en lang, tilfeldig nøkkel (minimum ca. 32 tegn).
+
+Mer om API-key og rotasjon (bytte nøkkel):
+- `docs/ops/security-minimum.md`
 
 ### B2. Start feltprofil
 Kjør:
@@ -109,6 +113,9 @@ Forutsetter at systemet kjører (db må være oppe).
 
 Viktig:
 - Restore overskriver databasen.
+
+Mer detaljer/verifikasjon:
+- `docs/ops/backup-restore.md`
 
 ---
 
