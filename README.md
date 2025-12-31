@@ -91,7 +91,7 @@ make restore-db FILE=backups/<fil>.sql
 
 Detaljer, verifikasjon og feilsøking: `docs/ops/backup-restore.md`.
 
-Ekstra dokumentasjonssetning: Kommandoer og “happy path” ligger i README, mens detaljer/feilsøking ligger i `docs/ops/backup-restore.md`.
+Ekstra dokumentasjonssetning: “Happy path” (steg-for-steg) ligger i `docs/ops/runbook.md`, mens detaljer/feilsøking ligger i `docs/ops/backup-restore.md`.
 
 ## Retention (data retention policy)
 
