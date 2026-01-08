@@ -2,12 +2,12 @@ id: sc_smoke_no_devs_with_motion
 description: "Smoke: minst én motion i vinduet skal gi ingen avvik (R-001 skal ikke trigge)"
 events:
   - id: "11111111-1111-1111-1111-111111111111"
-    timestamp: "2025-12-23T10:02:00Z"
+    timestamp: "2025-12-31T10:02:00Z"
     category: "motion"
     payload: {}
 evaluate:
   since: "2025-12-23T10:00:00Z"
-  until: "2025-12-23T10:05:00Z"
+  until: "2025-12-31T10:05:00Z"
 expect:
   pass_condition: exact
   deviations: []
