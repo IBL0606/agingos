@@ -30,13 +30,13 @@ def _night_window_utc(now: datetime) -> tuple[datetime, datetime]:
 
     # If we're before 07:00, night started yesterday at 22:00
     if now < end:
-        start = (start - timedelta(days=1))
+        start = start - timedelta(days=1)
     else:
         # If we're after 07:00, "last night" ended today at 07:00
         end = end
 
         # and started yesterday at 22:00
-        start = (start - timedelta(days=1))
+        start = start - timedelta(days=1)
 
     return start, end
 
@@ -50,7 +50,9 @@ def _agingos_client() -> httpx.Client:
     return httpx.Client(base_url=base, headers=headers, timeout=5.0)
 
 
-def _fetch_events(since: datetime, until: datetime, limit: int = 1000) -> list[dict[str, Any]]:
+def _fetch_events(
+    since: datetime, until: datetime, limit: int = 1000
+) -> list[dict[str, Any]]:
     params = {
         "since": since.isoformat().replace("+00:00", "Z"),
         "until": until.isoformat().replace("+00:00", "Z"),
@@ -99,7 +101,10 @@ def insights(
     except Exception as e:
         return {
             "schema_version": "v1",
-            "period": {"since": period_since.isoformat(), "until": period_until.isoformat()},
+            "period": {
+                "since": period_since.isoformat(),
+                "until": period_until.isoformat(),
+            },
             "findings": [],
             "proposals": [],
             "note": f"Could not fetch events from AgingOS: {type(e).__name__}",
@@ -108,9 +113,19 @@ def insights(
     total = len(events)
 
     # Basic signals (very conservative for MVP)
-    motion_count = sum(1 for ev in events if (ev.get("category") or "").lower() in ("motion", "presence"))
-    door_count = sum(1 for ev in events if (ev.get("category") or "").lower() in ("door", "door_open", "door_closed"))
-    heartbeat_count = sum(1 for ev in events if (ev.get("category") or "").lower() == "heartbeat")
+    motion_count = sum(
+        1
+        for ev in events
+        if (ev.get("category") or "").lower() in ("motion", "presence")
+    )
+    door_count = sum(
+        1
+        for ev in events
+        if (ev.get("category") or "").lower() in ("door", "door_open", "door_closed")
+    )
+    heartbeat_count = sum(
+        1 for ev in events if (ev.get("category") or "").lower() == "heartbeat"
+    )
 
     # Human-readable finding
     title = "I natt (oppsummering)"
@@ -136,7 +151,10 @@ def insights(
                 "until": period_until.isoformat(),
                 "limit": 1000,
             },
-            "period": {"since": period_since.isoformat(), "until": period_until.isoformat()},
+            "period": {
+                "since": period_since.isoformat(),
+                "until": period_until.isoformat(),
+            },
         }
     )
     # --- Last 24 hours summary + sensor health (Sprint 1) ---
@@ -146,12 +164,25 @@ def insights(
     try:
         events_24h = _fetch_events(last24_since, last24_until, limit=1000)
         total_24h = len(events_24h)
-        motion_24h = sum(1 for ev in events_24h if (ev.get("category") or "").lower() in ("motion", "presence"))
-        door_24h = sum(1 for ev in events_24h if (ev.get("category") or "").lower() in ("door", "door_open", "door_closed"))
-        heartbeat_24h = sum(1 for ev in events_24h if (ev.get("category") or "").lower() == "heartbeat")
+        motion_24h = sum(
+            1
+            for ev in events_24h
+            if (ev.get("category") or "").lower() in ("motion", "presence")
+        )
+        door_24h = sum(
+            1
+            for ev in events_24h
+            if (ev.get("category") or "").lower()
+            in ("door", "door_open", "door_closed")
+        )
+        heartbeat_24h = sum(
+            1 for ev in events_24h if (ev.get("category") or "").lower() == "heartbeat"
+        )
 
         # Sensor health: heartbeat missing/unstable
-        hb_events = [ev for ev in events_24h if (ev.get("category") or "").lower() == "heartbeat"]
+        hb_events = [
+            ev for ev in events_24h if (ev.get("category") or "").lower() == "heartbeat"
+        ]
         hb_times = []
         for ev in hb_events:
             ts = ev.get("timestamp")
@@ -181,7 +212,10 @@ def insights(
                         "category": "heartbeat",
                         "limit": 1000,
                     },
-                    "period": {"since": last24_since.isoformat(), "until": last24_until.isoformat()},
+                    "period": {
+                        "since": last24_since.isoformat(),
+                        "until": last24_until.isoformat(),
+                    },
                 }
             )
         else:
@@ -200,7 +234,7 @@ def insights(
                     {
                         "id": f"sensor-health-heartbeat-unstable-{now.date().isoformat()}",
                         "title": "Sensorhelse: Heartbeat ustabil",
-                        "summary": f"Heartbeat har et stort opphold (ca. {int(max_gap.total_seconds()//60)} minutter) siste 24 timer.",
+                        "summary": f"Heartbeat har et stort opphold (ca. {int(max_gap.total_seconds() // 60)} minutter) siste 24 timer.",
                         "severity": "observe",
                         "because": [
                             f"Periode: {last24_since.isoformat()} til {last24_until.isoformat()}",
@@ -215,7 +249,10 @@ def insights(
                             "category": "heartbeat",
                             "limit": 1000,
                         },
-                        "period": {"since": last24_since.isoformat(), "until": last24_until.isoformat()},
+                        "period": {
+                            "since": last24_since.isoformat(),
+                            "until": last24_until.isoformat(),
+                        },
                     }
                 )
 
@@ -238,7 +275,10 @@ def insights(
                     "until": last24_until.isoformat(),
                     "limit": 1000,
                 },
-                "period": {"since": last24_since.isoformat(), "until": last24_until.isoformat()},
+                "period": {
+                    "since": last24_since.isoformat(),
+                    "until": last24_until.isoformat(),
+                },
             }
         )
     except Exception:
@@ -246,9 +286,11 @@ def insights(
         pass
 
     return {
-
         "schema_version": "v1",
-        "period": {"since": period_since.isoformat(), "until": period_until.isoformat()},
+        "period": {
+            "since": period_since.isoformat(),
+            "until": period_until.isoformat(),
+        },
         "findings": findings,
         "proposals": proposals,
     }

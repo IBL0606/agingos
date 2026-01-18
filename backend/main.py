@@ -34,6 +34,7 @@ app.include_router(deviations_router)
 def health():
     return {"status": "ok"}
 
+
 @app.get("/ai/status")
 def ai_status():
     enabled = os.getenv("AI_BOT_ENABLED", "0").lower() in ("1", "true", "yes", "on")
@@ -70,6 +71,7 @@ def ai_status():
             "bot_version": None,
             "schema_version": "v1",
         }
+
 
 @app.get("/ai/insights")
 def ai_insights(
@@ -108,7 +110,13 @@ def ai_insights(
 
         # Ensure period is always present for GUI consistency
         payload.setdefault("schema_version", "v1")
-        payload.setdefault("period", {"since": since.isoformat() if since else None, "until": until.isoformat() if until else None})
+        payload.setdefault(
+            "period",
+            {
+                "since": since.isoformat() if since else None,
+                "until": until.isoformat() if until else None,
+            },
+        )
         payload.setdefault("findings", [])
         payload.setdefault("proposals", [])
         return payload
@@ -116,7 +124,10 @@ def ai_insights(
         # Fail soft: GUI should keep working even if bot is down
         return {
             "schema_version": "v1",
-            "period": {"since": since.isoformat() if since else None, "until": until.isoformat() if until else None},
+            "period": {
+                "since": since.isoformat() if since else None,
+                "until": until.isoformat() if until else None,
+            },
             "findings": [],
             "proposals": [],
             "note": "AI bot unreachable",
