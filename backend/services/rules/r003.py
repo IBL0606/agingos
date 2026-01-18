@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 from typing import List
-from uuid import UUID
 
 from sqlalchemy.orm import Session
 
@@ -41,7 +40,7 @@ def eval_r003_front_door_open_no_motion_after(
     )
 
     triggered = False
-    evidence: List[UUID] = []
+    evidence: List[str] = []
 
     for d in door_rows:
         state = None
@@ -77,11 +76,8 @@ def eval_r003_front_door_open_no_motion_after(
 
         if not has_motion_on:
             triggered = True
-            # Evidence: dør-eventet som utløste regelen (best effort)
-            try:
-                evidence.append(UUID(str(d.id)))
-            except Exception:
-                pass
+            # Evidence: dør-eventet som utløste regelen
+            evidence.append(str(d.id))
             # Samme mønster som R-002: én deviation hvis regelen trigges
             break
 

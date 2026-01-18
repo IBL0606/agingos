@@ -1,6 +1,5 @@
 from datetime import datetime, time
 from typing import List
-from uuid import UUID
 
 from sqlalchemy.orm import Session
 
@@ -54,7 +53,7 @@ def eval_r002_front_door_open_at_night(
     )
 
     triggered = False
-    evidence: List[UUID] = []
+    evidence: List[str] = []
 
     for r in rows:
         state = None
@@ -63,11 +62,7 @@ def eval_r002_front_door_open_at_night(
 
         if state == "open" and _is_night(r.timestamp):
             triggered = True
-            # Evidence er "best effort": hvis r.id ikke er UUID, lar vi evidence være tom
-            try:
-                evidence.append(UUID(str(r.id)))
-            except Exception:
-                pass
+            evidence.append(str(r.id))
 
     if not triggered:
         return []

@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AgingOS Console (MVP)</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 20px; max-width: 980px; }
+    .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 14px; flex: 1; min-width: 320px; }
+    .muted { color: #666; font-size: 14px; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #f2f2f2; font-size: 12px; }
+    label { display: inline-block; width: 110px; }
+    input { padding: 6px 8px; width: 320px; }
+    button { padding: 7px 10px; cursor: pointer; }
+    ul { margin: 8px 0 0 18px; }
+    pre { background: #fafafa; border: 1px solid #eee; padding: 10px; border-radius: 8px; overflow:auto; }
+    h2 { margin-top: 0; }
+    a { text-decoration: none; }
+    .finding { border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px; }
+    .finding:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+    .finding-title { font-weight: 600; }
+    .actions { margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <h1>AgingOS Console (MVP)</h1>
+  <p class="muted">Statisk HTML/JS. Ingen automatikk. Henter data fra AgingOS API.</p>
+  <p><a href="/events.html">Gå til Events</a></p>
+
+  <div class="card">
+    <div><span class="pill">Tilkobling</span></div>
+    <p>
+      <label>API Base:</label>
+      <input id="apiBase" value="/api" />
+    </p>
+    <p>
+      <label>X-API-Key:</label>
+      <input id="apiKey" placeholder="sett X-API-Key" />
+      <button id="saveBtn">Lagre</button>
+      <button id="refreshBtn">Oppdater</button>
+    </p>
+    <div class="muted">Nøkkelen lagres lokalt i nettleseren (localStorage).</div>
+  </div>
+
+  <div class="row">
+    <div class="card">
+      <h2>AI-status</h2>
+      <pre id="aiStatus">Trykk "Oppdater".</pre>
+    </div>
+
+    <div class="card">
+      <h2>Insights</h2>
+      <div id="insightsList" class="muted">Trykk "Oppdater".</div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    function loadSettings() {
+      const apiBase = localStorage.getItem("agingos_api_base") || $("apiBase").value;
+      const apiKey = localStorage.getItem("agingos_api_key") || "";
+      $("apiBase").value = apiBase;
+      $("apiKey").value = apiKey;
+    }
+
+    function saveSettings() {
+      localStorage.setItem("agingos_api_base", $("apiBase").value.trim());
+      localStorage.setItem("agingos_api_key", $("apiKey").value.trim());
+    }
+
+    async function apiGet(path) {
+      const base = $("apiBase").value.trim().replace(/\/$/, "");
+      const key = $("apiKey").value.trim();
+      const headers = key ? { "X-API-Key": key } : {};
+      const res = await fetch(base + path, { headers });
+      const text = await res.text();
+      if (!res.ok) throw new Error(res.status + " " + text);
+      return JSON.parse(text);
+    }
+
+    function buildEvidenceLink(finding) {
+      const ev = finding.evidence || {};
+      const p = finding.period || {};
+      const since = encodeURIComponent(p.since || ev.since || "");
+      const until = encodeURIComponent(p.until || ev.until || "");
+      const category = encodeURIComponent(ev.category || "");
+
+      let url = "/events.html";
+      const qs = [];
+      if (since) qs.push("since=" + since);
+      if (until) qs.push("until=" + until);
+      if (category) qs.push("category=" + category);
+      if (qs.length) url += "?" + qs.join("&");
+      return url;
+    }
+
+    function renderInsights(insights) {
+      const host = $("insightsList");
+      host.innerHTML = "";
+
+      const findings = insights.findings || [];
+      if (findings.length === 0) {
+        host.textContent = "Ingen innsikt ennå.";
+        return;
+      }
+
+      for (const f of findings) {
+        const div = document.createElement("div");
+        div.className = "finding";
+
+        const title = document.createElement("div");
+        title.className = "finding-title";
+        title.textContent = f.title || "(uten tittel)";
+
+        const summary = document.createElement("div");
+        summary.className = "muted";
+        summary.textContent = f.summary || "";
+
+        div.appendChild(title);
+        div.appendChild(summary);
+
+        if (Array.isArray(f.because) && f.because.length) {
+          const ul = document.createElement("ul");
+          for (const item of f.because) {
+            const li = document.createElement("li");
+            li.textContent = item;
+            ul.appendChild(li);
+          }
+          div.appendChild(ul);
+        }
+
+        const actions = document.createElement("div");
+        actions.className = "actions";
+        const a = document.createElement("a");
+        a.href = buildEvidenceLink(f);
+        a.textContent = "Vis grunnlag (events)";
+        actions.appendChild(a);
+        div.appendChild(actions);
+
+        host.appendChild(div);
+      }
+    }
+
+    async function refresh() {
+      $("aiStatus").textContent = "Laster...";
+      $("insightsList").textContent = "Laster...";
+
+      try {
+        const status = await apiGet("/ai/status");
+        $("aiStatus").textContent = JSON.stringify(status, null, 2);
+
+        const insights = await apiGet("/ai/insights");
+        renderInsights(insights);
+      } catch (e) {
+        $("aiStatus").textContent = "Feil: " + e.message;
+        $("insightsList").textContent = "Feil: " + e.message;
+      }
+    }
+
+    $("saveBtn").addEventListener("click", () => { saveSettings(); refresh(); });
+    $("refreshBtn").addEventListener("click", refresh);
+
+    loadSettings();
+  </script>
+</body>
+</html>

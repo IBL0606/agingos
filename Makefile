@@ -93,6 +93,16 @@ restore-db:
 	docker compose exec -T db psql -U agingos -d agingos < "$$FILE"
 	@echo "OK: restore complete"
 
+.PHONY: smoke-s0 smoke-s1 smoke-ai
+
+smoke-s0:
+	./scripts/smoke_ai_bot.sh
+
+smoke-s1:
+	./scripts/smoke_sprint1.sh
+
+smoke-ai: smoke-s0 smoke-s1
+
 help:
 	@echo "Targets:"
 	@echo "  make up          - start services (dev)"
@@ -110,3 +120,6 @@ help:
 	@echo "  make fmt-check   - check formatting (same as CI)"
 	@echo "  make lint        - lint (ruff via docker)"
 	@echo "  make lint-fix    - lint with auto-fix (ruff via docker)"
+	@echo "  make smoke-s0    - run AI bot smoke (Sprint 0)"
+	@echo "  make smoke-s1    - run AI insights smoke (Sprint 1)"
+	@echo "  make smoke-ai    - run both Sprint 0 and Sprint 1 AI smoke tests"

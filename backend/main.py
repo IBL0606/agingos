@@ -1,4 +1,6 @@
 import os
+import httpx
+
 
 # backend/main.py
 from fastapi import Depends, FastAPI, HTTPException
@@ -32,6 +34,94 @@ app.include_router(deviations_router)
 def health():
     return {"status": "ok"}
 
+@app.get("/ai/status")
+def ai_status():
+    enabled = os.getenv("AI_BOT_ENABLED", "0").lower() in ("1", "true", "yes", "on")
+    bot_url = os.getenv("AI_BOT_BASE_URL", "http://ai-bot:8010")
+
+    if not enabled:
+        return {
+            "enabled": False,
+            "reachable": False,
+            "bot_url": bot_url,
+            "bot_version": None,
+            "schema_version": "v1",
+        }
+
+    try:
+        with httpx.Client(timeout=1.5) as client:
+            r = client.get(f"{bot_url}/v1/capabilities")
+            r.raise_for_status()
+            caps = r.json()
+
+        return {
+            "enabled": True,
+            "reachable": True,
+            "bot_url": bot_url,
+            "bot_version": caps.get("bot_version"),
+            "schema_version": caps.get("schema_version", "v1"),
+            "features": caps.get("features", {}),
+        }
+    except Exception:
+        return {
+            "enabled": True,
+            "reachable": False,
+            "bot_url": bot_url,
+            "bot_version": None,
+            "schema_version": "v1",
+        }
+
+@app.get("/ai/insights")
+def ai_insights(
+    since: Optional[datetime] = Query(default=None),
+    until: Optional[datetime] = Query(default=None),
+):
+    enabled = os.getenv("AI_BOT_ENABLED", "0").lower() in ("1", "true", "yes", "on")
+    bot_url = os.getenv("AI_BOT_BASE_URL", "http://ai-bot:8010")
+
+    if not enabled:
+        return {
+            "schema_version": "v1",
+            "period": {"since": since, "until": until},
+            "findings": [],
+            "proposals": [],
+            "note": "AI bot disabled",
+        }
+
+    # Normalize times (optional but consistent with /events)
+    if since:
+        since = require_utc_aware(since, "since")
+    if until:
+        until = require_utc_aware(until, "until")
+
+    try:
+        params = {}
+        if since:
+            params["since"] = since.isoformat()
+        if until:
+            params["until"] = until.isoformat()
+
+        with httpx.Client(timeout=2.5) as client:
+            r = client.get(f"{bot_url}/v1/insights", params=params)
+            r.raise_for_status()
+            payload = r.json()
+
+        # Ensure period is always present for GUI consistency
+        payload.setdefault("schema_version", "v1")
+        payload.setdefault("period", {"since": since.isoformat() if since else None, "until": until.isoformat() if until else None})
+        payload.setdefault("findings", [])
+        payload.setdefault("proposals", [])
+        return payload
+    except Exception:
+        # Fail soft: GUI should keep working even if bot is down
+        return {
+            "schema_version": "v1",
+            "period": {"since": since.isoformat() if since else None, "until": until.isoformat() if until else None},
+            "findings": [],
+            "proposals": [],
+            "note": "AI bot unreachable",
+        }
+
 
 @app.post("/event")
 def receive_event(event: Event):
@@ -56,6 +146,7 @@ def list_events(
     category: Optional[str] = Query(default=None),
     since: Optional[datetime] = Query(default=None),
     until: Optional[datetime] = Query(default=None),
+    before: Optional[datetime] = Query(default=None),
     limit: int = Query(default=100, ge=1, le=1000),
 ) -> list[Event]:
     db = SessionLocal()
@@ -76,6 +167,12 @@ def list_events(
             except Exception as e:
                 raise HTTPException(status_code=400, detail=str(e))
             query = query.filter(EventDB.timestamp < until_utc)
+        if before:
+            try:
+                before_utc = require_utc_aware(before, "before")
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=str(e))
+            query = query.filter(EventDB.timestamp < before_utc)
 
         rows = query.order_by(EventDB.timestamp.desc()).limit(limit).all()
 

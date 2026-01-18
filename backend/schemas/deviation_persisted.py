@@ -1,6 +1,5 @@
 from pydantic import BaseModel
 from typing import List
-from uuid import UUID
 from datetime import datetime
 
 
@@ -23,5 +22,5 @@ class DeviationPersisted(BaseModel):
     last_seen_at: datetime
 
     subject_key: str
-    evidence: List[UUID] = []
+    evidence: List[str] = []
     window: Window

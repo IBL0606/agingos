@@ -16,5 +16,5 @@ class DeviationV1(BaseModel):
     severity: str
     title: str
     explanation: str
-    evidence: List[UUID] = []
+    evidence: List[str] = []
     window: Window

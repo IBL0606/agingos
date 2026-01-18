@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AgingOS Console – Events</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 20px; max-width: 1100px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 14px; }
+    .muted { color: #666; font-size: 14px; }
+    label { margin-right: 6px; }
+    select, input { padding: 6px 8px; }
+    button { padding: 7px 10px; cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { text-align: left; border-bottom: 1px solid #eee; padding: 8px; vertical-align: top; }
+    th { background: #fafafa; }
+    code { font-size: 12px; }
+    .topbar { display:flex; justify-content: space-between; align-items:center; margin-bottom: 12px; }
+    a { text-decoration: none; }
+    .btnrow { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>Events</h1>
+    <div class="muted"><a href="/">← Tilbake</a></div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <div>
+        <label>Periode:</label>
+        <select id="preset">
+          <option value="24h">Siste 24 timer</option>
+          <option value="7d" selected>Siste 7 dager</option>
+          <option value="14d">Siste 14 dager</option>
+          <option value="30d">Siste 30 dager</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Kategori:</label>
+        <input id="category" placeholder="(valgfritt, f.eks. motion)" />
+      </div>
+
+      <div>
+        <label>Limit:</label>
+        <select id="limit">
+          <option>3</option>
+          <option>200</option>
+          <option>500</option>
+          <option selected>1000</option>
+        </select>
+      </div>
+
+      <div class="btnrow">
+        <button id="loadBtn">Hent</button>
+        <button id="moreBtn" disabled>Hent flere</button>
+        <button id="clearBtn">Tøm</button>
+      </div>
+    </div>
+
+    <div class="muted" style="margin-top:8px;">
+      Bruker periode (since/until) + cursor-paginering (before) når du trykker "Hent flere".
+    </div>
+  </div>
+
+  <div id="status" class="muted" style="margin-top:10px;"></div>
+
+  <table id="tbl" style="display:none;">
+    <thead>
+      <tr>
+        <th>Tid</th>
+        <th>Kategori</th>
+        <th>ID</th>
+        <th>Payload</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+
+  <script>
+    function getQS() {
+      const p = new URLSearchParams(window.location.search);
+      return {
+        since: p.get("since"),
+        until: p.get("until"),
+        category: p.get("category"),
+      };
+    }
+    const $ = (id) => document.getElementById(id);
+
+    let state = {
+      since: null,
+      until: null,
+      category: "",
+      limit: 1000,
+      before: null,   // timestamp cursor (fetch older than this)
+      rows: [],
+      exhausted: false,
+    };
+
+    function apiKey() {
+      return localStorage.getItem("agingos_api_key") || "";
+    }
+
+    async function apiGet(path) {
+      const headers = {};
+      const key = apiKey().trim();
+      if (key) headers["X-API-Key"] = key;
+
+      const res = await fetch("/api" + path, { headers });
+      const text = await res.text();
+      if (!res.ok) throw new Error(res.status + " " + text);
+      return JSON.parse(text);
+    }
+
+    function isoUTC(d) {
+      return d.toISOString().replace(".000Z", "Z");
+    }
+
+    function computeRange(preset) {
+      const now = new Date();
+      let since = new Date(now);
+      if (preset === "24h") since.setHours(since.getHours() - 24);
+      if (preset === "7d") since.setDate(since.getDate() - 7);
+      if (preset === "14d") since.setDate(since.getDate() - 14);
+      if (preset === "30d") since.setDate(since.getDate() - 30);
+      return { since: isoUTC(since), until: isoUTC(now) };
+    }
+
+    function renderAppend(events) {
+      const tbody = $("tbody");
+      for (const ev of events) {
+        const tr = document.createElement("tr");
+        const tdT = document.createElement("td");
+        const tdC = document.createElement("td");
+        const tdI = document.createElement("td");
+        const tdP = document.createElement("td");
+
+        tdT.textContent = ev.timestamp || "";
+        tdC.textContent = ev.category || "";
+        tdI.innerHTML = `<code>${(ev.id || "").slice(0, 16)}…</code>`;
+        tdP.innerHTML = `<code>${JSON.stringify(ev.payload || {}, null, 0)}</code>`;
+
+        tr.appendChild(tdT);
+        tr.appendChild(tdC);
+        tr.appendChild(tdI);
+        tr.appendChild(tdP);
+        tbody.appendChild(tr);
+      }
+      $("tbl").style.display = "table";
+    }
+
+    function resetTable() {
+      $("tbody").innerHTML = "";
+      $("tbl").style.display = "none";
+    }
+
+    function updateButtons() {
+      $("moreBtn").disabled = state.exhausted || state.rows.length === 0;
+    }
+
+    async function fetchPage(isMore) {
+      $("status").textContent = isMore ? "Laster mer..." : "Laster...";
+      const qs = new URLSearchParams();
+      qs.set("since", state.since);
+      qs.set("until", state.until);
+      qs.set("limit", String(state.limit));
+      if (state.category) qs.set("category", state.category);
+      if (state.before) qs.set("before", state.before);
+
+      const data = await apiGet("/events?" + qs.toString());
+      return data;
+    }
+
+    async function loadFresh() {
+      resetTable();
+
+      const qs = getQS();
+      if (qs.since && qs.until) {
+        state.since = qs.since;
+        state.until = qs.until;
+      } else {
+        const preset = $("preset").value;
+        const range = computeRange(preset);
+        state.since = range.since;
+        state.until = range.until;
+      }
+      state.category = (qs.category || $("category").value.trim());
+      state.limit = parseInt($("limit").value, 10);
+      state.before = null;
+      state.rows = [];
+      state.exhausted = false;
+
+      try {
+        const page = await fetchPage(false);
+        state.rows = page;
+        renderAppend(page);
+
+        // update cursor: last item is oldest in this page (descending order)
+        if (page.length > 0) state.before = page[page.length - 1].timestamp;
+        if (page.length < state.limit) state.exhausted = true;
+
+        $("status").textContent = `Fant ${state.rows.length} events (viser siste). Periode: ${state.since} → ${state.until}` +
+          (state.exhausted ? " (ingen flere)" : " (trykk 'Hent flere' for eldre)");
+      } catch (e) {
+        $("status").textContent = "Feil: " + e.message + " (Husk å sette X-API-Key på forsiden.)";
+      }
+
+      updateButtons();
+    }
+
+    async function loadMore() {
+      if (state.exhausted) return;
+      try {
+        const page = await fetchPage(true);
+        if (page.length === 0) {
+          state.exhausted = true;
+          updateButtons();
+          $("status").textContent = `Fant ${state.rows.length} events. (ingen flere)`;
+          return;
+        }
+
+        state.rows = state.rows.concat(page);
+        renderAppend(page);
+
+        state.before = page[page.length - 1].timestamp;
+        if (page.length < state.limit) state.exhausted = true;
+
+        $("status").textContent = `Fant ${state.rows.length} events. Periode: ${state.since} → ${state.until}` +
+          (state.exhausted ? " (ingen flere)" : " (trykk 'Hent flere' for eldre)");
+      } catch (e) {
+        $("status").textContent = "Feil: " + e.message;
+      }
+
+      updateButtons();
+    }
+
+    function clearAll() {
+      resetTable();
+      state = { since:null, until:null, category:"", limit:1000, before:null, rows:[], exhausted:false };
+      $("status").textContent = "";
+      updateButtons();
+    }
+
+    $("loadBtn").addEventListener("click", loadFresh);
+    $("moreBtn").addEventListener("click", loadMore);
+    $("clearBtn").addEventListener("click", clearAll);
+
+    updateButtons();
+  </script>
+</body>
+</html>

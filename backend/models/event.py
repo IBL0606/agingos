@@ -19,11 +19,16 @@ class Event(BaseModel):
 
     @field_validator("id")
     @classmethod
-    def _id_must_be_uuid_or_ulid(cls, v: str) -> str:
-        # UUID?
+    def _normalize_id(cls, v: str) -> str:
+        # Accept UUID, ULID, or any non-empty string.
+        # Home Assistant may send non-UUID/ULID ids depending on template/rest_command usage.
+        v = str(v).strip()
+        if not v:
+            raise ValueError("id must be a non-empty string")
+
+        # UUID? (normalize to canonical form)
         try:
-            uuid.UUID(v)
-            return v
+            return str(uuid.UUID(v))
         except Exception:
             pass
 
@@ -31,7 +36,8 @@ class Event(BaseModel):
         if _ULID_RE.match(v):
             return v
 
-        raise ValueError("id must be a valid UUID or ULID")
+        # Fallback: accept as-is
+        return v
 
     @field_validator("timestamp")
     @classmethod
