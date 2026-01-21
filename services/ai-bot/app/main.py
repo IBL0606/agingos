@@ -222,7 +222,7 @@ def anomalies(
                     },
                     "because": [
                         f"Natt (UTC): {recent_since.isoformat()} → {recent_until.isoformat()}",
-                        f"Metrikk: antall events med category=motion/presence",
+                        "Metrikk: antall events med category=motion/presence",
                         f"I natt: {recent_mp}",
                         f"Baseline (siste {window_days} netter): snitt={mean:.1f}, spredning(stdev)={stdev:.1f}",
                         f"Terskel: snitt + {z_threshold}*stdev = {threshold:.1f}",
@@ -554,7 +554,7 @@ def anomalies(
                         "because": [
                             f"Tidssone: {tz_name}",
                             f"Morgen-vindu (lokal tid): {morning_start_h:02d}:00–{morning_end_h:02d}:00",
-                            f"Metrikk: første event med category=motion/presence i morgen-vinduet",
+                            "Metrikk: første event med category=motion/presence i morgen-vinduet",
                             f"I dag: {_fmt_minute(recent_minute)}",
                             f"Baseline: median {_fmt_minute(baseline_median)} (antall dager med data: {len(baseline_minutes)})",
                             f"Terskel: >= {delay_threshold_minutes} minutter senere enn baseline",
