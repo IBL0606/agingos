@@ -17,3 +17,6 @@ agingos_repo.zip
 
 *.zip
 *:Zone.Identifier
+
+# Local backups
+*.bak
