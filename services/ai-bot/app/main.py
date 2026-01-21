@@ -43,7 +43,6 @@ def _night_window_utc(now: datetime) -> tuple[datetime, datetime]:
     return start_local.astimezone(timezone.utc), end_local.astimezone(timezone.utc)
 
 
-
 def _agingos_client() -> httpx.Client:
     base = os.getenv("AGINGOS_API_BASE_URL", "http://backend:8000").rstrip("/")
     key = os.getenv("AGINGOS_API_KEY", "").strip()
@@ -146,7 +145,6 @@ def anomalies(
         recent_mp = motion_presence_count(recent_events)
         recent_by_room = motion_presence_count_by_room(recent_events)
 
-
         baseline_counts = []
         baseline_by_room: dict[str, list[int]] = {}
         for s, e in baseline_night_windows:
@@ -154,7 +152,11 @@ def anomalies(
             baseline_counts.append(motion_presence_count(evs))
             by_room = motion_presence_count_by_room(evs)
             # ensure every seen room gets a value for this night
-            rooms = set(baseline_by_room.keys()) | set(by_room.keys()) | set(recent_by_room.keys())
+            rooms = (
+                set(baseline_by_room.keys())
+                | set(by_room.keys())
+                | set(recent_by_room.keys())
+            )
             for room in rooms:
                 baseline_by_room.setdefault(room, []).append(by_room.get(room, 0))
 
@@ -162,7 +164,10 @@ def anomalies(
         if not baseline_counts:
             return {
                 "schema_version": "v1",
-                "period": {"since": recent_since.isoformat(), "until": recent_until.isoformat()},
+                "period": {
+                    "since": recent_since.isoformat(),
+                    "until": recent_until.isoformat(),
+                },
                 "baseline": {
                     "since": baseline_night_windows[-1][0].isoformat(),
                     "until": baseline_night_windows[0][1].isoformat(),
@@ -173,7 +178,9 @@ def anomalies(
             }
 
         mean = statistics.mean(baseline_counts)
-        stdev = statistics.pstdev(baseline_counts)  # population stdev for stability on small N
+        stdev = statistics.pstdev(
+            baseline_counts
+        )  # population stdev for stability on small N
         threshold = mean + (z_threshold * stdev)
 
         findings = []
@@ -235,7 +242,8 @@ def anomalies(
                             "window_days": window_days,
                             "night_counts": baseline_counts,
                         },
-                    },                    "period": {
+                    },
+                    "period": {
                         "since": recent_since.isoformat(),
                         "until": recent_until.isoformat(),
                     },
@@ -267,7 +275,14 @@ def anomalies(
                             f"sammenlignet med et baseline-snitt på {mean_r:.1f} (siste {window_days} netter)."
                         ),
                         "severity": "observe",
-                        "confidence": "middels" if stdev_r == 0 else ("høy" if ((recent_room_mp - mean_r) / stdev_r) >= (z_threshold + 1.0) else "middels"),
+                        "confidence": "middels"
+                        if stdev_r == 0
+                        else (
+                            "høy"
+                            if ((recent_room_mp - mean_r) / stdev_r)
+                            >= (z_threshold + 1.0)
+                            else "middels"
+                        ),
                         "normal": {
                             "room": room,
                             "baseline_window_days": window_days,
@@ -310,7 +325,6 @@ def anomalies(
                     }
                 )
 
-
         # --- Per-room night inactivity anomaly (Sprint 2) ---
         # Detect rooms with unusually low night motion/presence compared to room-specific baseline.
         # Conservative gating: require enough baseline nights and a minimum baseline activity level.
@@ -335,7 +349,9 @@ def anomalies(
             # Reuse min_abs_increase as an absolute *decrease* gate for silence (keeps API stable)
             min_abs_decrease = float(min_abs_increase)
 
-            if (recent_room_mp <= low_threshold_r) and ((mean_r - recent_room_mp) >= min_abs_decrease):
+            if (recent_room_mp <= low_threshold_r) and (
+                (mean_r - recent_room_mp) >= min_abs_decrease
+            ):
                 findings.append(
                     {
                         "id": f"anomaly-night-quiet-room-{room}-{recent_since.date().isoformat()}",
@@ -350,7 +366,8 @@ def anomalies(
                         if stdev_r == 0
                         else (
                             "høy"
-                            if ((mean_r - recent_room_mp) / stdev_r) >= (z_threshold + 1.0)
+                            if ((mean_r - recent_room_mp) / stdev_r)
+                            >= (z_threshold + 1.0)
                             else "middels"
                         ),
                         "normal": {
@@ -396,7 +413,6 @@ def anomalies(
                     }
                 )
 
-
         # --- Morning routine anomaly (Sprint 2) ---
         # Conservative, explainable: compare first motion/presence in the morning window vs baseline median.
         from zoneinfo import ZoneInfo
@@ -416,30 +432,42 @@ def anomalies(
         min_baseline_days = 5
 
         def _first_motion_presence_minute_in_window(s_utc, e_utc):
-          events = _fetch_events(s_utc, e_utc, limit=1000)
-          times = []
-          for ev in events:
-              if (ev.get("category") or "").lower() in ("motion", "presence"):
-                  ts = ev.get("timestamp")
-                  if ts:
-                      try:
-                          times.append(_parse_iso_z(ts))
-                      except Exception:
-                          pass
-          if not times:
-              return None, {"since": s_utc.isoformat(), "until": e_utc.isoformat(), "count": 0}
-          first = min(times)
-          first_local = first.astimezone(tz)
-          minute = first_local.hour * 60 + first_local.minute
-          return minute, {"since": s_utc.isoformat(), "until": e_utc.isoformat(), "count": len(times)}
+            events = _fetch_events(s_utc, e_utc, limit=1000)
+            times = []
+            for ev in events:
+                if (ev.get("category") or "").lower() in ("motion", "presence"):
+                    ts = ev.get("timestamp")
+                    if ts:
+                        try:
+                            times.append(_parse_iso_z(ts))
+                        except Exception:
+                            pass
+            if not times:
+                return None, {
+                    "since": s_utc.isoformat(),
+                    "until": e_utc.isoformat(),
+                    "count": 0,
+                }
+            first = min(times)
+            first_local = first.astimezone(tz)
+            minute = first_local.hour * 60 + first_local.minute
+            return minute, {
+                "since": s_utc.isoformat(),
+                "until": e_utc.isoformat(),
+                "count": len(times),
+            }
 
         # Baseline: previous N mornings
         baseline_minutes = []
         baseline_meta = []
         for d in range(1, window_days + 1):
-            day = (now_local.date() - timedelta(days=d))
-            s_local = datetime(day.year, day.month, day.day, morning_start_h, 0, 0, tzinfo=tz)
-            e_local = datetime(day.year, day.month, day.day, morning_end_h, 0, 0, tzinfo=tz)
+            day = now_local.date() - timedelta(days=d)
+            s_local = datetime(
+                day.year, day.month, day.day, morning_start_h, 0, 0, tzinfo=tz
+            )
+            e_local = datetime(
+                day.year, day.month, day.day, morning_end_h, 0, 0, tzinfo=tz
+            )
             s_utc = s_local.astimezone(timezone.utc)
             e_utc = e_local.astimezone(timezone.utc)
             minute, meta = _first_motion_presence_minute_in_window(s_utc, e_utc)
@@ -452,12 +480,18 @@ def anomalies(
         recent_window = None
         if now_local.hour >= morning_start_h:
             today = now_local.date()
-            s_local = datetime(today.year, today.month, today.day, morning_start_h, 0, 0, tzinfo=tz)
-            e_local = datetime(today.year, today.month, today.day, morning_end_h, 0, 0, tzinfo=tz)
+            s_local = datetime(
+                today.year, today.month, today.day, morning_start_h, 0, 0, tzinfo=tz
+            )
+            e_local = datetime(
+                today.year, today.month, today.day, morning_end_h, 0, 0, tzinfo=tz
+            )
             end_local = now_local if now_local < e_local else e_local
             s_utc = s_local.astimezone(timezone.utc)
             e_utc = end_local.astimezone(timezone.utc)
-            recent_minute, recent_window = _first_motion_presence_minute_in_window(s_utc, e_utc)
+            recent_minute, recent_window = _first_motion_presence_minute_in_window(
+                s_utc, e_utc
+            )
 
         def _fmt_minute(m):
             hh = int(m) // 60
@@ -468,6 +502,7 @@ def anomalies(
             baseline_median = statistics.median(baseline_minutes)
             # Typical range (robust): 10th–90th percentile of baseline minutes
             b_sorted = sorted(baseline_minutes)
+
             def _pct(vals, p):
                 if not vals:
                     return None
@@ -477,6 +512,7 @@ def anomalies(
                 if f == c:
                     return float(vals[f])
                 return float(vals[f]) + (k - f) * (float(vals[c]) - float(vals[f]))
+
             p10 = _pct(b_sorted, 0.10)
             p90 = _pct(b_sorted, 0.90)
             delta = recent_minute - baseline_median
@@ -548,7 +584,10 @@ def anomalies(
 
         return {
             "schema_version": "v1",
-            "period": {"since": recent_since.isoformat(), "until": recent_until.isoformat()},
+            "period": {
+                "since": recent_since.isoformat(),
+                "until": recent_until.isoformat(),
+            },
             "baseline": {
                 "since": baseline_night_windows[-1][0].isoformat(),
                 "until": baseline_night_windows[0][1].isoformat(),
@@ -560,7 +599,10 @@ def anomalies(
     except Exception as e:
         return {
             "schema_version": "v1",
-            "period": {"since": recent_since.isoformat(), "until": recent_until.isoformat()},
+            "period": {
+                "since": recent_since.isoformat(),
+                "until": recent_until.isoformat(),
+            },
             "baseline": {
                 "since": baseline_night_windows[-1][0].isoformat(),
                 "until": baseline_night_windows[0][1].isoformat(),
@@ -569,7 +611,6 @@ def anomalies(
             "findings": [],
             "note": f"Could not compute anomalies (fail-soft): {type(e).__name__}",
         }
-
 
 
 @app.get("/v1/proposals")
@@ -619,7 +660,7 @@ def proposals(
 
         props.append(
             {
-                "id": f"proposal-test-quiet-room-{room}-{(resp.get('period') or {}).get('since','')[:10]}",
+                "id": f"proposal-test-quiet-room-{room}-{(resp.get('period') or {}).get('since', '')[:10]}",
                 "title": f"Forslag: Test varsel for uvanlig stille rom ({room})",
                 "summary": "Utkast til regel basert på funn. Test i 7 dager før eventuell aktivering.",
                 "status": "draft",
@@ -638,16 +679,19 @@ def proposals(
                     "Test først i 7 dager for å validere før aktivering.",
                 ],
                 "evidence": ev,
-                "references": {"finding_id": fid, "anomaly_params": {
-                    "window_days": window_days,
-                    "min_abs_increase": min_abs_increase,
-                    "z_threshold": z_threshold,
-                    "meaningful_recent_floor": meaningful_recent_floor,
-                    "quiet_min_room_baseline_nights": quiet_min_room_baseline_nights,
-                    "quiet_min_room_baseline_mean": quiet_min_room_baseline_mean,
-                    "since": since,
-                    "until": until,
-                }},
+                "references": {
+                    "finding_id": fid,
+                    "anomaly_params": {
+                        "window_days": window_days,
+                        "min_abs_increase": min_abs_increase,
+                        "z_threshold": z_threshold,
+                        "meaningful_recent_floor": meaningful_recent_floor,
+                        "quiet_min_room_baseline_nights": quiet_min_room_baseline_nights,
+                        "quiet_min_room_baseline_mean": quiet_min_room_baseline_mean,
+                        "since": since,
+                        "until": until,
+                    },
+                },
                 "rule_draft": {
                     "type": "anomaly_followup",
                     "anomaly_id_prefix": "anomaly-night-quiet-room-",
@@ -663,6 +707,8 @@ def proposals(
         "period": resp.get("period"),
         "proposals": props,
     }
+
+
 @app.get("/v1/insights")
 def insights(
     since: Optional[str] = Query(default=None),

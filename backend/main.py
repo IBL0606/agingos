@@ -134,7 +134,6 @@ def ai_insights(
         }
 
 
-
 @app.get("/ai/anomalies")
 def ai_anomalies(
     since: Optional[datetime] = Query(default=None),
@@ -144,7 +143,9 @@ def ai_anomalies(
     z_threshold: Optional[float] = Query(default=None, ge=0.0, le=10.0),
     meaningful_recent_floor: Optional[int] = Query(default=None, ge=0, le=5000),
     quiet_min_room_baseline_nights: Optional[int] = Query(default=None, ge=1, le=60),
-    quiet_min_room_baseline_mean: Optional[float] = Query(default=None, ge=0.0, le=100000.0),
+    quiet_min_room_baseline_mean: Optional[float] = Query(
+        default=None, ge=0.0, le=100000.0
+    ),
 ):
     enabled = os.getenv("AI_BOT_ENABLED", "0").lower() in ("1", "true", "yes", "on")
     bot_url = os.getenv("AI_BOT_BASE_URL", "http://ai-bot:8010")
@@ -210,6 +211,7 @@ def ai_anomalies(
             "note": "AI bot unreachable",
         }
 
+
 @app.post("/event")
 def receive_event(event: Event):
     db = SessionLocal()
@@ -226,8 +228,6 @@ def receive_event(event: Event):
         db.close()
 
     return {"received": True}
-
-
 
 
 @app.get("/ai/proposals")
@@ -248,6 +248,7 @@ def ai_proposals(
     """
     import os
     import httpx
+
     enabled = os.getenv("AI_BOT_ENABLED", "0").lower() in ("1", "true", "yes", "on")
     bot_url = os.getenv("AI_BOT_BASE_URL", "http://ai-bot:8010")
     if not enabled:
@@ -280,6 +281,8 @@ def ai_proposals(
             "proposals": [],
             "note": f"Could not fetch proposals from AI bot (fail-soft): {type(e).__name__}: {e}",
         }
+
+
 @app.get("/events")
 def list_events(
     category: Optional[str] = Query(default=None),
