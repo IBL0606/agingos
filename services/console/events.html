@@ -87,6 +87,7 @@
         since: p.get("since"),
         until: p.get("until"),
         category: p.get("category"),
+        room: p.get("room"),
       };
     }
     const $ = (id) => document.getElementById(id);
@@ -95,9 +96,11 @@
       since: null,
       until: null,
       category: "",
+      room: "",
       limit: 1000,
       before: null,   // timestamp cursor (fetch older than this)
       rows: [],
+      categories: [],
       exhausted: false,
     };
 
@@ -131,7 +134,17 @@
     }
 
     function renderAppend(events) {
+      if (state.room) {
+        events = events.filter(ev =>
+          String(((ev.payload || {}).room || "")).trim().toLowerCase() === String(state.room).trim().toLowerCase()
+        );
+      }
+      if (state.categories.length > 0) {
+        events = events.filter(ev => state.categories.includes(String(ev.category || "").toLowerCase()));
+      }
+      if (events.length === 0) return;
       const tbody = $("tbody");
+
       for (const ev of events) {
         const tr = document.createElement("tr");
         const tdT = document.createElement("td");
@@ -168,7 +181,7 @@
       qs.set("since", state.since);
       qs.set("until", state.until);
       qs.set("limit", String(state.limit));
-      if (state.category) qs.set("category", state.category);
+      if (state.categories.length === 1) qs.set("category", state.categories[0]);
       if (state.before) qs.set("before", state.before);
 
       const data = await apiGet("/events?" + qs.toString());
@@ -193,6 +206,10 @@
       state.before = null;
       state.rows = [];
       state.exhausted = false;
+      state.room = (qs.room || "").trim();
+      state.categories = state.category
+        ? state.category.split(",").map(s => s.trim().toLowerCase()).filter(Boolean)
+        : [];
 
       try {
         const page = await fetchPage(false);
@@ -249,6 +266,7 @@
     $("moreBtn").addEventListener("click", loadMore);
     $("clearBtn").addEventListener("click", clearAll);
 
+    loadFresh();
     updateButtons();
   </script>
 </body>

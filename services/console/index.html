@@ -53,6 +53,27 @@
       <h2>Insights</h2>
       <div id="insightsList" class="muted">Trykk "Oppdater".</div>
     </div>
+
+    <div class="card">
+      <h2>Anomalier (Sprint 2)</h2>
+  <div class="card" style="margin-top:10px;">
+    <div class="row">
+      <div>
+        <label>Rom (filter):</label>
+        <input id="anomalyRoom" placeholder="f.eks. living" />
+      </div>
+      <div class="muted">Filtrerer funn på rom (client-side).</div>
+    </div>
+  </div>
+
+      <div id="anomaliesList" class="muted">Trykk "Oppdater".</div>
+
+    </div>
+
+    <div class="card">
+      <h2>Forslag (Sprint 3)</h2>
+      <div id="proposalsList" class="muted">Trykk "Oppdater".</div>
+    </div>
   </div>
 
   <script>
@@ -68,6 +89,11 @@
     function saveSettings() {
       localStorage.setItem("agingos_api_base", $("apiBase").value.trim());
       localStorage.setItem("agingos_api_key", $("apiKey").value.trim());
+    }
+
+    function getQS(name) {
+      const v = new URLSearchParams(window.location.search).get(name);
+      return (v && v.trim()) ? v.trim() : null;
     }
 
     async function apiGet(path) {
@@ -92,8 +118,92 @@
       if (since) qs.push("since=" + since);
       if (until) qs.push("until=" + until);
       if (category) qs.push("category=" + category);
+      if (ev.room) qs.push("room=" + encodeURIComponent(ev.room));
       if (qs.length) url += "?" + qs.join("&");
       return url;
+    }
+
+
+    function renderAnomalies(payload) {
+      const host = $("anomaliesList");
+      host.innerHTML = "";
+
+      const findings = (payload && payload.findings) ? payload.findings : [];
+      const roomFilter = new URLSearchParams(window.location.search).get("anomaly_room");
+      const filtered = roomFilter ? findings.filter(f => (f.normal && f.normal.room) ? (String(f.normal.room) === String(roomFilter)) : true) : findings;
+      const list = filtered;
+      if (list.length === 0) {
+        host.textContent = "Ingen anomalier funnet.";
+        return;
+      }
+
+      for (const f of list) {
+        const div = document.createElement("div");
+        div.className = "finding";
+
+        const title = document.createElement("div");
+        title.className = "finding-title";
+        title.textContent = f.title || "(uten tittel)";
+
+        const summary = document.createElement("div");
+        summary.className = "muted";
+        summary.textContent = f.summary || "";
+
+        div.appendChild(title);
+        div.appendChild(summary);
+
+        // Human-friendly "normal" summary when provided by the bot
+        console.log("ANOMALY NORMAL", f.id, f.normal);
+        if (f.normal && typeof f.normal === "object") {
+          const n = f.normal;
+          console.log("ANOMALY NORMAL", f.id, n);
+          const normalLine = document.createElement("div");
+          normalLine.className = "muted";
+
+          // Night activity anomaly fields (if present)
+          const mean = Number(n.baseline_mean_motion_presence_night);
+          const thrCandidate = (n && Object.prototype.hasOwnProperty.call(n, "computed_low_threshold")) ? n.computed_low_threshold : null;
+          const thr = Number(thrCandidate);
+          if (Number.isFinite(mean) && Number.isFinite(thr)) {
+            const days = n.baseline_window_days || "";
+            normalLine.textContent = "Normal: snitt " + mean.toFixed(1) + ", terskel " + ((thrCandidate == null || !Number.isFinite(Number(thrCandidate))) ? "?" : Number(thrCandidate).toFixed(1)) + " (siste " + days + " netter)";
+          } else if (typeof n.baseline_median_minutes_local === "number" && typeof n.delay_threshold_minutes === "number") {
+            const medianMin = n.baseline_median_minutes_local;
+            const hh = Math.floor(medianMin / 60);
+            const mm = Math.floor(medianMin % 60);
+            const median = `${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`;
+            const days = n.baseline_days_with_data || "";
+            normalLine.textContent =
+              `Normal: median ${median}, terskel +${n.delay_threshold_minutes} min (dager med data: ${days})`;
+          } else if (typeof n.baseline_window_days === "number") {
+            normalLine.textContent = `Normal: baseline (siste ${n.baseline_window_days} dager)`;
+          } else {
+            normalLine.textContent = "Normal: (tilgjengelig)";
+          }
+
+          div.appendChild(normalLine);
+        }
+
+        if (Array.isArray(f.because) && f.because.length) {
+          const ul = document.createElement("ul");
+          for (const item of f.because) {
+            const li = document.createElement("li");
+            li.textContent = item;
+            ul.appendChild(li);
+          }
+          div.appendChild(ul);
+        }
+
+        const actions = document.createElement("div");
+        actions.className = "actions";
+        const a = document.createElement("a");
+        a.href = buildEvidenceLink(f);
+        a.textContent = "Vis grunnlag (events)";
+        actions.appendChild(a);
+        div.appendChild(actions);
+
+        host.appendChild(div);
+      }
     }
 
     function renderInsights(insights) {
@@ -143,9 +253,59 @@
       }
     }
 
+
+    function renderProposals(payload) {
+      const host = $("proposalsList");
+      host.innerHTML = "";
+
+      const proposals = (payload && payload.proposals) ? payload.proposals : [];
+      if (proposals.length === 0) {
+        host.textContent = "Ingen forslag.";
+        return;
+      }
+
+      for (const p of proposals) {
+        const div = document.createElement("div");
+        div.className = "finding";
+
+        const title = document.createElement("div");
+        title.className = "finding-title";
+        title.textContent = p.title || "(uten tittel)";
+
+        const summary = document.createElement("div");
+        summary.className = "muted";
+        summary.textContent = p.summary || "";
+
+        div.appendChild(title);
+        div.appendChild(summary);
+
+        if (Array.isArray(p.because) && p.because.length) {
+          const ul = document.createElement("ul");
+          for (const item of p.because) {
+            const li = document.createElement("li");
+            li.textContent = item;
+            ul.appendChild(li);
+          }
+          div.appendChild(ul);
+        }
+
+        const actions = document.createElement("div");
+        actions.className = "actions";
+        const a = document.createElement("a");
+        a.href = buildEvidenceLink(p);
+        a.textContent = "Vis grunnlag (events)";
+        actions.appendChild(a);
+        div.appendChild(actions);
+
+        host.appendChild(div);
+      }
+    }
+
     async function refresh() {
       $("aiStatus").textContent = "Laster...";
       $("insightsList").textContent = "Laster...";
+      $("anomaliesList").textContent = "Laster...";
+      $("proposalsList").textContent = "Laster...";
 
       try {
         const status = await apiGet("/ai/status");
@@ -153,14 +313,48 @@
 
         const insights = await apiGet("/ai/insights");
         renderInsights(insights);
+
+        // Dev/testing knobs via querystring (optional):
+        // ?anomaly_until=2026-01-09T12:00:00Z&anomaly_floor=0&anomaly_min_abs_increase=0&anomaly_z=0
+        const qs = [];
+        const a_until = getQS("anomaly_until");
+        const a_floor = getQS("anomaly_floor");
+        const a_min = getQS("anomaly_min_abs_increase");
+        const a_z = getQS("anomaly_z");
+        const quietNights = new URLSearchParams(window.location.search).get("anomaly_quiet_nights");
+        const quietMean = new URLSearchParams(window.location.search).get("anomaly_quiet_mean");
+        if (quietNights) qs.push("quiet_min_room_baseline_nights=" + encodeURIComponent(quietNights));
+        if (quietMean) qs.push("quiet_min_room_baseline_mean=" + encodeURIComponent(quietMean));
+        if (a_until) qs.push("until=" + encodeURIComponent(a_until));
+        if (a_floor) qs.push("meaningful_recent_floor=" + encodeURIComponent(a_floor));
+        if (a_min) qs.push("min_abs_increase=" + encodeURIComponent(a_min));
+        if (a_z) qs.push("z_threshold=" + encodeURIComponent(a_z));
+        const anomaliesPath = qs.length ? ("/ai/anomalies?" + qs.join("&")) : "/ai/anomalies";
+        const anomalies = await apiGet(anomaliesPath);
+        renderAnomalies(anomalies);
+        const proposalsPath = qs.length ? ("/ai/proposals?" + qs.join("&")) : "/ai/proposals";
+        const proposals = await apiGet(proposalsPath);
+        renderProposals(proposals);
+
       } catch (e) {
         $("aiStatus").textContent = "Feil: " + e.message;
         $("insightsList").textContent = "Feil: " + e.message;
+        $("anomaliesList").textContent = "Feil: " + e.message;
+        $("proposalsList").textContent = "Feil: " + e.message;
       }
     }
 
+    function syncAnomalyRoomToQS() {
+      const v = ($("anomalyRoom").value || "").trim();
+      const p = new URLSearchParams(window.location.search);
+      if (v) p.set("anomaly_room", v);
+      else p.delete("anomaly_room");
+      const newUrl = window.location.pathname + (p.toString() ? ("?" + p.toString()) : "");
+      window.history.replaceState({}, "", newUrl);
+    }
+
     $("saveBtn").addEventListener("click", () => { saveSettings(); refresh(); });
-    $("refreshBtn").addEventListener("click", refresh);
+    $("refreshBtn").addEventListener("click", () => { syncAnomalyRoomToQS(); refresh(); });
 
     loadSettings();
   </script>

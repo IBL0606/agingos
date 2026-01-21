@@ -93,7 +93,7 @@ restore-db:
 	docker compose exec -T db psql -U agingos -d agingos < "$$FILE"
 	@echo "OK: restore complete"
 
-.PHONY: smoke-s0 smoke-s1 smoke-ai
+.PHONY: smoke-s0 smoke-s1 smoke-s2 smoke-ai
 
 smoke-s0:
 	./scripts/smoke_ai_bot.sh
@@ -101,7 +101,10 @@ smoke-s0:
 smoke-s1:
 	./scripts/smoke_sprint1.sh
 
-smoke-ai: smoke-s0 smoke-s1
+smoke-s2:
+	./scripts/smoke_sprint2.sh
+
+smoke-ai: smoke-s0 smoke-s1 smoke-s2
 
 help:
 	@echo "Targets:"

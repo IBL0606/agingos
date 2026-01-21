@@ -3,7 +3,7 @@ import httpx
 
 
 # backend/main.py
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 
 from db import SessionLocal
 from models.event import Event
@@ -134,6 +134,82 @@ def ai_insights(
         }
 
 
+
+@app.get("/ai/anomalies")
+def ai_anomalies(
+    since: Optional[datetime] = Query(default=None),
+    until: Optional[datetime] = Query(default=None),
+    window_days: int = Query(default=14, ge=3, le=60),
+    min_abs_increase: Optional[int] = Query(default=None, ge=0, le=5000),
+    z_threshold: Optional[float] = Query(default=None, ge=0.0, le=10.0),
+    meaningful_recent_floor: Optional[int] = Query(default=None, ge=0, le=5000),
+    quiet_min_room_baseline_nights: Optional[int] = Query(default=None, ge=1, le=60),
+    quiet_min_room_baseline_mean: Optional[float] = Query(default=None, ge=0.0, le=100000.0),
+):
+    enabled = os.getenv("AI_BOT_ENABLED", "0").lower() in ("1", "true", "yes", "on")
+    bot_url = os.getenv("AI_BOT_BASE_URL", "http://ai-bot:8010")
+
+    if not enabled:
+        return {
+            "schema_version": "v1",
+            "period": {
+                "since": since.isoformat() if since else None,
+                "until": until.isoformat() if until else None,
+            },
+            "baseline": None,
+            "findings": [],
+            "note": "AI bot disabled",
+        }
+
+    if since:
+        since = require_utc_aware(since, "since")
+    if until:
+        until = require_utc_aware(until, "until")
+
+    try:
+        params = {"window_days": window_days}
+        if min_abs_increase is not None:
+            params["min_abs_increase"] = min_abs_increase
+        if z_threshold is not None:
+            params["z_threshold"] = z_threshold
+        if meaningful_recent_floor is not None:
+            params["meaningful_recent_floor"] = meaningful_recent_floor
+        if since:
+            params["since"] = since.isoformat()
+        if until:
+            params["until"] = until.isoformat()
+        if quiet_min_room_baseline_nights is not None:
+            params["quiet_min_room_baseline_nights"] = quiet_min_room_baseline_nights
+        if quiet_min_room_baseline_mean is not None:
+            params["quiet_min_room_baseline_mean"] = quiet_min_room_baseline_mean
+
+        with httpx.Client(timeout=2.5) as client:
+            r = client.get(f"{bot_url}/v1/anomalies", params=params)
+            r.raise_for_status()
+            payload = r.json()
+
+        payload.setdefault("schema_version", "v1")
+        payload.setdefault(
+            "period",
+            {
+                "since": since.isoformat() if since else None,
+                "until": until.isoformat() if until else None,
+            },
+        )
+        payload.setdefault("findings", [])
+        return payload
+    except Exception:
+        return {
+            "schema_version": "v1",
+            "period": {
+                "since": since.isoformat() if since else None,
+                "until": until.isoformat() if until else None,
+            },
+            "baseline": None,
+            "findings": [],
+            "note": "AI bot unreachable",
+        }
+
 @app.post("/event")
 def receive_event(event: Event):
     db = SessionLocal()
@@ -152,6 +228,58 @@ def receive_event(event: Event):
     return {"received": True}
 
 
+
+
+@app.get("/ai/proposals")
+def ai_proposals(
+    request: Request,
+    since: Optional[str] = Query(default=None),
+    until: Optional[str] = Query(default=None),
+    window_days: int = Query(default=14, ge=3, le=60),
+    min_abs_increase: int = Query(default=10, ge=0, le=5000),
+    z_threshold: float = Query(default=2.0, ge=0.0, le=10.0),
+    meaningful_recent_floor: int = Query(default=20, ge=0, le=5000),
+    quiet_min_room_baseline_nights: int = Query(7, ge=1, le=60),
+    quiet_min_room_baseline_mean: float = Query(3.0, ge=0.0),
+):
+    """
+    Sprint 3 (minimal v1): Proxy proposals from ai-bot.
+    Fail-soft: return empty proposals with note if AI bot is unavailable.
+    """
+    import os
+    import httpx
+    enabled = os.getenv("AI_BOT_ENABLED", "0").lower() in ("1", "true", "yes", "on")
+    bot_url = os.getenv("AI_BOT_BASE_URL", "http://ai-bot:8010")
+    if not enabled:
+        return {"enabled": False, "proposals": [], "note": "AI bot disabled"}
+
+    try:
+        params = {}
+        if since:
+            params["since"] = since
+        if until:
+            params["until"] = until
+        params.update(
+            {
+                "window_days": window_days,
+                "min_abs_increase": min_abs_increase,
+                "z_threshold": z_threshold,
+                "meaningful_recent_floor": meaningful_recent_floor,
+                "quiet_min_room_baseline_nights": quiet_min_room_baseline_nights,
+                "quiet_min_room_baseline_mean": quiet_min_room_baseline_mean,
+            }
+        )
+        with httpx.Client(timeout=2.5) as client:
+            r = client.get(f"{bot_url}/v1/proposals", params=params)
+            r.raise_for_status()
+            return r.json()
+    except Exception as e:
+        return {
+            "schema_version": "v1",
+            "period": {"since": since, "until": until},
+            "proposals": [],
+            "note": f"Could not fetch proposals from AI bot (fail-soft): {type(e).__name__}: {e}",
+        }
 @app.get("/events")
 def list_events(
     category: Optional[str] = Query(default=None),
