@@ -19,6 +19,11 @@ def create_rule(payload: dict, db: Session = Depends(get_db)):
     if "name" not in payload or "rule_type" not in payload:
         raise HTTPException(status_code=400, detail="name and rule_type are required")
 
+    # Idempotency: if rule with same name already exists, return it
+    existing = db.query(Rule).filter(Rule.name == payload["name"]).first()
+    if existing:
+        return existing
+
     try:
         rule_type = RuleType(payload["rule_type"])
     except Exception:

@@ -106,6 +106,37 @@
       return JSON.parse(text);
     }
 
+    async function apiSend(method, path, payload) {
+      const base = $("apiBase").value.trim().replace(/\/$/, "");
+      const key = $("apiKey").value.trim();
+      const headers = { "Content-Type": "application/json" };
+      if (key) headers["X-API-Key"] = key;
+      const res = await fetch(base + path, { method, headers, body: JSON.stringify(payload) });
+      const text = await res.text();
+      if (!res.ok) throw new Error(res.status + " " + text);
+      return JSON.parse(text);
+    }
+
+    async function createRuleFromProposal(p, action) {
+      const room = (p && p.rule_draft && p.rule_draft.room) ? p.rule_draft.room : ((p && p.normal && p.normal.room) ? p.normal.room : null);
+      const status = (action === "reject") ? "rejected" : ((action === "activate") ? "active" : "testing");
+      const is_enabled = action !== "reject";
+      const payload = {
+        name: (p && p.id) ? p.id : ("proposal-" + Date.now()),
+        rule_type: "NO_MOTION",
+        params: {
+          room: room,
+          proposal_id: (p && p.id) ? p.id : null,
+          proposal_action: action,
+          proposal_status: status,
+          rule_draft: (p && p.rule_draft) ? p.rule_draft : null
+        },
+        is_enabled: (action !== "reject"),
+        severity: 2
+      };
+      return apiSend("POST", "/rules", payload);
+    }
+
     function buildEvidenceLink(finding) {
       const ev = finding.evidence || {};
       const p = finding.period || {};
@@ -295,6 +326,31 @@
         a.href = buildEvidenceLink(p);
         a.textContent = "Vis grunnlag (events)";
         actions.appendChild(a);
+
+        console.log("PROPOSAL ACTIONS", p.id, p.lifecycle.actions);
+
+        if (p.lifecycle && Array.isArray(p.lifecycle.actions) && p.lifecycle.actions.length) {
+          const btnWrap = document.createElement("div");
+          btnWrap.style.marginTop = "6px";
+          for (const act of p.lifecycle.actions) {
+            const b = document.createElement("button");
+            b.textContent = act.label || act.action;
+            b.addEventListener("click", async () => {
+              b.disabled = true;
+              try {
+                await createRuleFromProposal(p, act.action);
+                await refresh();
+              } catch (e) {
+                alert("Feil: " + e.message);
+              } finally {
+                b.disabled = false;
+              }
+            });
+            btnWrap.appendChild(b);
+          }
+          actions.appendChild(btnWrap);
+        }
+
         div.appendChild(actions);
 
         host.appendChild(div);
