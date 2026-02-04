@@ -273,7 +273,54 @@ def ai_proposals(
         with httpx.Client(timeout=2.5) as client:
             r = client.get(f"{bot_url}/v1/proposals", params=params)
             r.raise_for_status()
-            return r.json()
+            payload = r.json()
+
+            # Enrich proposals with persisted rule info (if present)
+            try:
+                from models.rule import Rule
+                if isinstance(payload, dict):
+                    ps = payload.get('proposals') or []
+                    if ps:
+                        db = SessionLocal()
+                        try:
+                            rules = db.query(Rule).order_by(Rule.id.desc()).all()
+                        finally:
+                            db.close()
+
+                        by_pid = {}
+                        for ru in rules:
+                            p = ru.params or {}
+                            pid = p.get('proposal_id')
+                            if pid and pid not in by_pid:
+                                by_pid[pid] = ru  # newest wins
+
+                        for p in ps:
+                            pid = p.get('id')
+                            ru = by_pid.get(pid)
+                            if ru:
+                                ref = dict(ru.params or {})
+                                ref['id'] = ru.id
+                                ref['name'] = ru.name
+                                ref['is_enabled'] = bool(getattr(ru, 'is_enabled', False))
+                                ca = getattr(ru, 'created_at', None)
+                                if ca is not None:
+                                    try:
+                                        ref['created_at'] = ca.isoformat()
+                                    except Exception:
+                                        pass
+
+                                p.setdefault('references', {})
+                                p['references']['rule'] = ref
+
+                                # reflect persisted status onto proposal.status (useful for UI)
+                                st = ref.get('proposal_status')
+                                if st and (p.get('status') in (None, '', 'draft')):
+                                    p['status'] = st
+            except Exception:
+                pass
+
+            return payload
+
     except Exception as e:
         return {
             "schema_version": "v1",
