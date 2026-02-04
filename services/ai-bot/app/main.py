@@ -288,8 +288,6 @@ def occupancy(
             presence_room[ent] = room
             presence_last_ts[ent] = ts
 
-            strong_on = current_on_rooms(strong_set)
-            primary_on = current_on_rooms(primary_set)
 
             # STRONG presence ON => HOME
             if room in strong_set and st == "on":
@@ -332,7 +330,7 @@ def occupancy(
                             [
                                 "Exit + stillhet (STRONG):",
                                 f"Exit close {last_front_exit_close_ts.isoformat()}",
-                                f"Ingen STRONG evidence etter exit.",
+                                "Ingen STRONG evidence etter exit.",
                                 f"exit_quiet={exit_quiet_minutes}m oppfylt.",
                             ],
                         )
