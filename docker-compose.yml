@@ -10,7 +10,7 @@ services:
       PYTHONDONTWRITEBYTECODE: "1"
       DATABASE_URL: postgresql://agingos:agingos@db:5432/agingos
       AGINGOS_AUTH_MODE: ${AGINGOS_AUTH_MODE:-off}
-      AGINGOS_API_KEYS: ${AGINGOS_API_KEYS:-}
+      AGINGOS_API_KEY: ${AGINGOS_API_KEY:-}
       AI_BOT_ENABLED: ${AI_BOT_ENABLED:-false}
       AI_BOT_BASE_URL: ${AI_BOT_BASE_URL:-http://ai-bot:8010}
     depends_on:
@@ -32,7 +32,7 @@ services:
       context: ./services/ai-bot
     environment:
       AGINGOS_API_BASE_URL: "http://backend:8000"
-      AGINGOS_API_KEY: ${AGINGOS_API_KEYS:-}
+      AGINGOS_API_KEY: ${AGINGOS_API_KEY:-}
       BOT_SCHEMA_VERSION: "v1"
     depends_on:
       - backend
@@ -50,6 +50,5 @@ services:
       - ./services/console/index.html:/usr/share/nginx/html/index.html:ro
       - ./services/console/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./services/console/events.html:/usr/share/nginx/html/events.html:ro
-
 volumes:
   pgdata:

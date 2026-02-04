@@ -1,0 +1,9 @@
+services:
+  heartbeat:
+    image: curlimages/curl:8.5.0
+    depends_on:
+      - backend
+    restart: unless-stopped
+    command: ["sh","-lc","while true; do id=$$(cat /proc/sys/kernel/random/uuid); ts=$$(date -u +%Y-%m-%dT%H:%M:%SZ); curl -sS -X POST http://backend:8000/event -H 'Content-Type: application/json' -H 'X-API-Key: $${AGINGOS_API_KEY}' -d \"{\\\"id\\\":\\\"$$id\\\",\\\"timestamp\\\":\\\"$$ts\\\",\\\"category\\\":\\\"heartbeat\\\",\\\"payload\\\":{\\\"room\\\":\\\"system\\\",\\\"source\\\":\\\"minipc\\\"}}\" >/dev/null; sleep 600; done"]
+    environment:
+      AGINGOS_API_KEY: ${AGINGOS_API_KEY:-}
