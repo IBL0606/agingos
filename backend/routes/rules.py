@@ -14,7 +14,12 @@ router = APIRouter(prefix="/rules", tags=["rules"])
 
 def _utc_now_iso() -> str:
     # RFC3339-ish with Z, seconds precision (stable for UI)
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
 
 
 def _apply_proposal_timestamps(params: dict) -> dict:
@@ -34,7 +39,6 @@ def _apply_proposal_timestamps(params: dict) -> dict:
 
     if act == "test_7_days" or status == "testing":
         p.setdefault("proposal_test_started_at", now)
-
 
     if act == "reject" or status == "rejected":
         p.setdefault("proposal_rejected_at", now)

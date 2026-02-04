@@ -110,6 +110,7 @@ def _fetch_events(
 
     return out
 
+
 @app.get("/healthz")
 def healthz():
     return {"status": "ok"}
@@ -122,7 +123,6 @@ def capabilities():
         "schema_version": "v1",
         "features": {"insights": True, "proposals": True, "anomalies": True},
     }
-
 
 
 @app.get("/v1/occupancy")
@@ -186,12 +186,18 @@ def occupancy(
     try:
         occ_limit = 5000
         door_events = _fetch_events(since, now, limit=occ_limit, category="door")
-        presence_events = _fetch_events(since, now, limit=occ_limit, category="presence")
+        presence_events = _fetch_events(
+            since, now, limit=occ_limit, category="presence"
+        )
         events = door_events + presence_events
 
         live_since = now - timedelta(hours=12)
-        heartbeat_events = _fetch_events(live_since, now, limit=1000, category="heartbeat")
-        snapshot_events = _fetch_events(live_since, now, limit=1000, category="ha_snapshot")
+        heartbeat_events = _fetch_events(
+            live_since, now, limit=1000, category="heartbeat"
+        )
+        snapshot_events = _fetch_events(
+            live_since, now, limit=1000, category="ha_snapshot"
+        )
     except Exception as e:
         return {
             "schema_version": "v1",
@@ -220,8 +226,8 @@ def occupancy(
     rel.sort(key=lambda x: x[0])
 
     # Presence state reconstruction
-    presence_state: dict[str, str] = {}   # entity_id -> "on"/"off"
-    presence_room: dict[str, str] = {}    # entity_id -> room
+    presence_state: dict[str, str] = {}  # entity_id -> "on"/"off"
+    presence_room: dict[str, str] = {}  # entity_id -> room
     presence_last_ts: dict[str, datetime] = {}
 
     def current_on_rooms(room_set: set[str]) -> list[str]:
@@ -366,7 +372,9 @@ def occupancy(
                 "entity_id": ent,
                 "room": presence_room.get(ent),
                 "state": st,
-                "last_ts": presence_last_ts.get(ent).isoformat() if presence_last_ts.get(ent) else None,
+                "last_ts": presence_last_ts.get(ent).isoformat()
+                if presence_last_ts.get(ent)
+                else None,
             }
         )
 
@@ -383,9 +391,8 @@ def occupancy(
     last_snapshot_ts = _max_event_ts(snapshot_events)
     live_threshold = timedelta(minutes=live_minutes)
     is_live = (
-        (last_heartbeat_ts is not None and (now - last_heartbeat_ts) <= live_threshold)
-        or (last_snapshot_ts is not None and (now - last_snapshot_ts) <= live_threshold)
-    )
+        last_heartbeat_ts is not None and (now - last_heartbeat_ts) <= live_threshold
+    ) or (last_snapshot_ts is not None and (now - last_snapshot_ts) <= live_threshold)
 
     return {
         "schema_version": "v1",
@@ -402,8 +409,12 @@ def occupancy(
             "liveness": {
                 "is_live": is_live,
                 "live_minutes": live_minutes,
-                "last_heartbeat_ts": last_heartbeat_ts.isoformat() if last_heartbeat_ts else None,
-                "last_ha_snapshot_ts": last_snapshot_ts.isoformat() if last_snapshot_ts else None,
+                "last_heartbeat_ts": last_heartbeat_ts.isoformat()
+                if last_heartbeat_ts
+                else None,
+                "last_ha_snapshot_ts": last_snapshot_ts.isoformat()
+                if last_snapshot_ts
+                else None,
             },
             "counts": {
                 "door": len(door_events),
@@ -412,10 +423,18 @@ def occupancy(
                 "ha_snapshot_12h": len(snapshot_events),
             },
             "front_door_entity_id": front_door_entity_id,
-            "last_front_open_ts": last_front_open_ts.isoformat() if last_front_open_ts else None,
-            "last_front_close_ts": last_front_close_ts.isoformat() if last_front_close_ts else None,
-            "last_front_exit_close_ts": last_front_exit_close_ts.isoformat() if last_front_exit_close_ts else None,
-            "last_strong_evidence_ts": last_strong_evidence_ts.isoformat() if last_strong_evidence_ts else None,
+            "last_front_open_ts": last_front_open_ts.isoformat()
+            if last_front_open_ts
+            else None,
+            "last_front_close_ts": last_front_close_ts.isoformat()
+            if last_front_close_ts
+            else None,
+            "last_front_exit_close_ts": last_front_exit_close_ts.isoformat()
+            if last_front_exit_close_ts
+            else None,
+            "last_strong_evidence_ts": last_strong_evidence_ts.isoformat()
+            if last_strong_evidence_ts
+            else None,
             "strong_on_rooms": strong_on_now,
             "primary_on_rooms": primary_on_now,
             "pet_on_rooms": pet_on_now,
@@ -1057,7 +1076,13 @@ def proposals(
                 },
                 "rule_draft": {
                     "type": "anomaly_followup",
-                    "anomaly_id_prefix": ("anomaly-night-quiet-room-" if fid.startswith("anomaly-night-quiet-room-") else "anomaly-night-activity-room-" if fid.startswith("anomaly-night-activity-room-") else "anomaly-morning-late-"),
+                    "anomaly_id_prefix": (
+                        "anomaly-night-quiet-room-"
+                        if fid.startswith("anomaly-night-quiet-room-")
+                        else "anomaly-night-activity-room-"
+                        if fid.startswith("anomaly-night-activity-room-")
+                        else "anomaly-morning-late-"
+                    ),
                     "room": room,
                     "action": "notify",
                     "test_days": 7,
