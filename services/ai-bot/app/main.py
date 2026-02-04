@@ -53,18 +53,62 @@ def _agingos_client() -> httpx.Client:
 
 
 def _fetch_events(
-    since: datetime, until: datetime, limit: int = 1000
+    since: datetime, until: datetime, limit: int = 1000, category: Optional[str] = None
 ) -> list[dict[str, Any]]:
-    params = {
-        "since": since.isoformat().replace("+00:00", "Z"),
-        "until": until.isoformat().replace("+00:00", "Z"),
-        "limit": limit,
-    }
-    with _agingos_client() as client:
-        r = client.get("/events", params=params)
-        r.raise_for_status()
-        return r.json()
+    """
+    Fetch events from backend /events.
 
+    Backend enforces limit <= 1000. This function supports:
+    - category filtering (if backend supports it)
+    - paging in chunks of 1000 when caller requests more than 1000
+    """
+    MAX_LIMIT = 1000
+    requested = int(limit) if limit else MAX_LIMIT
+
+    def _params(since_dt: datetime, batch_limit: int) -> dict[str, Any]:
+        params = {
+            "since": since_dt.isoformat().replace("+00:00", "Z"),
+            "until": until.isoformat().replace("+00:00", "Z"),
+            "limit": batch_limit,
+        }
+        if category:
+            params["category"] = category
+        return params
+
+    # Single call
+    if requested <= MAX_LIMIT:
+        with _agingos_client() as client:
+            r = client.get("/events", params=_params(since, requested))
+            r.raise_for_status()
+            return r.json()
+
+    # Paging mode
+    out: list[dict[str, Any]] = []
+    cursor = since
+
+    with _agingos_client() as client:
+        while len(out) < requested and cursor < until:
+            batch_limit = min(MAX_LIMIT, requested - len(out))
+            r = client.get("/events", params=_params(cursor, batch_limit))
+            r.raise_for_status()
+            batch = r.json()
+            if not batch:
+                break
+            out.extend(batch)
+
+            # Advance cursor to just after last timestamp to avoid duplicates
+            last_ts = batch[-1].get("timestamp")
+            if not last_ts:
+                break
+            try:
+                cursor = _parse_iso_z(last_ts) + timedelta(microseconds=1)
+            except Exception:
+                break
+
+            if len(batch) < batch_limit:
+                break
+
+    return out
 
 @app.get("/healthz")
 def healthz():
@@ -77,6 +121,318 @@ def capabilities():
         "bot_version": "0.1.0",
         "schema_version": "v1",
         "features": {"insights": True, "proposals": True, "anomalies": True},
+    }
+
+
+
+@app.get("/v1/occupancy")
+def occupancy(
+    until: Optional[str] = Query(default=None),
+    window_hours: int = Query(default=72, ge=1, le=24 * 14),
+    exit_quiet_minutes: int = Query(default=60, ge=1, le=24 * 12),
+    entry_window_minutes: int = Query(default=7, ge=1, le=60),
+    open_close_max_seconds: int = Query(default=120, ge=5, le=600),
+    live_minutes: int = Query(default=30, ge=1, le=240),
+    front_door_entity_id: str = Query(default="binary_sensor.inngangsdor_contact"),
+    strong_rooms: str = Query(default="inngang,living,baderom"),
+    pet_rooms: str = Query(default="bedroom,gjesterom"),
+    primary_rooms: str = Query(default="inngang,living"),
+):
+    """
+    Occupancy v1 (pet-aware) basert på door + presence ON/OFF.
+
+    Viktig: presence ON kan vare lenge uten nye events. Derfor rekonstrueres "siste kjente state"
+    per presence-sensor (entity_id), og vi tolker "on" som aktivt helt til neste "off".
+
+    Modell (konservativ):
+    - HOME hvis STRONG-room presence er ON (inngang/living/baderom som default)
+    - AWAY hvis vi har en "exit" (ytterdør open->closed innen open_close_max) og:
+        * now >= exit_close + exit_quiet
+        * ingen STRONG evidence etter exit_close
+        * ingen STRONG rooms er ON nå
+    - AWAY -> HOME krever ytterdør OPEN nylig + presence ON i PRIMARY rooms innen entry_window
+    """
+    now = _utc_now()
+    if until:
+        try:
+            now = _parse_iso_z(until)
+        except Exception:
+            pass
+
+    window = timedelta(hours=window_hours)
+    since = now - window
+
+    exit_quiet = timedelta(minutes=exit_quiet_minutes)
+    entry_window = timedelta(minutes=entry_window_minutes)
+    open_close_max = timedelta(seconds=open_close_max_seconds)
+
+    strong_set = {r.strip() for r in (strong_rooms or "").split(",") if r.strip()}
+    pet_set = {r.strip() for r in (pet_rooms or "").split(",") if r.strip()}
+    primary_set = {r.strip() for r in (primary_rooms or "").split(",") if r.strip()}
+
+    def ev_ts(ev: dict[str, Any]) -> Optional[datetime]:
+        t = ev.get("timestamp") or ev.get("ts") or ev.get("time")
+        if not t:
+            return None
+        if isinstance(t, datetime):
+            return t
+        if isinstance(t, str):
+            try:
+                return _parse_iso_z(t)
+            except Exception:
+                return None
+        return None
+
+    try:
+        occ_limit = 5000
+        door_events = _fetch_events(since, now, limit=occ_limit, category="door")
+        presence_events = _fetch_events(since, now, limit=occ_limit, category="presence")
+        events = door_events + presence_events
+
+        live_since = now - timedelta(hours=12)
+        heartbeat_events = _fetch_events(live_since, now, limit=1000, category="heartbeat")
+        snapshot_events = _fetch_events(live_since, now, limit=1000, category="ha_snapshot")
+    except Exception as e:
+        return {
+            "schema_version": "v1",
+            "computed_at": now.isoformat(),
+            "period": {"since": since.isoformat(), "until": now.isoformat()},
+            "state": "UNKNOWN",
+            "reason": ["Backend utilgjengelig ved henting av events."],
+            "error": str(e),
+        }
+
+    # Filtrer kun det vi trenger
+    rel: list[tuple[datetime, str, dict[str, Any]]] = []
+    hit_limit = (len(door_events) >= occ_limit) or (len(presence_events) >= occ_limit)
+    for ev in events:
+        cat = (ev.get("category") or "").lower().strip()
+        if cat not in ("presence", "door"):
+            continue
+        ts = ev_ts(ev)
+        if not ts:
+            continue
+        payload = ev.get("payload") or {}
+        if not isinstance(payload, dict):
+            continue
+        rel.append((ts, cat, payload))
+
+    rel.sort(key=lambda x: x[0])
+
+    # Presence state reconstruction
+    presence_state: dict[str, str] = {}   # entity_id -> "on"/"off"
+    presence_room: dict[str, str] = {}    # entity_id -> room
+    presence_last_ts: dict[str, datetime] = {}
+
+    def current_on_rooms(room_set: set[str]) -> list[str]:
+        rooms_on = set()
+        for ent, st in presence_state.items():
+            if st != "on":
+                continue
+            room = presence_room.get(ent) or ""
+            if room in room_set:
+                rooms_on.add(room)
+        return sorted(rooms_on)
+
+    # Door tracking (ytterdør)
+    last_front_open_ts: Optional[datetime] = None
+    last_front_close_ts: Optional[datetime] = None
+    last_front_exit_close_ts: Optional[datetime] = None
+
+    # "strong evidence" = tidspunkt vi sist med sikkerhet hadde menneske-aktig presence
+    last_strong_evidence_ts: Optional[datetime] = None
+
+    occ_state = "UNKNOWN"
+    last_transition_ts: Optional[datetime] = None
+    last_transition_reason: list[str] = []
+
+    def set_state(new_state: str, ts: datetime, because: list[str]):
+        nonlocal occ_state, last_transition_ts, last_transition_reason
+        if new_state != occ_state:
+            occ_state = new_state
+            last_transition_ts = ts
+            last_transition_reason = because
+
+    for ts, cat, payload in rel:
+        if cat == "door":
+            ent = (payload.get("entity_id") or "").strip()
+            if ent != front_door_entity_id:
+                continue
+            st = (payload.get("state") or "").lower().strip()
+            if st == "open":
+                last_front_open_ts = ts
+            elif st == "closed":
+                last_front_close_ts = ts
+                # Exit/entry-sekvens: open->closed innen open_close_max
+                if last_front_open_ts and (ts - last_front_open_ts) <= open_close_max:
+                    last_front_exit_close_ts = ts
+
+                # Hvis STRONG rooms er ON når døren lukkes, regn det som strong evidence (konservativt)
+                if current_on_rooms(strong_set):
+                    last_strong_evidence_ts = ts
+
+        elif cat == "presence":
+            ent = (payload.get("entity_id") or "").strip()
+            room = (payload.get("room") or "").strip()
+            st = (payload.get("state") or "").lower().strip()
+            if not ent or not room or st not in ("on", "off"):
+                continue
+
+            presence_state[ent] = st
+            presence_room[ent] = room
+            presence_last_ts[ent] = ts
+
+            strong_on = current_on_rooms(strong_set)
+            primary_on = current_on_rooms(primary_set)
+
+            # STRONG presence ON => HOME
+            if room in strong_set and st == "on":
+                last_strong_evidence_ts = ts
+                set_state("HOME", ts, [f"STRONG presence ON i '{room}' ({ent})."])
+                continue
+
+            # AWAY -> HOME: door open nylig + presence ON i PRIMARY rooms innen entry_window
+            if occ_state in ("AWAY", "UNKNOWN") and st == "on" and room in primary_set:
+                if last_front_open_ts and ts <= (last_front_open_ts + entry_window):
+                    set_state(
+                        "HOME",
+                        ts,
+                        [
+                            "Kom hjem-sekvens:",
+                            f"Ytterdør open {last_front_open_ts.isoformat()}",
+                            f"Presence ON i PRIMARY '{room}' {ts.isoformat()}",
+                        ],
+                    )
+                    continue
+
+            # UNKNOWN: Sett ikke HOME basert på svake rom/pet-rom alene.
+            # HOME oppnås via:
+            #  - STRONG presence ON (håndteres over), eller
+            #  - entry-sekvens (dør OPEN nylig + presence ON i PRIMARY; håndteres over for AWAY/UNKNOWN).
+            # Ellers lar vi state stå som UNKNOWN til sterkere evidens dukker opp.
+
+            # Etter hver presence-event: hvis HOME og vi har passert exit_quiet etter exit_close,
+            # og ingen STRONG evidence etter exit_close, og ingen STRONG rooms er ON, så kan vi sette AWAY.
+            if occ_state == "HOME" and last_front_exit_close_ts:
+                if ts >= (last_front_exit_close_ts + exit_quiet):
+                    strong_on_now = current_on_rooms(strong_set)
+                    if (not strong_on_now) and (
+                        last_strong_evidence_ts is None
+                        or last_strong_evidence_ts <= last_front_exit_close_ts
+                    ):
+                        set_state(
+                            "AWAY",
+                            ts,
+                            [
+                                "Exit + stillhet (STRONG):",
+                                f"Exit close {last_front_exit_close_ts.isoformat()}",
+                                f"Ingen STRONG evidence etter exit.",
+                                f"exit_quiet={exit_quiet_minutes}m oppfylt.",
+                            ],
+                        )
+
+    # Final decision at 'now' (viktig hvis det ikke kom events rundt deadline)
+    strong_on_now = current_on_rooms(strong_set)
+    pet_on_now = current_on_rooms(pet_set)
+    primary_on_now = current_on_rooms(primary_set)
+
+    final_state = occ_state
+    final_reason = list(last_transition_reason) if last_transition_reason else []
+
+    if strong_on_now:
+        final_state = "HOME"
+        final_reason = ["STRONG rooms er ON nå: " + ", ".join(strong_on_now)]
+    else:
+        if last_front_exit_close_ts and now >= (last_front_exit_close_ts + exit_quiet):
+            if (not strong_on_now) and (
+                last_strong_evidence_ts is None
+                or last_strong_evidence_ts <= last_front_exit_close_ts
+            ):
+                final_state = "AWAY"
+                final_reason = [
+                    "Exit + stillhet (STRONG) ved nåtid:",
+                    f"Exit close {last_front_exit_close_ts.isoformat()}",
+                    f"exit_quiet={exit_quiet_minutes}m oppfylt ved {now.isoformat()}",
+                ]
+
+    if not final_reason:
+        final_reason = ["Ingen sterk nok evidens til å endre state."]
+
+    # Bygg sensor-state oversikt (siste kjente state per entity)
+    presence_states = []
+    for ent, st in sorted(presence_state.items()):
+        presence_states.append(
+            {
+                "entity_id": ent,
+                "room": presence_room.get(ent),
+                "state": st,
+                "last_ts": presence_last_ts.get(ent).isoformat() if presence_last_ts.get(ent) else None,
+            }
+        )
+
+    # Liveness (heartbeat/ha_snapshot)
+    def _max_event_ts(evs: list[dict[str, Any]]) -> Optional[datetime]:
+        best: Optional[datetime] = None
+        for ev in evs:
+            ts = ev_ts(ev)
+            if ts and (best is None or ts > best):
+                best = ts
+        return best
+
+    last_heartbeat_ts = _max_event_ts(heartbeat_events)
+    last_snapshot_ts = _max_event_ts(snapshot_events)
+    live_threshold = timedelta(minutes=live_minutes)
+    is_live = (
+        (last_heartbeat_ts is not None and (now - last_heartbeat_ts) <= live_threshold)
+        or (last_snapshot_ts is not None and (now - last_snapshot_ts) <= live_threshold)
+    )
+
+    return {
+        "schema_version": "v1",
+        "computed_at": now.isoformat(),
+        "period": {"since": since.isoformat(), "until": now.isoformat()},
+        "state": final_state,
+        "reason": final_reason,
+        "transition": {
+            "state": occ_state,
+            "at": last_transition_ts.isoformat() if last_transition_ts else None,
+            "because": last_transition_reason,
+        },
+        "evidence": {
+            "liveness": {
+                "is_live": is_live,
+                "live_minutes": live_minutes,
+                "last_heartbeat_ts": last_heartbeat_ts.isoformat() if last_heartbeat_ts else None,
+                "last_ha_snapshot_ts": last_snapshot_ts.isoformat() if last_snapshot_ts else None,
+            },
+            "counts": {
+                "door": len(door_events),
+                "presence": len(presence_events),
+                "heartbeat_12h": len(heartbeat_events),
+                "ha_snapshot_12h": len(snapshot_events),
+            },
+            "front_door_entity_id": front_door_entity_id,
+            "last_front_open_ts": last_front_open_ts.isoformat() if last_front_open_ts else None,
+            "last_front_close_ts": last_front_close_ts.isoformat() if last_front_close_ts else None,
+            "last_front_exit_close_ts": last_front_exit_close_ts.isoformat() if last_front_exit_close_ts else None,
+            "last_strong_evidence_ts": last_strong_evidence_ts.isoformat() if last_strong_evidence_ts else None,
+            "strong_on_rooms": strong_on_now,
+            "primary_on_rooms": primary_on_now,
+            "pet_on_rooms": pet_on_now,
+            "presence_states": presence_states,
+            "params": {
+                "window_hours": window_hours,
+                "exit_quiet_minutes": exit_quiet_minutes,
+                "entry_window_minutes": entry_window_minutes,
+                "open_close_max_seconds": open_close_max_seconds,
+                "strong_rooms": sorted(strong_set),
+                "primary_rooms": sorted(primary_set),
+                "pet_rooms": sorted(pet_set),
+            },
+            "note": "Event-limit nådd (door/presence); vurder å øke lookback eller limit i bot hvis dere har svært mye data."
+            if hit_limit
+            else None,
+        },
     }
 
 
@@ -652,9 +1008,16 @@ def proposals(
     findings = resp.get("findings") or []
     for f in findings:
         fid = f.get("id") or ""
-        if not fid.startswith("anomaly-night-quiet-room-"):
+        # Proposal sources (Sprint 3 MVP -> generalized)
+        # - anomaly-night-quiet-room-*
+        # - anomaly-night-activity-room-*
+        # - anomaly-morning-late-*
+        if not (
+            fid.startswith("anomaly-night-quiet-room-")
+            or fid.startswith("anomaly-night-activity-room-")
+            or fid.startswith("anomaly-morning-late-")
+        ):
             continue
-
         ev = f.get("evidence") or {}
         room = ev.get("room") or (f.get("normal") or {}).get("room") or "unknown"
 
@@ -694,7 +1057,7 @@ def proposals(
                 },
                 "rule_draft": {
                     "type": "anomaly_followup",
-                    "anomaly_id_prefix": "anomaly-night-quiet-room-",
+                    "anomaly_id_prefix": ("anomaly-night-quiet-room-" if fid.startswith("anomaly-night-quiet-room-") else "anomaly-night-activity-room-" if fid.startswith("anomaly-night-activity-room-") else "anomaly-morning-late-"),
                     "room": room,
                     "action": "notify",
                     "test_days": 7,
