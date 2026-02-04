@@ -288,7 +288,6 @@ def occupancy(
             presence_room[ent] = room
             presence_last_ts[ent] = ts
 
-
             # STRONG presence ON => HOME
             if room in strong_set and st == "on":
                 last_strong_evidence_ts = ts
