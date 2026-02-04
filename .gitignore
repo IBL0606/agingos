@@ -20,3 +20,19 @@ agingos_repo.zip
 
 # Local backups
 *.bak
+
+# Local env / logs / handoff artifacts
+*.log
+console.log
+backend.log
+ai-bot.log
+
+# Local backups / handoff
+_backup/
+_handoff/
+
+# Editor/patch backups created during terminal edits
+*.bak
+*.bak.*
+index.html
+ps.txt

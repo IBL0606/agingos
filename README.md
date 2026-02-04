@@ -1,4 +1,19 @@
 # AgingOS — dokumentasjon, struktur og kode
+## Run (Docker)
+
+### Base stack
+
+    cp .env.example .env
+    # edit .env as needed
+    docker compose up -d --build
+
+### Optional dev tooling (heartbeat generator)
+
+Heartbeat is defined in `docker-compose.dev.yml` and is only started when explicitly included:
+
+    docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+
+
 
 [![CI](https://github.com/IBL0606/agingos/actions/workflows/ci.yml/badge.svg?event=push)](https://github.com/IBL0606/agingos/actions/workflows/ci.yml)
 
@@ -43,12 +58,12 @@ Feltprofilen kjører uten auto-reload og uten source-mount (immutable container)
 
 1) Sett auth for felt (anbefalt):
 - `AGINGOS_AUTH_MODE=api_key`
-- `AGINGOS_API_KEYS` = komma-separert liste (f.eks. `key1,key2`)
+- `AGINGOS_API_KEY` = API key (f.eks. `change-me-1`)
 
 Eksempel `.env` (i repo-root):
 ```bash
 AGINGOS_AUTH_MODE=api_key
-AGINGOS_API_KEYS=change-me-1,change-me-2
+AGINGOS_API_KEY=change-me-1
 ```
 
 2) Start feltprofil + migrasjoner:

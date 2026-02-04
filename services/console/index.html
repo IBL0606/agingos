@@ -22,6 +22,17 @@
     .finding-title { font-weight: 600; }
     .actions { margin-top: 8px; }
   </style>
+
+<style>
+  .rules-grid { display:flex; flex-direction:column; gap:8px; }
+  .rule-row { padding:8px 10px; border:1px solid #eee; border-radius:8px; background:#fafafa; }
+  .rule-top { display:flex; gap:10px; flex-wrap:wrap; align-items:baseline; }
+  .rule-name code { font-size:12px; }
+  .rule-kv { font-size:13px; }
+  .rule-meta { margin-top:4px; }
+  .rule-meta small { color:#666; }
+</style>
+
 </head>
 <body>
   <h1>AgingOS Console (MVP)</h1>
@@ -39,7 +50,7 @@
       <input id="apiKey" placeholder="sett X-API-Key" />
       <button id="saveBtn">Lagre</button>
       <button id="refreshBtn">Oppdater</button>
-    </p>
+</p>
     <div class="muted">Nøkkelen lagres lokalt i nettleseren (localStorage).</div>
   </div>
 
@@ -51,6 +62,7 @@
 
     <div class="card">
       <h2>Insights</h2>
+      <div id="insightsNote" style="display:none;margin:6px 0;padding:6px 8px;background:#fff6e5;border:1px solid #ffe3ad;border-radius:6px;font-size:12px"></div>
       <div id="insightsList" class="muted">Trykk "Oppdater".</div>
     </div>
 
@@ -66,13 +78,16 @@
     </div>
   </div>
 
+      <div id="anomaliesNote" style="display:none;margin:6px 0;padding:6px 8px;background:#fff6e5;border:1px solid #ffe3ad;border-radius:6px;font-size:12px"></div>
       <div id="anomaliesList" class="muted">Trykk "Oppdater".</div>
 
     </div>
 
     <div class="card">
       <h2>Forslag (Sprint 3)</h2>
+      <div id="proposalsNote" style="display:none;margin:6px 0;padding:6px 8px;background:#fff6e5;border:1px solid #ffe3ad;border-radius:6px;font-size:12px"></div>
       <div id="proposalsList" class="muted">Trykk "Oppdater".</div>
+        <div id="proposalsDebug" class="muted" style="margin-top:6px;font-size:12px"></div>
     </div>
   </div>
 
@@ -84,58 +99,114 @@
       const apiKey = localStorage.getItem("agingos_api_key") || "";
       $("apiBase").value = apiBase;
       $("apiKey").value = apiKey;
-    }
+      }
 
     function saveSettings() {
       localStorage.setItem("agingos_api_base", $("apiBase").value.trim());
       localStorage.setItem("agingos_api_key", $("apiKey").value.trim());
-    }
+      }
 
     function getQS(name) {
       const v = new URLSearchParams(window.location.search).get(name);
       return (v && v.trim()) ? v.trim() : null;
-    }
+      }
 
     async function apiGet(path) {
       const base = $("apiBase").value.trim().replace(/\/$/, "");
       const key = $("apiKey").value.trim();
       const headers = key ? { "X-API-Key": key } : {};
       const res = await fetch(base + path, { headers });
+
+      const ct = (res.headers.get("content-type") || "").toLowerCase();
       const text = await res.text();
-      if (!res.ok) throw new Error(res.status + " " + text);
-      return JSON.parse(text);
-    }
+
+      if (!res.ok) {
+        let msg = `${path} -> ${res.status} ${res.statusText || ""}`.trim();
+
+        // If backend returned JSON error, surface a short detail/message field.
+        if (ct.includes("application/json")) {
+          try {
+            const j = JSON.parse(text);
+            const d = (j && (j.detail || j.message || j.error)) ? (j.detail || j.message || j.error) : null;
+            if (d) msg += ` (${typeof d === "string" ? d : JSON.stringify(d)})`;
+          } catch (_) {}
+          }
+
+        throw new Error(msg);
+        }
+      try {
+        return JSON.parse(text);
+      } catch (_) {
+        throw new Error(`${path} -> invalid JSON (${ct || "unknown content-type"})`);
+        }
+      }
 
     async function apiSend(method, path, payload) {
+      console.log("API SEND", method, path, payload);
       const base = $("apiBase").value.trim().replace(/\/$/, "");
       const key = $("apiKey").value.trim();
       const headers = { "Content-Type": "application/json" };
       if (key) headers["X-API-Key"] = key;
-      const res = await fetch(base + path, { method, headers, body: JSON.stringify(payload) });
-      const text = await res.text();
-      if (!res.ok) throw new Error(res.status + " " + text);
-      return JSON.parse(text);
-    }
 
-    async function createRuleFromProposal(p, action) {
-      const room = (p && p.rule_draft && p.rule_draft.room) ? p.rule_draft.room : ((p && p.normal && p.normal.room) ? p.normal.room : null);
-      const status = (action === "reject") ? "rejected" : ((action === "activate") ? "active" : "testing");
-      const is_enabled = action !== "reject";
-      const payload = {
-        name: (p && p.id) ? p.id : ("proposal-" + Date.now()),
-        rule_type: "NO_MOTION",
-        params: {
-          room: room,
-          proposal_id: (p && p.id) ? p.id : null,
-          proposal_action: action,
-          proposal_status: status,
-          rule_draft: (p && p.rule_draft) ? p.rule_draft : null
-        },
-        is_enabled: (action !== "reject"),
-        severity: 2
-      };
-      return apiSend("POST", "/rules", payload);
-    }
+      const res = await fetch(base + path, { method, headers, body: JSON.stringify(payload) });
+
+      const ct = (res.headers.get("content-type") || "").toLowerCase();
+      const text = await res.text();
+
+      console.log("API RESP", method, path, "status=", res.status, "body=", text);
+
+      if (!res.ok) {
+        let msg = `${path} -> ${res.status} ${res.statusText || ""}`.trim();
+
+        if (ct.includes("application/json")) {
+          try {
+            const j = JSON.parse(text);
+            const d = (j && (j.detail || j.message || j.error)) ? (j.detail || j.message || j.error) : null;
+            if (d) msg += ` (${typeof d === "string" ? d : JSON.stringify(d)})`;
+          } catch (_) {}
+          }
+
+        throw new Error(msg);
+        }
+      try {
+        return JSON.parse(text);
+      } catch (_) {
+        throw new Error(`${path} -> invalid JSON (${ct || "unknown content-type"})`);
+        }
+      }
+
+          async function createRuleFromProposal(p, action) {
+        // action: test_7_days | activate | reject
+        const room = (p && p.rule_draft && p.rule_draft.room) ? p.rule_draft.room : ((p && p.normal && p.normal.room) ? p.normal.room : null);
+
+        const status =
+          (action === "activate") ? "active" :
+          (action === "reject") ? "rejected" :
+          "testing";
+
+        // Requirement:
+        // - test_7_days => is_enabled=false
+        // - activate   => is_enabled=true
+        // - reject     => is_enabled=false
+        const is_enabled = (action === "activate");
+
+        const payload = {
+          name: (p && p.id) ? (p.id + ":" + action) : ("proposal-" + Date.now() + ":" + action),
+          rule_type: "NO_MOTION",
+          params: {
+            source: "proposal",
+            room: room,
+            proposal_id: (p && p.id) ? p.id : null,
+            proposal_action: action,
+            proposal_status: status,
+            rule_draft: (p && p.rule_draft) ? p.rule_draft : null
+          },
+          is_enabled: is_enabled,
+          severity: 2
+        };
+        return apiSend("POST", "/rules", payload);
+
+      }
 
     function buildEvidenceLink(finding) {
       const ev = finding.evidence || {};
@@ -152,8 +223,8 @@
       if (ev.room) qs.push("room=" + encodeURIComponent(ev.room));
       if (qs.length) url += "?" + qs.join("&");
       return url;
-    }
 
+      }
 
     function renderAnomalies(payload) {
       const host = $("anomaliesList");
@@ -166,7 +237,7 @@
       if (list.length === 0) {
         host.textContent = "Ingen anomalier funnet.";
         return;
-      }
+        }
 
       for (const f of list) {
         const div = document.createElement("div");
@@ -210,10 +281,10 @@
             normalLine.textContent = `Normal: baseline (siste ${n.baseline_window_days} dager)`;
           } else {
             normalLine.textContent = "Normal: (tilgjengelig)";
-          }
+            }
 
           div.appendChild(normalLine);
-        }
+          }
 
         if (Array.isArray(f.because) && f.because.length) {
           const ul = document.createElement("ul");
@@ -223,9 +294,9 @@
             ul.appendChild(li);
           }
           div.appendChild(ul);
-        }
+          }
 
-        const actions = document.createElement("div");
+const actions = document.createElement("div");
         actions.className = "actions";
         const a = document.createElement("a");
         a.href = buildEvidenceLink(f);
@@ -234,171 +305,245 @@
         div.appendChild(actions);
 
         host.appendChild(div);
+        }
       }
-    }
 
     function renderInsights(insights) {
-      const host = $("insightsList");
-      host.innerHTML = "";
+  const host = $("insightsList");
+  host.innerHTML = "";
 
-      const findings = insights.findings || [];
-      if (findings.length === 0) {
-        host.textContent = "Ingen innsikt ennå.";
-        return;
+  const findings = (insights && insights.findings) ? insights.findings : [];
+  if (!findings.length) {
+    host.textContent = "Ingen innsikt ennå.";
+    return;
+  }
+
+  for (const f of findings) {
+    const div = document.createElement("div");
+    div.className = "finding";
+
+    const title = document.createElement("div");
+    title.className = "finding-title";
+    title.textContent = f.title || "(uten tittel)";
+
+    const summary = document.createElement("div");
+    summary.className = "muted";
+    summary.textContent = f.summary || "";
+
+    div.appendChild(title);
+    div.appendChild(summary);
+
+    if (Array.isArray(f.because) && f.because.length) {
+      const ul = document.createElement("ul");
+      for (const item of f.because) {
+        const li = document.createElement("li");
+        li.textContent = item;
+        ul.appendChild(li);
       }
-
-      for (const f of findings) {
-        const div = document.createElement("div");
-        div.className = "finding";
-
-        const title = document.createElement("div");
-        title.className = "finding-title";
-        title.textContent = f.title || "(uten tittel)";
-
-        const summary = document.createElement("div");
-        summary.className = "muted";
-        summary.textContent = f.summary || "";
-
-        div.appendChild(title);
-        div.appendChild(summary);
-
-        if (Array.isArray(f.because) && f.because.length) {
-          const ul = document.createElement("ul");
-          for (const item of f.because) {
-            const li = document.createElement("li");
-            li.textContent = item;
-            ul.appendChild(li);
-          }
-          div.appendChild(ul);
-        }
-
-        const actions = document.createElement("div");
-        actions.className = "actions";
-        const a = document.createElement("a");
-        a.href = buildEvidenceLink(f);
-        a.textContent = "Vis grunnlag (events)";
-        actions.appendChild(a);
-        div.appendChild(actions);
-
-        host.appendChild(div);
-      }
+      div.appendChild(ul);
     }
 
+    const actions = document.createElement("div");
+    actions.className = "actions";
+    const a = document.createElement("a");
+    a.href = buildEvidenceLink(f);
+    a.textContent = "Vis grunnlag (events)";
+    actions.appendChild(a);
+    div.appendChild(actions);
 
-    function renderProposals(payload) {
-      const host = $("proposalsList");
-      host.innerHTML = "";
+    host.appendChild(div);
+  }
+}
 
-      const proposals = (payload && payload.proposals) ? payload.proposals : [];
-      if (proposals.length === 0) {
-        host.textContent = "Ingen forslag.";
-        return;
-      }
 
-      for (const p of proposals) {
-        const div = document.createElement("div");
-        div.className = "finding";
 
-        const title = document.createElement("div");
-        title.className = "finding-title";
-        title.textContent = p.title || "(uten tittel)";
+      function renderProposals(payload) {
+        const host = $("proposalsList");
+        host.innerHTML = "";
 
-        const summary = document.createElement("div");
-        summary.className = "muted";
-        summary.textContent = p.summary || "";
-
-        div.appendChild(title);
-        div.appendChild(summary);
-
-        if (Array.isArray(p.because) && p.because.length) {
-          const ul = document.createElement("ul");
-          for (const item of p.because) {
-            const li = document.createElement("li");
-            li.textContent = item;
-            ul.appendChild(li);
-          }
-          div.appendChild(ul);
+        const proposals = (payload && payload.proposals) ? payload.proposals : [];
+        if (!proposals.length) {
+          host.textContent = "Ingen forslag.";
+          return;
         }
 
-        const actions = document.createElement("div");
-        actions.className = "actions";
-        const a = document.createElement("a");
-        a.href = buildEvidenceLink(p);
-        a.textContent = "Vis grunnlag (events)";
-        actions.appendChild(a);
+        for (const p of proposals) {
+          const div = document.createElement("div");
+          div.className = "finding";
 
-        console.log("PROPOSAL ACTIONS", p.id, p.lifecycle.actions);
+          const title = document.createElement("div");
+          title.className = "finding-title";
+          title.textContent = p.title || "(uten tittel)";
 
-        if (p.lifecycle && Array.isArray(p.lifecycle.actions) && p.lifecycle.actions.length) {
-          const btnWrap = document.createElement("div");
-          btnWrap.style.marginTop = "6px";
-          for (const act of p.lifecycle.actions) {
-            const b = document.createElement("button");
-            b.textContent = act.label || act.action;
-            b.addEventListener("click", async () => {
-              b.disabled = true;
-              try {
-                await createRuleFromProposal(p, act.action);
-                await refresh();
-              } catch (e) {
-                alert("Feil: " + e.message);
-              } finally {
-                b.disabled = false;
-              }
-            });
-            btnWrap.appendChild(b);
+          const summary = document.createElement("div");
+          summary.className = "muted";
+          summary.textContent = p.summary || "";
+
+          div.appendChild(title);
+          div.appendChild(summary);
+
+          // Status + timestamp fra persisted rule (references.rule)
+          const refRule = (p && p.references && p.references.rule) ? p.references.rule : null;
+          if (refRule && refRule.proposal_status) {
+            const meta = document.createElement("div");
+            meta.className = "muted";
+
+            const st = String(refRule.proposal_status || "");
+            const testIso = refRule.proposal_test_started_at || "";
+            const actIso  = refRule.proposal_activated_at || "";
+            const rejIso  = refRule.proposal_rejected_at || "";
+
+            let ts = "";
+            if (st === "active" && actIso) ts = actIso;
+            else if (st === "testing" && testIso) ts = testIso;
+            else if (st === "rejected" && rejIso) ts = rejIso;
+
+            const label =
+              (st === "active") ? "Aktiv" :
+              (st === "testing") ? "Testing" :
+              (st === "rejected") ? "Avvist" :
+              ("Status: " + st);
+
+            meta.textContent = label + (ts ? (" " + ts.replace("T"," ").replace("Z"," UTC")) : "");
+            div.appendChild(meta);
           }
-          actions.appendChild(btnWrap);
+
+          if (Array.isArray(p.because) && p.because.length) {
+            const ul = document.createElement("ul");
+            for (const item of p.because) {
+              const li = document.createElement("li");
+              li.textContent = item;
+              ul.appendChild(li);
+            }
+            div.appendChild(ul);
+          }
+
+          const actions = document.createElement("div");
+          actions.className = "actions";
+
+          const a = document.createElement("a");
+          a.href = buildEvidenceLink(p);
+          a.textContent = "Vis grunnlag (events)";
+          actions.appendChild(a);
+
+          // Buttons: kun når vi ikke har persisted status (draft).
+          // Når status er active/testing/rejected: UI read-only.
+          const persisted = refRule && refRule.proposal_status ? String(refRule.proposal_status) : "";
+          if (p.lifecycle && Array.isArray(p.lifecycle.actions) && p.lifecycle.actions.length) {
+            const btnWrap = document.createElement("div");
+            btnWrap.style.marginTop = "6px";
+
+            for (const act of p.lifecycle.actions) {
+              if (persisted === "active" || persisted === "rejected" || persisted === "testing") continue;
+
+              const b = document.createElement("button");
+              b.textContent = act.label || act.action;
+
+              b.addEventListener("click", async () => {
+                b.disabled = true;
+                try {
+                  console.log("CLICK PROPOSAL", p.id, "action=", act.action);
+                  await createRuleFromProposal(p, act.action);
+                  await refresh();
+                } catch (e) {
+                  alert("Feil: " + e.message);
+                } finally {
+                  b.disabled = false;
+                }
+              });
+
+              btnWrap.appendChild(b);
+            }
+
+            if (btnWrap.childNodes && btnWrap.childNodes.length) {
+              actions.appendChild(btnWrap);
+            }
+          }
+
+          div.appendChild(actions);
+          host.appendChild(div);
         }
-
-        div.appendChild(actions);
-
-        host.appendChild(div);
       }
-    }
 
     async function refresh() {
+  console.log("[UI] refresh() start", { apiBase: ($("apiBase") && $("apiBase").value), keyLen: ($("apiKey") && $("apiKey").value ? $("apiKey").value.length : 0) });
+
+      function setNote(id, note) {
+        const el = $(id);
+        if (!el) return;
+        if (note) {
+          el.style.display = "block";
+          el.textContent = String(note);
+        } else {
+          el.style.display = "none";
+          el.textContent = "";
+          }
+        }
+
       $("aiStatus").textContent = "Laster...";
       $("insightsList").textContent = "Laster...";
       $("anomaliesList").textContent = "Laster...";
       $("proposalsList").textContent = "Laster...";
+      setNote("insightsNote", "");
+      setNote("anomaliesNote", "");
+      setNote("proposalsNote", "");
 
+      // Status
       try {
         const status = await apiGet("/ai/status");
         $("aiStatus").textContent = JSON.stringify(status, null, 2);
-
-        const insights = await apiGet("/ai/insights");
-        renderInsights(insights);
-
-        // Dev/testing knobs via querystring (optional):
-        // ?anomaly_until=2026-01-09T12:00:00Z&anomaly_floor=0&anomaly_min_abs_increase=0&anomaly_z=0
-        const qs = [];
-        const a_until = getQS("anomaly_until");
-        const a_floor = getQS("anomaly_floor");
-        const a_min = getQS("anomaly_min_abs_increase");
-        const a_z = getQS("anomaly_z");
-        const quietNights = new URLSearchParams(window.location.search).get("anomaly_quiet_nights");
-        const quietMean = new URLSearchParams(window.location.search).get("anomaly_quiet_mean");
-        if (quietNights) qs.push("quiet_min_room_baseline_nights=" + encodeURIComponent(quietNights));
-        if (quietMean) qs.push("quiet_min_room_baseline_mean=" + encodeURIComponent(quietMean));
-        if (a_until) qs.push("until=" + encodeURIComponent(a_until));
-        if (a_floor) qs.push("meaningful_recent_floor=" + encodeURIComponent(a_floor));
-        if (a_min) qs.push("min_abs_increase=" + encodeURIComponent(a_min));
-        if (a_z) qs.push("z_threshold=" + encodeURIComponent(a_z));
-        const anomaliesPath = qs.length ? ("/ai/anomalies?" + qs.join("&")) : "/ai/anomalies";
-        const anomalies = await apiGet(anomaliesPath);
-        renderAnomalies(anomalies);
-        const proposalsPath = qs.length ? ("/ai/proposals?" + qs.join("&")) : "/ai/proposals";
-        const proposals = await apiGet(proposalsPath);
-        renderProposals(proposals);
-
       } catch (e) {
         $("aiStatus").textContent = "Feil: " + e.message;
+        }
+
+      // Insights
+      try {
+        const insights = await apiGet("/ai/insights");
+        renderInsights(insights);
+        setNote("insightsNote", insights && insights.note ? insights.note : "");
+      } catch (e) {
         $("insightsList").textContent = "Feil: " + e.message;
+        setNote("insightsNote", "");
+        }
+
+      // Anomalies (with existing QS knobs)
+      const qs = [];
+      const a_until = getQS("anomaly_until");
+      const a_floor = getQS("anomaly_floor");
+      const a_min = getQS("anomaly_min_abs_increase");
+      const a_z = getQS("anomaly_z");
+      const quietNights = new URLSearchParams(window.location.search).get("anomaly_quiet_nights");
+      const quietMean = new URLSearchParams(window.location.search).get("anomaly_quiet_mean");
+      if (quietNights) qs.push("quiet_min_room_baseline_nights=" + encodeURIComponent(quietNights));
+      if (quietMean) qs.push("quiet_min_room_baseline_mean=" + encodeURIComponent(quietMean));
+      if (a_until) qs.push("until=" + encodeURIComponent(a_until));
+      if (a_floor) qs.push("meaningful_recent_floor=" + encodeURIComponent(a_floor));
+      if (a_min) qs.push("min_abs_increase=" + encodeURIComponent(a_min));
+      if (a_z) qs.push("z_threshold=" + encodeURIComponent(a_z));
+      const anomaliesPath = qs.length ? ("/ai/anomalies?" + qs.join("&")) : "/ai/anomalies";
+      try {
+        const anomalies = await apiGet(anomaliesPath);
+        renderAnomalies(anomalies);
+        setNote("anomaliesNote", anomalies && anomalies.note ? anomalies.note : "");
+      } catch (e) {
         $("anomaliesList").textContent = "Feil: " + e.message;
+        setNote("anomaliesNote", "");
+        }
+
+      // Proposals (re-use anomaly qs + deterministic test mode)
+      const pqs = qs.slice();
+        // (test mode) removed hardcoded until; keep only relaxed thresholds
+
+              const proposalsPath = pqs.length ? ("/ai/proposals?" + pqs.join("&")) : "/ai/proposals";
+        try {
+          const proposals = await apiGet(proposalsPath);
+          renderProposals(proposals);
+          setNote("proposalsNote", proposals && proposals.note ? proposals.note : "");
+        } catch (e) {
         $("proposalsList").textContent = "Feil: " + e.message;
+        setNote("proposalsNote", "");
+        }
       }
-    }
 
     function syncAnomalyRoomToQS() {
       const v = ($("anomalyRoom").value || "").trim();
@@ -409,10 +554,296 @@
       window.history.replaceState({}, "", newUrl);
     }
 
-    $("saveBtn").addEventListener("click", () => { saveSettings(); refresh(); });
-    $("refreshBtn").addEventListener("click", () => { syncAnomalyRoomToQS(); refresh(); });
 
-    loadSettings();
+      window.addEventListener("load", () => {
+        loadSettings();
+        $("saveBtn").addEventListener("click", () => { saveSettings(); refresh(); });
+        $("refreshBtn").addEventListener("click", () => {
+  try {
+    syncAnomalyRoomToQS();
+    const r = refresh();
+    if (r && typeof r.catch === "function") r.catch(e => { console.error("[UI] refresh() failed", e); $("aiStatus").textContent = "Feil i refresh(): " + (e && e.message ? e.message : String(e)); });
+  } catch (e) {
+    console.error("[UI] refresh() threw", e);
+    $("aiStatus").textContent = "Feil i refresh(): " + (e && e.message ? e.message : String(e));
+  }
+});
+        refresh();
+      });
+</script>
+<section id="agingos-observability" style="margin:16px;padding:12px;border:1px solid #ddd;border-radius:8px;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif">
+  <h2 style="margin:0 0 8px 0;font-size:16px">AgingOS observability</h2>
+  <div id="ao-status" style="display:flex;gap:12px;flex-wrap:wrap;font-size:13px">
+    <div><b>Backend</b>: <span id="ao-backend">?</span></div>
+    <div><b>AI</b>: <span id="ao-ai">?</span></div>
+    <div><b>Sist event</b>: <span id="ao-last-ts">?</span></div>
+    <div><b>Events siste 5 min</b>: <span id="ao-c5">?</span></div>
+    <div><b>Events siste 60 min</b>: <span id="ao-c60">?</span></div>
+  </div>
+  <div style="margin-top:10px">
+    <div style="font-size:13px;margin-bottom:6px"><b>Live feed</b> (siste 10)</div>
+    <pre id="ao-feed" style="margin:0;padding:10px;background:#fafafa;border:1px solid #eee;border-radius:6px;max-height:260px;overflow:auto;font-size:12px;line-height:1.35"></pre>
+  </div>
+    <div style="margin-top:10px">
+      <div style="font-size:13px;margin-bottom:6px"><b>Events per rom</b></div>
+      <pre id="ao-roomstats" style="margin:0;padding:10px;background:#fafafa;border:1px solid #eee;border-radius:6px;max-height:260px;overflow:auto;font-size:12px;line-height:1.35"></pre>
+    </div>
+</section>
+
+<script>
+  // AO_OBS_FIX_V1: Robust observability (ES5/promise; no async/await, no optional chaining)
+  (function(){
+    function $(id){ return document.getElementById(id); }
+    function setText(id, txt){
+      var el = $(id);
+      if (el) el.textContent = (txt === undefined || txt === null) ? "" : String(txt);
+    }
+    function fmt(s){ return s ? String(s) : "-"; }
+
+    function fetchJson(url, key){
+      var headers = key ? { "X-API-Key": key } : {};
+      return fetch(url, { headers: headers }).then(function(r){
+        if (!r.ok) throw new Error(url + " -> " + r.status);
+        return r.json();
+      });
+    }
+
+    function sinceIso(mins){
+      return new Date(Date.now() - mins*60*1000).toISOString();
+    }
+
+    function countSince(events, iso){
+      var t0 = Date.parse(iso);
+      var n = 0;
+      for (var i=0; i<(events||[]).length; i++){
+        var ts = Date.parse(events[i] && events[i].timestamp);
+        if (!Number.isNaN(ts) && ts >= t0) n++;
+      }
+      return n;
+    }
+
+    function fmtShort(iso){
+      if (!iso) return "-";
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return String(iso);
+      return d.toLocaleString("nb-NO", { timeZone:"Europe/Oslo", day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit" });
+    }
+
+    function tick(){
+      var keyEl = document.getElementById("apiKey");
+      var key = (keyEl && keyEl.value) ? keyEl.value : (localStorage.getItem("agingos_api_key") || "");
+
+      fetchJson("/api/health", key).then(function(){
+        setText("ao-backend", "OK");
+      }).catch(function(){
+        setText("ao-backend", "FEIL");
+      });
+
+      fetchJson("/api/ai/status", key).then(function(st){
+        var ok = st && st.enabled && st.reachable;
+        var txt = ok ? "OK" : (st && st.enabled ? "ENABLED, MEN IKKE REACHABLE" : "DISABLED");
+        setText("ao-ai", txt);
+      }).catch(function(){
+        setText("ao-ai", "FEIL");
+      });
+
+      fetchJson("/api/events?limit=200", key).then(function(events){
+        var last = (events && events.length) ? events[0] : null;
+        setText("ao-last-ts", last ? fmt(last.timestamp) : "(ingen)");
+        setText("ao-c5", String(countSince(events, sinceIso(5))));
+        setText("ao-c60", String(countSince(events, sinceIso(60))));
+
+        // live feed (10)
+        var lines = [];
+        for (var i=0; i<Math.min(10, (events||[]).length); i++){
+          var e = events[i] || {};
+          var payload = e.payload || {};
+          var room = (payload.room || payload.area) ? (payload.room || payload.area) : "-";
+          lines.push(fmt(e.timestamp) + "  " + fmt(e.category) + "  room=" + room + "  id=" + fmt(e.id));
+        }
+        setText("ao-feed", lines.join("\n"));
+
+        // per-room stats
+        var byRoom = {};
+        for (var j=0; j<(events||[]).length; j++){
+          var evj = events[j] || {};
+          var plj = evj.payload || {};
+          var rname = (plj.room || plj.area) ? (plj.room || plj.area) : "-";
+          var tms = Date.parse(evj.timestamp);
+          if (!byRoom[rname]) byRoom[rname] = { n: 0, min: null, max: null, minIso: "", maxIso: "" };
+          byRoom[rname].n += 1;
+          if (!Number.isNaN(tms)) {
+            if (byRoom[rname].min === null || tms < byRoom[rname].min) { byRoom[rname].min = tms; byRoom[rname].minIso = evj.timestamp; }
+            if (byRoom[rname].max === null || tms > byRoom[rname].max) { byRoom[rname].max = tms; byRoom[rname].maxIso = evj.timestamp; }
+          }
+        }
+        var rooms = Object.keys(byRoom).sort();
+        var out = [];
+        for (var k=0; k<rooms.length; k++){
+          var rn = rooms[k];
+          var it = byRoom[rn];
+          out.push(rn + ": " + it.n + " | siste: <" + fmtShort(it.maxIso) + "> | første: <" + fmtShort(it.minIso) + ">");
+        }
+        setText("ao-roomstats", out.join("\n"));
+
+      }).catch(function(){
+        setText("ao-last-ts", "?");
+        setText("ao-c5", "?");
+        setText("ao-c60", "?");
+        setText("ao-feed", "Kunne ikke hente /api/events (sjekk API-key / proxy).");
+        setText("ao-roomstats", "");
+      });
+    }
+
+    window.addEventListener("load", function(){
+      try { tick(); } catch(_) {}
+      setInterval(function(){ try { tick(); } catch(_) {} }, 5000);
+    });
+  })();
   </script>
+
+  <script>
+  // --- Rules UI (GET /rules) ---
+  (function () {
+    function $(id) { return document.getElementById(id); }
+
+    function escapeHtml(s) {
+      return String((s === null || s === undefined) ? "" : s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+
+    function formatOslo(iso) {
+      if (!iso) return "";
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return String(iso);
+      return d.toLocaleString("nb-NO", {
+        timeZone: "Europe/Oslo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+
+    function pickRoom(rule) {
+      var p = (rule && rule.params) ? rule.params : {};
+      var rd = (p && p.rule_draft) ? p.rule_draft : {};
+      return (p.room || rd.room || "");
+
+    function pickStatus(rule) {
+      var p = (rule && rule.params) ? rule.params : {};
+      return (p.proposal_status || "");
+
+    function renderList(targetEl, htmlList) {
+      if (!targetEl) return;
+      if (!htmlList || !htmlList.length) {
+        targetEl.innerHTML = '<p class="muted">Ingen</p>';
+        return;
+      targetEl.innerHTML = '<div class="rules-grid">' + htmlList.join("") + "</div>";
+
+    function fmtRule(r) {
+      var name = (r && r.name) ? r.name : "";
+      var room = pickRoom(r) || "-";
+      var status = pickStatus(r) || "-";
+
+      var p = (r && r.params) ? r.params : {};
+      var testIso = p.proposal_test_started_at || "";
+      var actIso  = p.proposal_activated_at || "";
+      var createdIso = (r && r.created_at) ? r.created_at : "";
+
+      var meta = [];
+      if (testIso) meta.push('<span title="' + escapeHtml(testIso) + '">test: ' + escapeHtml(formatOslo(testIso)) + "</span>");
+      if (actIso)  meta.push('<span title="' + escapeHtml(actIso) + '">aktivert: ' + escapeHtml(formatOslo(actIso)) + "</span>");
+      if (createdIso) meta.push('<span title="' + escapeHtml(createdIso) + '">opprettet: ' + escapeHtml(formatOslo(createdIso)) + "</span>");
+      var metaHtml = meta.length ? '<div class="muted"><small>' + meta.join(" · ") + "</small></div>" : "";
+
+      return (
+        '<div class="rule-card">' +
+          '<div><code title="' + escapeHtml(name) + '">' + escapeHtml(name) + "</code></div>" +
+          '<div class="muted">rom: ' + escapeHtml(room) +
+            " · status: " + escapeHtml(status) +
+            " · enabled: " + ((r && r.is_enabled) ? "ja" : "nei") +
+          "</div>" +
+          metaHtml +
+        "</div>"
+      );
+
+    async function loadRules() {
+      var err = $("rules-error");
+      var activeEl = $("rules-active");
+      var testingEl = $("rules-testing");
+      var otherEl = $("rules-other");
+      var hA = $("rules-active-h");
+      var hT = $("rules-testing-h");
+      var hO = $("rules-other-h");
+
+      if (!activeEl || !testingEl || !otherEl) {
+        if (err) {
+          err.style.display = "block";
+          err.textContent = "Rules UI: Mangler #rules-active/#rules-testing/#rules-other i HTML.";
+        return;
+
+      if (err) { err.style.display = "none"; err.textContent = ""; }
+
+      try {
+        var qsKey = new URLSearchParams(window.location.search).get("api_key");
+        var key = (qsKey && qsKey.trim()) ? qsKey.trim() :s*"";
+
+        var resp = await fetch("/rules", { headers: { "X-API-Key": key } });
+        if (resp.status === 401 || resp.status === 403) resp = await fetch("/rules");
+        if (!resp.ok) throw new Error("HTTP " + resp.status + " " + resp.statusText);
+
+        var rules = await resp.json();
+        var list = Array.isArray(rules) ? rules : [];
+
+        var active = list.filter(function (r) { return r && r.is_enabled && pickStatus(r) === "active"; });
+        var testing = list.filter(function (r) { return r && r.is_enabled && pickStatus(r) === "testing"; });
+        var other = list.filter(function (r) {
+          return !(r && r.is_enabled && (pickStatus(r) === "active" || pickStatus(r) === "testing"));
+        });
+
+        if (hA) hA.textContent = "Aktive (" + active.length + ")";
+        if (hT) hT.textContent = "Testing (" + testing.length + ")";
+        if (hO) hO.textContent = "Andre (" + other.length + ")";
+
+        renderList(activeEl, active.map(fmtRule));
+        renderList(testingEl, testing.map(fmtRule));
+        renderList(otherEl, other.map(fmtRule));
+      } catch (e) {
+        if (err) {
+          err.style.display = "block";
+          err.textContent = "Kunne ikke hente regler: " + (e && e.message ? e.message : String(e));
+        renderList(activeEl, []);
+        renderList(testingEl, []);
+        renderList(otherEl, []);
+
+    window.addEventListener("load", function () {
+      try { loadRules(); } catch (_) {}
+      setInterval(function () { try { loadRules(); } catch (_) {} }, 10000);
+    });
+  })();
+
+</script>
+
+
+<!-- Rules section (GET /rules) -->
+<section id="rules-section">
+  <h2>Regler</h2>
+  <div id="rules-error" style="display:none;"></div>
+
+  <h3 id="rules-active-h">Aktive</h3>
+  <div id="rules-active"></div>
+
+  <h3 id="rules-testing-h">Testing</h3>
+  <div id="rules-testing"></div>
+
+  <h3 id="rules-other-h">Andre</h3>
+  <div id="rules-other"></div>
+</section>
+
 </body>
 </html>
