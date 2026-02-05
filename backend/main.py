@@ -14,8 +14,11 @@ from services.auth import require_api_key, validate_auth_config_on_startup
 
 from routes.rules import router as rules_router
 from routes.deviations import router as deviations_router
+from routes.baseline import router as baseline_router
+from routes.anomalies import router as anomalies_router
 
 from fastapi import Query
+from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 
@@ -28,6 +31,8 @@ app = FastAPI(
 
 app.include_router(rules_router)
 app.include_router(deviations_router)
+app.include_router(baseline_router)
+app.include_router(anomalies_router)
 
 
 @app.get("/health")
@@ -331,6 +336,671 @@ def ai_proposals(
             "proposals": [],
             "note": f"Could not fetch proposals from AI bot (fail-soft): {type(e).__name__}: {e}",
         }
+
+
+
+
+
+# -------------------------
+# Proposals (persistent MVP)
+# -------------------------
+
+from fastapi import Body
+from sqlalchemy import text
+
+
+@app.get("/proposals")
+def list_proposals(
+    last: str | None = None,
+    limit: int = Query(default=200, ge=1, le=500),
+):
+    """
+    Persistent proposals from DB (NOT ai-bot proxy).
+    If `last` is provided: returns rows with updated_at > last (ISO8601 string).
+    Includes recent action history (proposal_actions) in `actions`.
+    """
+    db = SessionLocal()
+    try:
+        if last:
+            q = text(
+                """
+                SELECT
+                  p.proposal_id, p.org_id, p.subject_id, p.room_id,
+                  p.proposal_type, p.dedupe_key, p.state, p.priority,
+                  p.evidence, p.why,
+                  p.action_target, p.action_payload,
+                  p.first_detected_at, p.last_detected_at,
+                  p.window_start, p.window_end,
+                  p.test_started_at, p.test_until,
+                  p.activated_at, p.rejected_at,
+                  p.last_actor, p.last_source, p.last_note,
+                  p.created_at, p.updated_at,
+                  COALESCE((
+                    SELECT jsonb_agg(to_jsonb(a) ORDER BY a.created_at DESC, a.action_id DESC)
+                    FROM (
+                      SELECT action_id, action, prev_state, new_state, actor, source, note, created_at
+                      FROM proposal_actions
+                      WHERE proposal_id = p.proposal_id
+                      ORDER BY created_at DESC, action_id DESC
+                      LIMIT 20
+                    ) a
+                  ), '[]'::jsonb) AS actions
+                FROM proposals p
+                WHERE p.updated_at > :last_ts
+                ORDER BY p.updated_at ASC
+                LIMIT :limit
+                """
+            )
+            rows = db.execute(q, {"last_ts": last, "limit": limit}).mappings().all()
+        else:
+            q = text(
+                """
+                SELECT
+                  p.proposal_id, p.org_id, p.subject_id, p.room_id,
+                  p.proposal_type, p.dedupe_key, p.state, p.priority,
+                  p.evidence, p.why,
+                  p.action_target, p.action_payload,
+                  p.first_detected_at, p.last_detected_at,
+                  p.window_start, p.window_end,
+                  p.test_started_at, p.test_until,
+                  p.activated_at, p.rejected_at,
+                  p.last_actor, p.last_source, p.last_note,
+                  p.created_at, p.updated_at,
+                  COALESCE((
+                    SELECT jsonb_agg(to_jsonb(a) ORDER BY a.created_at DESC, a.action_id DESC)
+                    FROM (
+                      SELECT action_id, action, prev_state, new_state, actor, source, note, created_at
+                      FROM proposal_actions
+                      WHERE proposal_id = p.proposal_id
+                      ORDER BY created_at DESC, action_id DESC
+                      LIMIT 20
+                    ) a
+                  ), '[]'::jsonb) AS actions
+                FROM proposals p
+                ORDER BY p.updated_at DESC
+                LIMIT :limit
+                """
+            )
+            rows = db.execute(q, {"limit": limit}).mappings().all()
+
+        return [dict(r) for r in rows]
+    finally:
+        db.close()
+
+
+def _transition_allowed(prev_state: str, action: str) -> bool:
+    # Conservative MVP transitions
+    prev_state = (prev_state or "").upper()
+    action = (action or "").upper()
+
+    if action == "TEST":
+        return prev_state == "NEW"
+    if action == "ACTIVATE":
+        return prev_state in ("NEW", "TESTING")
+    if action == "REJECT":
+        return prev_state in ("NEW", "TESTING", "ACTIVE")
+    return False
+
+
+def _proposal_transition(
+    db,
+    *,
+    proposal_id: int,
+    action: str,          # TEST | ACTIVATE | REJECT
+    actor: str | None,
+    source: str,
+    note: str | None,
+):
+    row = db.execute(
+        text("SELECT proposal_id, state FROM proposals WHERE proposal_id = :id FOR UPDATE"),
+        {"id": proposal_id},
+    ).mappings().one_or_none()
+
+    if not row:
+        return {"ok": False, "error": "not_found"}
+
+    prev_state = row["state"]
+
+    if not _transition_allowed(prev_state, action):
+        return {"ok": False, "error": "transition_not_allowed", "prev_state": prev_state, "action": action}
+
+    if action == "TEST":
+        new_state = "TESTING"
+        db.execute(
+            text(
+                """
+                UPDATE proposals
+                SET state = 'TESTING',
+                    test_started_at = now(),
+                    test_until = now() + interval '7 days',
+                    last_actor = :actor,
+                    last_source = :source,
+                    last_note = :note
+                WHERE proposal_id = :id
+                """
+            ),
+            {"id": proposal_id, "actor": actor, "source": source, "note": note},
+        )
+
+    elif action == "ACTIVATE":
+        new_state = "ACTIVE"
+        db.execute(
+            text(
+                """
+                UPDATE proposals
+                SET state = 'ACTIVE',
+                    activated_at = now(),
+                    -- clear any test window when activating
+                    test_started_at = NULL,
+                    test_until = NULL,
+                    last_actor = :actor,
+                    last_source = :source,
+                    last_note = :note
+                WHERE proposal_id = :id
+                """
+            ),
+            {"id": proposal_id, "actor": actor, "source": source, "note": note},
+        )
+
+    elif action == "REJECT":
+        new_state = "REJECTED"
+        db.execute(
+            text(
+                """
+                UPDATE proposals
+                SET state = 'REJECTED',
+                    rejected_at = now(),
+                    -- clear any test window when rejecting
+                    test_started_at = NULL,
+                    test_until = NULL,
+                    activated_at = NULL,
+                    last_actor = :actor,
+                    last_source = :source,
+                    last_note = :note
+                WHERE proposal_id = :id
+                """
+            ),
+            {"id": proposal_id, "actor": actor, "source": source, "note": note},
+        )
+    else:
+        return {"ok": False, "error": "bad_action"}
+
+    db.execute(
+        text(
+            """
+            INSERT INTO proposal_actions (
+              proposal_id, action, prev_state, new_state,
+              actor, source, note, payload
+            )
+            VALUES (
+              :proposal_id, :action, :prev_state, :new_state,
+              :actor, :source, :note, '{}'::jsonb
+            )
+            """
+        ),
+        {
+            "proposal_id": proposal_id,
+            "action": action,
+            "prev_state": prev_state,
+            "new_state": new_state,
+            "actor": actor,
+            "source": source,
+            "note": note,
+        },
+    )
+
+    return {"ok": True, "proposal_id": proposal_id, "prev_state": prev_state, "new_state": new_state}
+
+
+@app.post("/proposals/{proposal_id}/test")
+def test_proposal(proposal_id: int, body: dict = Body(default={})):
+    db = SessionLocal()
+    try:
+        with db.begin():
+            return _proposal_transition(
+                db,
+                proposal_id=proposal_id,
+                action="TEST",
+                actor=body.get("actor"),
+                source=body.get("source", "ui"),
+                note=body.get("note"),
+            )
+    finally:
+        db.close()
+
+
+@app.post("/proposals/{proposal_id}/activate")
+def activate_proposal(proposal_id: int, body: dict = Body(default={})):
+    db = SessionLocal()
+    try:
+        with db.begin():
+            return _proposal_transition(
+                db,
+                proposal_id=proposal_id,
+                action="ACTIVATE",
+                actor=body.get("actor"),
+                source=body.get("source", "ui"),
+                note=body.get("note"),
+            )
+    finally:
+        db.close()
+
+
+@app.post("/proposals/{proposal_id}/reject")
+def reject_proposal(proposal_id: int, body: dict = Body(default={})):
+    db = SessionLocal()
+    try:
+        with db.begin():
+            return _proposal_transition(
+                db,
+                proposal_id=proposal_id,
+                action="REJECT",
+                actor=body.get("actor"),
+                source=body.get("source", "ui"),
+                note=body.get("note"),
+            )
+    finally:
+        db.close()
+
+
+
+# --- Episodes (dev dashboard) -------------------------------------------------
+
+def _parse_duration_seconds(s: str) -> int:
+    """
+    Parse simple durations like: 30s, 15m, 24h, 7d, 2w
+    """
+    s = (s or "").strip().lower()
+    import re
+    m = re.fullmatch(r"(\d+)\s*([smhdw])", s)
+    if not m:
+        raise ValueError("Invalid 'last' duration. Use like 24h, 7d, 30m, 90s, 2w")
+    n = int(m.group(1))
+    unit = m.group(2)
+    mult = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800}[unit]
+    return n * mult
+
+
+def _tod_bucket_utc(dt_utc: datetime) -> str:
+    # Simple UTC buckets for now (explainable + deterministic)
+    h = dt_utc.hour
+    if h < 7:
+        return "night"
+    if h < 12:
+        return "morning"
+    if h < 18:
+        return "day"
+    return "evening"
+
+
+@app.get("/episodes")
+def list_episodes(
+    last: str = Query(default="24h"),
+    limit: int = Query(default=200, ge=1, le=5000),
+    before: Optional[datetime] = Query(default=None),
+    before_id: Optional[str] = Query(default=None),
+    classification: Optional[str] = Query(default=None),
+    room_id: Optional[str] = Query(default=None),
+    quality: Optional[str] = Query(default=None),
+):
+    """
+    Dev endpoint: return stored episodes for the last window.
+    No pipeline here; this only reads from episodes + episode_labels tables.
+    """
+    from datetime import timezone, timedelta
+    from sqlalchemy import text
+
+    try:
+        seconds = _parse_duration_seconds(last)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(seconds=seconds)
+    until = now
+
+    db = SessionLocal()
+    try:
+        # Fetch episodes (most recent first)
+        # Fetch episodes with pagination + filters (stable ordering)
+        # Stable sort: start_ts DESC, id DESC
+        params = {"since": since, "until": until, "limit": limit}
+        where = ["start_ts >= :since", "start_ts < :until"]
+
+        # Filters
+        if classification:
+            c = classification.strip().lower()
+            if c not in ("human", "pet", "unknown"):
+                raise HTTPException(status_code=400, detail="classification must be human|pet|unknown")
+            where.append("class = :class")
+            params["class"] = c
+
+        if room_id:
+            where.append("room = :room")
+            params["room"] = room_id
+
+        if quality:
+            q = quality.strip().lower()
+            if q == "good":
+                where.append("quality = :quality")
+                params["quality"] = "high"
+            elif q == "timeout":
+                where.append("close_reason = :close_reason")
+                params["close_reason"] = "timeout"
+            elif q in ("high", "low"):
+                where.append("quality = :quality")
+                params["quality"] = q
+            else:
+                raise HTTPException(status_code=400, detail="quality must be high|low|good|timeout")
+
+        # Pagination cursor
+        if before is not None:
+            try:
+                before_utc = require_utc_aware(before, "before")
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=str(e))
+
+            if before_id:
+                import uuid
+                try:
+                    uuid.UUID(before_id)
+                except Exception:
+                    raise HTTPException(status_code=400, detail="before_id must be a UUID")
+                where.append("(start_ts < :before_ts OR (start_ts = :before_ts AND id < :before_id))")
+                params["before_ts"] = before_utc
+                params["before_id"] = before_id
+            else:
+                where.append("start_ts < :before_ts")
+                params["before_ts"] = before_utc
+
+        sql = f"""
+                SELECT
+                  id, room, room_type, primary_sensor, sensor_set,
+                  start_ts, end_ts, duration_s,
+                  close_reason, timeout_s, quality, quality_flags,
+                  event_count_total, event_count_motion, event_count_presence_on, event_count_presence_off,
+                  event_rate_per_min,
+                  door_before_s, door_during, door_after_s,
+                  tod_bucket, weekday,
+                  class, p_human, p_pet, p_unknown,
+                  classifier_version, feature_version, reasons, reason_summary
+                FROM episodes
+                WHERE {' AND '.join(where)}
+                ORDER BY start_ts DESC, id DESC
+                LIMIT :limit
+        """
+
+        ep_rows = db.execute(text(sql), params).fetchall()
+
+        episodes = []
+        ep_ids = []
+
+        for r in ep_rows:
+            m = dict(r._mapping)
+            ep_ids.append(m["id"])
+
+            # Normalize for JSON (psycopg handles most; be explicit with datetimes)
+            start_ts = m["start_ts"]
+            end_ts = m["end_ts"]
+            episodes.append(
+                {
+                    "id": str(m["id"]),
+                    "room": m["room"],
+                    "room_type": m.get("room_type"),
+                    "primary_sensor": m["primary_sensor"],
+                    "sensor_set": m.get("sensor_set") or [],
+                    "start_ts": start_ts.isoformat() if start_ts else None,
+                    "end_ts": end_ts.isoformat() if end_ts else None,
+                    "duration_s": m.get("duration_s"),
+                    "close_reason": m["close_reason"],
+                    "timeout_s": m["timeout_s"],
+                    "quality": m["quality"],
+                    "quality_flags": m.get("quality_flags") or [],
+                    "event_agg": {
+                        "total": m["event_count_total"],
+                        "motion": m["event_count_motion"],
+                        "presence_on": m["event_count_presence_on"],
+                        "presence_off": m["event_count_presence_off"],
+                        "event_rate_per_min": float(m["event_rate_per_min"]),
+                    },
+                    "context": {
+                        "tod_bucket": m.get("tod_bucket") or _tod_bucket_utc(start_ts),
+                        "weekday": m.get("weekday"),
+                        "door_before_s": m.get("door_before_s"),
+                        "door_during": bool(m.get("door_during")),
+                        "door_after_s": m.get("door_after_s"),
+                    },
+                    "classification": {
+                        "class": m["class"],
+                        "p_human": float(m["p_human"]),
+                        "p_pet": float(m["p_pet"]),
+                        "p_unknown": float(m["p_unknown"]),
+                        "classifier_version": m["classifier_version"],
+                        "feature_version": m.get("feature_version") or "features_v1",
+                        "reason_summary": m.get("reason_summary") or "",
+                        "reasons": m.get("reasons") or [],
+                    },
+                    "label": None,  # filled below
+                }
+            )
+
+        # Fetch labels for these episodes and compute:
+        # - labels[] history (newest first), including undone_by_label_id
+        # - label.current (effective label after applying undo)
+        #
+        # Undo rule:
+        # - If label.is_undo=true and undone_label_id matches a label, that label is considered undone.
+        # - Current label = newest non-undo label that is not undone.
+        label_current_by_episode = {}
+        labels_history_by_episode = {}
+
+        if ep_ids:
+            lab_rows = db.execute(
+                text(
+                    """
+                    SELECT
+                      id, episode_id, label, actor, created_at, note, is_undo, undone_label_id
+                    FROM episode_labels
+                    WHERE episode_id = ANY(:ep_ids)
+                    ORDER BY episode_id, created_at ASC, id ASC
+                    """
+                ),
+                {"ep_ids": ep_ids},
+            ).fetchall()
+
+            from collections import defaultdict
+
+            # Track undo relations: target_label_id -> undo_label_id (per episode)
+            undone_by = defaultdict(dict)  # episode_id -> {target_label_id: undo_label_id}
+
+            # Collect all non-undo labels in insertion order (oldest->newest)
+            history = defaultdict(list)  # episode_id -> [label_item...]
+
+            # First pass: record undo relations + collect labels
+            for r in lab_rows:
+                m = dict(r._mapping)
+                lid = str(m["id"])
+                eid = str(m["episode_id"])
+                is_undo = bool(m.get("is_undo"))
+                target = str(m["undone_label_id"]) if m.get("undone_label_id") else None
+
+                if is_undo and target:
+                    # If multiple undos target same label, keep the first (oldest) for determinism
+                    undone_by[eid].setdefault(target, lid)
+                    continue
+
+                if not is_undo:
+                    item = {
+                        "label_id": lid,
+                        "label": m["label"],
+                        "source": "manual" if (m.get("actor") not in (None, "")) else "unknown",
+                        "actor": m.get("actor"),
+                        "created_at": m["created_at"].isoformat() if m.get("created_at") else None,
+                        "note": m.get("note"),
+                        "undone_by_label_id": None,  # filled after we know undo mapping
+                    }
+                    history[eid].append(item)
+
+            # Second pass: annotate history with undone_by_label_id + compute current
+            for eid, items in history.items():
+                for it in items:
+                    it_id = it["label_id"]
+                    it["undone_by_label_id"] = undone_by[eid].get(it_id)
+
+                # labels[] should be newest first
+                labels_history_by_episode[eid] = list(reversed(items))
+
+                # Current = newest label that is not undone
+                current = None
+                for it in reversed(items):
+                    if it.get("undone_by_label_id"):
+                        continue
+                    current = it
+                    break
+
+                if current:
+                    label_current_by_episode[eid] = {
+                        "current": current["label"],
+                        "current_source": current["source"],
+                        "actor": current["actor"],
+                        "created_at": current["created_at"],
+                        "note": current.get("note"),
+                        "label_id": current["label_id"],
+                    }
+        # Attach label info
+        for ep in episodes:
+            ep["label"] = label_current_by_episode.get(ep["id"])
+            ep["labels"] = labels_history_by_episode.get(ep["id"], [])
+
+        return {
+            "schema_version": "v1",
+            "period": {"since": since.isoformat(), "until": until.isoformat()},
+            "episodes": episodes,
+        }
+
+    finally:
+        db.close()
+
+# -----------------------------------------------------------------------------
+
+
+class EpisodeLabelIn(BaseModel):
+    label: str
+    actor: str
+    note: Optional[str] = None
+
+
+class EpisodeUndoIn(BaseModel):
+    actor: str
+    label_id: str
+    note: Optional[str] = None
+
+
+@app.post("/episodes/{episode_id}/label")
+def set_episode_label(episode_id: str, body: EpisodeLabelIn):
+    """
+    Persist a user label for an episode (audit trail in episode_labels).
+    """
+    from sqlalchemy import text
+
+    lbl = (body.label or "").strip().lower()
+    if lbl not in ("human", "pet", "unknown"):
+        raise HTTPException(status_code=400, detail="label must be one of: human, pet, unknown")
+    actor = (body.actor or "").strip()
+    if not actor:
+        raise HTTPException(status_code=400, detail="actor is required")
+
+    db = SessionLocal()
+    try:
+        # Ensure episode exists
+        ep = db.execute(text("SELECT id FROM episodes WHERE id = :id"), {"id": episode_id}).fetchone()
+        if not ep:
+            raise HTTPException(status_code=404, detail="episode not found")
+
+        row = db.execute(
+            text(
+                """
+                INSERT INTO episode_labels (episode_id, label, actor, note, is_undo, undone_label_id)
+                VALUES (:episode_id, :label, :actor, :note, false, NULL)
+                RETURNING id, created_at
+                """
+            ),
+            {"episode_id": episode_id, "label": lbl, "actor": actor, "note": body.note},
+        ).fetchone()
+        db.commit()
+
+        return {
+            "ok": True,
+            "episode_id": episode_id,
+            "label_id": str(row._mapping["id"]),
+            "current_label": lbl,
+            "created_at": row._mapping["created_at"].isoformat() if row._mapping["created_at"] else None,
+        }
+    finally:
+        db.close()
+
+
+@app.post("/episodes/{episode_id}/label/undo")
+def undo_episode_label(episode_id: str, body: EpisodeUndoIn):
+    """
+    Undo a previous label by inserting an undo record that targets label_id.
+    """
+    from sqlalchemy import text
+
+    actor = (body.actor or "").strip()
+    if not actor:
+        raise HTTPException(status_code=400, detail="actor is required")
+
+    target = (body.label_id or "").strip()
+    if not target:
+        raise HTTPException(status_code=400, detail="label_id is required")
+
+    db = SessionLocal()
+    try:
+        # Ensure episode exists
+        ep = db.execute(text("SELECT id FROM episodes WHERE id = :id"), {"id": episode_id}).fetchone()
+        if not ep:
+            raise HTTPException(status_code=404, detail="episode not found")
+
+        # Ensure target label exists and belongs to this episode and is not an undo itself
+        t = db.execute(
+            text(
+                """
+                SELECT id, is_undo
+                FROM episode_labels
+                WHERE id = :label_id AND episode_id = :episode_id
+                """
+            ),
+            {"label_id": target, "episode_id": episode_id},
+        ).fetchone()
+        if not t:
+            raise HTTPException(status_code=404, detail="label not found for this episode")
+        if bool(t._mapping["is_undo"]):
+            raise HTTPException(status_code=400, detail="cannot undo an undo label")
+
+        row = db.execute(
+            text(
+                """
+                INSERT INTO episode_labels (episode_id, label, actor, note, is_undo, undone_label_id)
+                VALUES (:episode_id, 'unknown', :actor, :note, true, :undone_label_id)
+                RETURNING id, created_at
+                """
+            ),
+            {"episode_id": episode_id, "actor": actor, "note": body.note, "undone_label_id": target},
+        ).fetchone()
+        db.commit()
+
+        return {
+            "ok": True,
+            "episode_id": episode_id,
+            "undo_label_id": str(row._mapping["id"]),
+            "undone_label_id": target,
+            "created_at": row._mapping["created_at"].isoformat() if row._mapping["created_at"] else None,
+        }
+    finally:
+        db.close()
+
+
 
 
 @app.get("/events")

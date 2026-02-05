@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from util.time import utcnow
 from db import SessionLocal
 from services.rule_engine import RULE_REGISTRY
+from services.proposals_miner import run_proposals_miner_job
 from config.rule_config import load_rule_config
 
 from models.rule import Rule, RuleType
@@ -433,5 +434,13 @@ def setup_scheduler():
         run_rule_engine_job,
         trigger=IntervalTrigger(minutes=interval_minutes),
         id="rule_engine_job",
+        replace_existing=True,
+    )
+
+
+    scheduler.add_job(
+        run_proposals_miner_job,
+        trigger=IntervalTrigger(hours=24),
+        id="proposals_miner_job",
         replace_existing=True,
     )
