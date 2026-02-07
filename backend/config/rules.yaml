@@ -19,7 +19,7 @@ defaults:
 
 rules:
   R-001:
-    enabled_in_scheduler: false
+    enabled_in_scheduler: true
     lookback_minutes: 60
     expire_after_minutes: 60
     params: {}

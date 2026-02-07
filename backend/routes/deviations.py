@@ -21,37 +21,74 @@ def _severity_str_from_score(score: int) -> str:
     return {1: "LOW", 2: "MEDIUM", 3: "HIGH"}.get(int(score or 2), "MEDIUM")
 
 
-def _serialize_persisted(dev: Deviation) -> dict:
-    ctx = dev.context or {}
-    window = ctx.get("window") or {}
+def _serialize_persisted(dev):
+    """Serialize persisted deviation to API schema (DeviationPersisted).
 
-    evidence_ids = (dev.evidence or {}).get("event_ids", []) or []
+    Keep legacy fields (title/explanation/timestamp/window/severity as str),
+    but return evidence as-is to preserve e.g. _monitor_mode.
+    """
 
-    rule_key = ctx.get("rule_key")
-    severity_str = ctx.get("severity_str") or _severity_str_from_score(dev.severity)
-    title = ctx.get("title") or ""
-    explanation = ctx.get("explanation") or ""
-    timestamp = ctx.get("timestamp") or dev.last_seen_at
+    def g(*names, default=None):
+        for n in names:
+            if hasattr(dev, n):
+                return getattr(dev, n)
+        return default
+
+    ctx = g("context", default=None) or {}
+    window = (ctx.get("window") or {}) if isinstance(ctx, dict) else {}
+
+    evidence_obj = g("evidence", default=None)
+    evidence_event_ids = []
+    if isinstance(evidence_obj, dict):
+        ev = evidence_obj.get("event_ids", [])
+        if isinstance(ev, list):
+            evidence_event_ids = ev
+    elif isinstance(evidence_obj, list):
+        evidence_event_ids = evidence_obj
+
+    # status enum -> str
+    status_val = g("status", default=None)
+    if hasattr(status_val, "value"):
+        status_val = status_val.value
+    else:
+        status_val = str(status_val) if status_val is not None else "OPEN"
+
+    # severity (stored as int score) -> "LOW/MEDIUM/HIGH"
+    sev_score = g("severity", default=None)
+    severity_str = ctx.get("severity_str") if isinstance(ctx, dict) else None
+    if not severity_str:
+        severity_str = _severity_str_from_score(int(sev_score or 2))
+
+    # rule id string (prefer ctx.rule_key like "R-001", else dev.rule_id)
+    rule_id = ctx.get("rule_key") if isinstance(ctx, dict) else None
+    if not rule_id:
+        rule_id = g("rule_id", default=None)
+    rule_id = str(rule_id) if rule_id is not None else ""
+
+    title = (ctx.get("title") if isinstance(ctx, dict) else None) or ""
+    explanation = (ctx.get("explanation") if isinstance(ctx, dict) else None) or ""
+
+    # timestamp: prefer ctx.timestamp else last_seen_at
+    timestamp = (ctx.get("timestamp") if isinstance(ctx, dict) else None) or g("last_seen_at", default=None)
 
     return {
-        "deviation_id": dev.id,
-        "rule_id": rule_key or str(dev.rule_id),
-        "status": dev.status.value if hasattr(dev.status, "value") else str(dev.status),
+        "deviation_id": g("deviation_id", "id"),
+        "rule_id": rule_id,
+        "status": status_val,
         "severity": severity_str,
         "title": title,
         "explanation": explanation,
         "timestamp": timestamp,
-        "started_at": dev.started_at,
-        "last_seen_at": dev.last_seen_at,
-        "subject_key": dev.subject_key,
-        "evidence": evidence_ids,
+        "started_at": g("started_at", default=None),
+        "last_seen_at": g("last_seen_at", default=None),
+        "subject_key": g("subject_key", default="default") or "default",
+        "evidence": evidence_obj,
+        "evidence_event_ids": evidence_event_ids,
         "window": {
             "since": window.get("since"),
             "until": window.get("until"),
         },
     }
-
-
 @router.get("", response_model=List[DeviationPersisted])
 def list_deviations(
     status: DeviationStatus | None = Query(None),

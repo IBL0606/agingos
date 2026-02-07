@@ -11,6 +11,8 @@ from models.db_event import EventDB
 
 from services.scheduler import scheduler, setup_scheduler
 from services.auth import require_api_key, validate_auth_config_on_startup
+from services.proposals_miner import mine_proposals
+from services.proposals_expiry import expire_testing_proposals
 
 from routes.rules import router as rules_router
 from routes.deviations import router as deviations_router
@@ -38,6 +40,21 @@ app.include_router(anomalies_router)
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.post("/pattern_miner/run_once")
+def pattern_miner_run_once(request: Request):
+    # manual trigger for testing (auth already enforced globally)
+    db = SessionLocal()
+    try:
+        res = mine_proposals(db)
+        db.commit()
+        return {"status": "ok", "result": res}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
 
 
 @app.get("/ai/status")
@@ -349,6 +366,42 @@ from fastapi import Body
 from sqlalchemy import text
 
 
+def _monitor_key_from_action_target(action_target: str) -> str:
+    """
+    Normalize proposal action_target -> canonical monitor_key used by scheduler/monitor_modes.
+
+    Canonical monitor_key in monitor_modes: rule key like "R-001", "R-002", ...
+    Proposals may emit friendly keys like "monitor:night_activity"; we map those here (MVP).
+    """
+    s = (action_target or "").strip()
+    if s.startswith("monitor:"):
+        key = s.split(":", 1)[1].strip()
+    else:
+        key = s
+
+    # MVP mapping: proposal "friendly key" -> rule key
+    FRIENDLY_TO_RULE = {
+        "night_activity": "R-001",
+        "door_watch": "R-002",
+        "mvp_bootstrap": "R-003",
+    }
+    return FRIENDLY_TO_RULE.get(key, key)
+
+
+def _upsert_monitor_mode(db, *, monitor_key: str, room_id: str, mode: str) -> None:
+    db.execute(
+        text(
+            """
+            INSERT INTO monitor_modes (monitor_key, room_id, mode, updated_at)
+            VALUES (:k, :r, :m, now())
+            ON CONFLICT (monitor_key, room_id)
+            DO UPDATE SET mode = EXCLUDED.mode, updated_at = now()
+            """
+        ),
+        {"k": monitor_key, "r": room_id, "m": mode},
+    )
+
+
 @app.get("/proposals")
 def list_proposals(
     last: str | None = None,
@@ -452,7 +505,7 @@ def _proposal_transition(
     note: str | None,
 ):
     row = db.execute(
-        text("SELECT proposal_id, state FROM proposals WHERE proposal_id = :id FOR UPDATE"),
+        text("SELECT proposal_id, state, action_target, room_id FROM proposals WHERE proposal_id = :id FOR UPDATE"),
         {"id": proposal_id},
     ).mappings().one_or_none()
 
@@ -524,6 +577,18 @@ def _proposal_transition(
         )
     else:
         return {"ok": False, "error": "bad_action"}
+
+
+    # Apply real effect: monitor mode OFF|TEST|ON based on lifecycle action
+    try:
+        monitor_key = _monitor_key_from_action_target(row.get("action_target") or "")
+        room_id = row.get("room_id") or "__GLOBAL__"
+        mode = {"TEST": "TEST", "ACTIVATE": "ON", "REJECT": "OFF"}.get(action, "OFF")
+        if monitor_key:
+            _upsert_monitor_mode(db, monitor_key=monitor_key, room_id=room_id, mode=mode)
+    except Exception:
+        # fail-safe: do not break lifecycle if mode update fails
+        pass
 
     db.execute(
         text(
@@ -1068,3 +1133,151 @@ def on_startup():
 @app.on_event("shutdown")
 def on_shutdown():
     scheduler.shutdown()
+
+
+# -------------------------
+# Proposals: test expiry (manual trigger)
+# -------------------------
+
+@app.post("/proposals/expire_once")
+def proposals_expire_once():
+    db = SessionLocal()
+    try:
+        with db.begin():
+            res = expire_testing_proposals(db)
+        return {"status": "ok", "result": res}
+    finally:
+        db.close()
+
+
+# -------------------------
+# Monitor modes (read-back)
+# -------------------------
+
+
+@app.post("/proposals/mine_once")
+def mine_once() -> dict:
+    """
+    Dev endpoint: run proposals miner immediately.
+    Intended for dev-dashboard verification.
+    """
+    from db import SessionLocal
+    from services.proposals_miner import mine_proposals
+
+    db = SessionLocal()
+    try:
+        result = mine_proposals(db)
+        db.execute(
+            text(
+                "INSERT INTO job_status (job_key, last_run_at, last_ok_at, last_error_at, last_error_msg, last_payload) "
+                "VALUES ('proposals_miner', now(), now(), NULL, NULL, CAST(:payload AS jsonb)) "
+                "ON CONFLICT (job_key) DO UPDATE SET "
+                "  last_run_at = EXCLUDED.last_run_at, "
+                "  last_ok_at = EXCLUDED.last_ok_at, "
+                "  last_error_at = NULL, "
+                "  last_error_msg = NULL, "
+                "  last_payload = EXCLUDED.last_payload"
+            ),
+            {"payload": __import__("json").dumps(result, ensure_ascii=False, separators=(",", ":"))},
+        )
+        db.commit()
+        return {"ok": True, **result}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail={"error": str(e)})
+    finally:
+        db.close()
+
+
+@app.get("/proposals/miner_status")
+def proposals_miner_status() -> dict:
+    from db import SessionLocal
+    db = SessionLocal()
+    try:
+        row = db.execute(
+            text(
+                "SELECT job_key, last_run_at, last_ok_at, last_error_at, last_error_msg, last_payload "
+                "FROM job_status WHERE job_key = 'proposals_miner'"
+            )
+        ).mappings().first()
+        return {"ok": True, "status": (dict(row) if row else None)}
+    finally:
+        db.close()
+@app.get("/monitor_modes")
+def list_monitor_modes(
+    monitor_key: str | None = None,
+    room_id: str | None = None,
+    limit: int = Query(default=500, ge=1, le=5000),
+):
+    """
+    Read current monitor_modes rows for ops/debug without psql.
+
+    Filters:
+      - monitor_key: exact match
+      - room_id: exact match
+
+    Returns rows sorted by updated_at desc.
+    """
+    db = SessionLocal()
+    try:
+        where = []
+        params = {"limit": limit}
+
+        if monitor_key:
+            where.append("monitor_key = :k")
+            params["k"] = monitor_key
+
+        if room_id:
+            where.append("room_id = :r")
+            params["r"] = room_id
+
+        where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+        q = text(
+            f"""
+            SELECT monitor_key, room_id, mode, updated_at
+            FROM monitor_modes
+            {where_sql}
+            ORDER BY updated_at DESC, monitor_key ASC, room_id ASC
+            LIMIT :limit
+            """
+        )
+        rows = db.execute(q, params).mappings().all()
+        return {"status": "ok", "rows": [dict(r) for r in rows]}
+    finally:
+        db.close()
+
+
+@app.post("/monitor_modes")
+def set_monitor_mode(payload: dict) -> dict:
+    """
+    Dev endpoint: upsert monitor_modes.
+    Expected JSON:
+      { "monitor_key": "R-001", "room_id": "__GLOBAL__", "mode": "OFF|TEST|ON" }
+    """
+    monitor_key = str(payload.get("monitor_key") or "").strip()
+    room_id = str(payload.get("room_id") or "__GLOBAL__").strip() or "__GLOBAL__"
+    mode = str(payload.get("mode") or "").strip().upper()
+
+    if not monitor_key:
+        raise HTTPException(status_code=400, detail="monitor_key required")
+    if mode not in ("OFF", "TEST", "ON"):
+        raise HTTPException(status_code=400, detail=f"invalid mode: {mode}")
+
+    db = SessionLocal()
+    try:
+        _upsert_monitor_mode(db, monitor_key=monitor_key, room_id=room_id, mode=mode)
+        db.commit()
+        row = db.execute(
+            text(
+                "SELECT monitor_key, room_id, mode, updated_at "
+                "FROM monitor_modes WHERE monitor_key=:k AND room_id=:r"
+            ),
+            {"k": monitor_key, "r": room_id},
+        ).mappings().first()
+        return {"status": "ok", "row": (dict(row) if row else None)}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail={"error": str(e)})
+    finally:
+        db.close()
+
