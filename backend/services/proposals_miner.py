@@ -18,9 +18,17 @@ def _utc_iso(dt: datetime) -> str:
     return s.replace("+00:00", "Z")
 
 
-
-def _set_job_status(db: Session, *, job_key: str, ok: bool, now: datetime, payload: dict, error_msg: str | None = None) -> None:
+def _set_job_status(
+    db: Session,
+    *,
+    job_key: str,
+    ok: bool,
+    now: datetime,
+    payload: dict,
+    error_msg: str | None = None,
+) -> None:
     import json as _json
+
     db.execute(
         text(
             "INSERT INTO job_status (job_key, last_run_at, last_ok_at, last_error_at, last_error_msg, last_payload) "
@@ -40,6 +48,8 @@ def _set_job_status(db: Session, *, job_key: str, ok: bool, now: datetime, paylo
             "payload": _json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
         },
     )
+
+
 def _upsert_proposal(
     db: Session,
     *,
@@ -299,7 +309,6 @@ def mine_proposals(db: Session, *, now: datetime | None = None) -> dict[str, Any
         )
         door_upserts += 1
 
-
     # 3) MVP_BOOTSTRAP_ANY_L2_1_OF_7
     # Enables lifecycle/API/UI testing early in pilot with minimal data.
     bootstrap_q = text(
@@ -363,7 +372,7 @@ def mine_proposals(db: Session, *, now: datetime | None = None) -> dict[str, Any
     # Yellow/Red night anomaly (level>=2) >=4 of last 7 nights in same room.
     # Night window: 22:00–06:00 Europe/Oslo. night_date assigns 00:00–05:59 to previous date.
     night_room_q = text(
-        '''
+        """
         WITH ae AS (
           SELECT
             (peak_bucket_details->>'user_id') AS subject_id,
@@ -410,7 +419,7 @@ def mine_proposals(db: Session, *, now: datetime | None = None) -> dict[str, Any
         FROM agg
         WHERE nights_hit >= 4
         ;
-        '''
+        """
     )
 
     nr_rows = db.execute(night_room_q).mappings().all()
@@ -468,8 +477,8 @@ def mine_proposals(db: Session, *, now: datetime | None = None) -> dict[str, Any
             "night_proposals_upserted": night_upserts,
             "door_proposals_upserted": door_upserts,
             "bootstrap_proposals_upserted": bs_upserts,
-        
-            "night_room_proposals_upserted": night_room_upserts,},
+            "night_room_proposals_upserted": night_room_upserts,
+        },
     }
 
 
@@ -486,7 +495,9 @@ def run_proposals_miner_job() -> None:
     db = SessionLocal()
     try:
         result = mine_proposals(db)
-        _set_job_status(db, job_key="proposals_miner", ok=True, now=utcnow(), payload=result)
+        _set_job_status(
+            db, job_key="proposals_miner", ok=True, now=utcnow(), payload=result
+        )
         db.commit()
 
         duration_ms = int((time.monotonic() - t0) * 1000)
@@ -508,7 +519,14 @@ def run_proposals_miner_job() -> None:
         )
     except Exception as e:
         db.rollback()
-        _set_job_status(db, job_key="proposals_miner", ok=False, now=utcnow(), payload={}, error_msg=str(e))
+        _set_job_status(
+            db,
+            job_key="proposals_miner",
+            ok=False,
+            now=utcnow(),
+            payload={},
+            error_msg=str(e),
+        )
         duration_ms = int((time.monotonic() - t0) * 1000)
         print(
             json.dumps(

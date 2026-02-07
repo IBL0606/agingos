@@ -12,6 +12,7 @@ from models.anomaly_episode import AnomalyEpisode
 def _jsonable(x):
     """Make nested structures JSON-serializable (convert date/datetime to ISO strings)."""
     from datetime import date, datetime
+
     if isinstance(x, (datetime, date)):
         return x.isoformat()
     if isinstance(x, dict):
@@ -19,7 +20,6 @@ def _jsonable(x):
     if isinstance(x, (list, tuple)):
         return [_jsonable(v) for v in x]
     return x
-
 
 
 def _utc_now() -> datetime:
@@ -40,6 +40,7 @@ def _level_to_text(level: Any) -> str:
         return "YELLOW"
     return "GREEN"
 
+
 def _level_to_int(level: Any) -> int:
     # Accept either text ("GREEN"/"YELLOW"/"RED") or int-like
     if isinstance(level, str):
@@ -53,7 +54,6 @@ def _level_to_int(level: Any) -> int:
         return int(level)
     except Exception:
         return 0
-
 
 
 def _should_open(level_text: str) -> bool:
@@ -176,7 +176,9 @@ def upsert_bucket_result(
         active_ep.green_streak = 0
 
     # Close rules (priority: timeout, then green streak)
-    if _should_close_by_timeout(active_ep.last_bucket, now=now, timeout_minutes=close_timeout_minutes):
+    if _should_close_by_timeout(
+        active_ep.last_bucket, now=now, timeout_minutes=close_timeout_minutes
+    ):
         active_ep.end_ts = bucket_end
         active_ep.closed_at = now
         active_ep.closed_reason = "TIMEOUT"

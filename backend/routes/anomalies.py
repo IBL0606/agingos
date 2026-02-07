@@ -1,4 +1,3 @@
-
 from services.anomalies_repo_lifecycle import upsert_bucket_result
 # backend/routes/anomalies.py
 
@@ -19,12 +18,20 @@ router = APIRouter(prefix="/anomalies", tags=["anomalies"])
 
 
 def _level_str(level: int) -> str:
-    return {AnomalyLevel.GREEN: "GREEN", AnomalyLevel.YELLOW: "YELLOW", AnomalyLevel.RED: "RED"}.get(int(level), "GREEN")
+    return {
+        AnomalyLevel.GREEN: "GREEN",
+        AnomalyLevel.YELLOW: "YELLOW",
+        AnomalyLevel.RED: "RED",
+    }.get(int(level), "GREEN")
 
 
 def _level_int(level: str) -> int:
     s = (level or "").strip().upper()
-    return {"GREEN": AnomalyLevel.GREEN, "YELLOW": AnomalyLevel.YELLOW, "RED": AnomalyLevel.RED}.get(s, AnomalyLevel.GREEN)
+    return {
+        "GREEN": AnomalyLevel.GREEN,
+        "YELLOW": AnomalyLevel.YELLOW,
+        "RED": AnomalyLevel.RED,
+    }.get(s, AnomalyLevel.GREEN)
 
 
 def _serialize(ep: AnomalyEpisode) -> dict:
@@ -40,7 +47,9 @@ def _serialize(ep: AnomalyEpisode) -> dict:
         "score_sequence": float(ep.score_sequence or 0.0),
         "score_event": float(ep.score_event or 0.0),
         "peak_bucket_start_ts": ep.peak_bucket_start_ts,
-        "peak_bucket_score": float(ep.peak_bucket_score) if ep.peak_bucket_score is not None else None,
+        "peak_bucket_score": float(ep.peak_bucket_score)
+        if ep.peak_bucket_score is not None
+        else None,
         "reasons": ep.reasons or [],
         "human_weight_mode": ep.human_weight_mode,
         "pet_weight": float(ep.pet_weight or 0.0),
@@ -58,7 +67,9 @@ def get_anomalies(
     db: Session = Depends(get_db),
 ):
     since = parse_last_param_to_since(last)
-    eps = list_episodes(db, since=since, room=room, active_only=active_only, limit=limit)
+    eps = list_episodes(
+        db, since=since, room=room, active_only=active_only, limit=limit
+    )
 
     if min_level:
         min_i = _level_int(min_level)
@@ -70,7 +81,9 @@ def get_anomalies(
 @router.get("/score")
 def score_anomaly_bucket(
     room: str = Query(...),
-    bucket_start: str = Query(..., description="ISO8601 UTC, e.g. 2026-02-05T05:00:00Z"),
+    bucket_start: str = Query(
+        ..., description="ISO8601 UTC, e.g. 2026-02-05T05:00:00Z"
+    ),
     pet_weight: float = Query(0.25, ge=0.0, le=1.0),
     unknown_weight: float = Query(0.50, ge=0.0, le=1.0),
     db: Session = Depends(get_db),
@@ -78,11 +91,24 @@ def score_anomaly_bucket(
     # parse bucket_start with datetime.fromisoformat (accept Z)
     bs = bucket_start.strip().replace("Z", "+00:00")
     from datetime import datetime
+
     dt = datetime.fromisoformat(bs)
-    res = score_room_bucket(db, room=room, bucket_start=dt, pet_weight=pet_weight, unknown_weight=unknown_weight)
+    res = score_room_bucket(
+        db,
+        room=room,
+        bucket_start=dt,
+        pet_weight=pet_weight,
+        unknown_weight=unknown_weight,
+    )
     return {
         "room": res.room,
-        "bucket": {"start": res.bucket_start, "end": res.bucket_end, "bucket_idx": res.bucket_idx, "dow": res.dow, "is_weekend": res.is_weekend},
+        "bucket": {
+            "start": res.bucket_start,
+            "end": res.bucket_end,
+            "bucket_idx": res.bucket_idx,
+            "dow": res.dow,
+            "is_weekend": res.is_weekend,
+        },
         "score": {
             "total": res.score_total,
             "intensity": res.score_intensity,
@@ -98,7 +124,9 @@ def score_anomaly_bucket(
 @router.post("/run_once")
 def run_once_anomaly(
     room: str = Query(...),
-    bucket_start: str = Query(..., description="ISO8601 UTC, e.g. 2026-02-05T05:15:00Z"),
+    bucket_start: str = Query(
+        ..., description="ISO8601 UTC, e.g. 2026-02-05T05:15:00Z"
+    ),
     close_after_green_buckets: int = Query(2, ge=1, le=10),
     pet_weight: float = Query(0.25, ge=0.0, le=1.0),
     unknown_weight: float = Query(0.50, ge=0.0, le=1.0),
@@ -106,9 +134,16 @@ def run_once_anomaly(
 ):
     bs = bucket_start.strip().replace("Z", "+00:00")
     from datetime import datetime
+
     dt = datetime.fromisoformat(bs)
 
-    scored = score_room_bucket(db, room=room, bucket_start=dt, pet_weight=pet_weight, unknown_weight=unknown_weight)
+    scored = score_room_bucket(
+        db,
+        room=room,
+        bucket_start=dt,
+        pet_weight=pet_weight,
+        unknown_weight=unknown_weight,
+    )
 
     ep = upsert_bucket_result(
         db,
@@ -191,6 +226,7 @@ def anomalies_runner_status():
 def run_latest():
     # Debug/manual trigger of the same logic scheduler runs.
     from datetime import datetime, timezone
+
     out = run_anomalies_job()
 
     # Update in-memory status too (useful for UI verification)
@@ -203,4 +239,3 @@ def run_latest():
     ANOMALIES_RUNNER_STATUS["last_rooms_scored"] = out.get("rooms_scored")
 
     return out
-

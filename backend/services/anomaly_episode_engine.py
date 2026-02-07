@@ -15,7 +15,11 @@ from services.anomaly_scoring import BucketScore
 
 def _level_int(level: str) -> int:
     s = (level or "").strip().upper()
-    return {"GREEN": AnomalyLevel.GREEN, "YELLOW": AnomalyLevel.YELLOW, "RED": AnomalyLevel.RED}.get(s, AnomalyLevel.GREEN)
+    return {
+        "GREEN": AnomalyLevel.GREEN,
+        "YELLOW": AnomalyLevel.YELLOW,
+        "RED": AnomalyLevel.RED,
+    }.get(s, AnomalyLevel.GREEN)
 
 
 def _choose_episode_level(current_level_i: int, new_level_i: int) -> int:
@@ -31,20 +35,23 @@ class EpisodeProcessResult:
 
 
 def _get_active_episode(db: Session, room: str) -> Optional[dict]:
-    row = db.execute(
-        text(
-            """
+    row = (
+        db.execute(
+            text(
+                """
             SELECT id, level, score_total, peak_bucket_score, start_ts, end_ts
             FROM anomaly_episodes
             WHERE room = :room AND end_ts IS NULL
             ORDER BY start_ts DESC
             LIMIT 1
             """
-        ),
-        {"room": room},
-    ).mappings().first()
+            ),
+            {"room": room},
+        )
+        .mappings()
+        .first()
+    )
     return dict(row) if row else None
-
 
 
 def _json_safe(x: Any) -> Any:
@@ -58,6 +65,7 @@ def _json_safe(x: Any) -> Any:
     if isinstance(x, (list, tuple)):
         return [_json_safe(v) for v in x]
     return x
+
 
 def process_bucket_score(
     db: Session,
@@ -91,7 +99,9 @@ def process_bucket_score(
     if not active:
         # No open episode
         if level_i <= AnomalyLevel.GREEN:
-            return EpisodeProcessResult(action="noop", episode_id=None, episode_active=False)
+            return EpisodeProcessResult(
+                action="noop", episode_id=None, episode_active=False
+            )
 
         # Open new episode
         ep = create_episode(
@@ -108,10 +118,23 @@ def process_bucket_score(
             reasons=_json_safe(bucket.reasons),
             peak_bucket_details=_json_safe(_set_green_streak(bucket.details, 0)),
             human_weight_mode="human_weighted",
-            pet_weight=float(bucket.details.get("observed", {}).get("pet_weight") or 0.25),
-            baseline_ref={"model_end": (str(bucket.details.get("model_end")) if bucket.details.get("model_end") is not None else None), "window_days": 7, "bucket_minutes": 15, "baseline_version": "v1"},
+            pet_weight=float(
+                bucket.details.get("observed", {}).get("pet_weight") or 0.25
+            ),
+            baseline_ref={
+                "model_end": (
+                    str(bucket.details.get("model_end"))
+                    if bucket.details.get("model_end") is not None
+                    else None
+                ),
+                "window_days": 7,
+                "bucket_minutes": 15,
+                "baseline_version": "v1",
+            },
         )
-        return EpisodeProcessResult(action="opened", episode_id=ep.id, episode_active=True)
+        return EpisodeProcessResult(
+            action="opened", episode_id=ep.id, episode_active=True
+        )
 
     # There is an active episode
     ep_id = int(active["id"])
@@ -119,16 +142,22 @@ def process_bucket_score(
     # GREEN bucket while episode active: increment streak, close if threshold reached
     if level_i <= AnomalyLevel.GREEN:
         # fetch current peak_bucket_details for streak
-        row = db.execute(
-            text("SELECT peak_bucket_details FROM anomaly_episodes WHERE id = :id"),
-            {"id": ep_id},
-        ).mappings().first()
+        row = (
+            db.execute(
+                text("SELECT peak_bucket_details FROM anomaly_episodes WHERE id = :id"),
+                {"id": ep_id},
+            )
+            .mappings()
+            .first()
+        )
         cur_details = row["peak_bucket_details"] if row else None
         streak = _get_green_streak(cur_details) + 1
 
         if streak >= close_after_green_buckets:
             close_episode(db, episode_id=ep_id, end_ts=bucket.bucket_end)
-            return EpisodeProcessResult(action="closed", episode_id=ep_id, episode_active=False)
+            return EpisodeProcessResult(
+                action="closed", episode_id=ep_id, episode_active=False
+            )
 
         # keep episode open; just update updated_at and streak (no score changes)
         db.execute(
@@ -143,17 +172,25 @@ def process_bucket_score(
             {"id": ep_id, "details": _set_green_streak(cur_details, streak)},
         )
         db.commit()
-        return EpisodeProcessResult(action="updated", episode_id=ep_id, episode_active=True)
+        return EpisodeProcessResult(
+            action="updated", episode_id=ep_id, episode_active=True
+        )
 
     # Non-green: reset green streak and update peak if this bucket is higher
-    row = db.execute(
-        text(
-            "SELECT level, score_total, peak_bucket_score, peak_bucket_details FROM anomaly_episodes WHERE id = :id"
-        ),
-        {"id": ep_id},
-    ).mappings().first()
+    row = (
+        db.execute(
+            text(
+                "SELECT level, score_total, peak_bucket_score, peak_bucket_details FROM anomaly_episodes WHERE id = :id"
+            ),
+            {"id": ep_id},
+        )
+        .mappings()
+        .first()
+    )
     if not row:
-        return EpisodeProcessResult(action="noop", episode_id=ep_id, episode_active=True)
+        return EpisodeProcessResult(
+            action="noop", episode_id=ep_id, episode_active=True
+        )
 
     cur_level_i = int(row["level"] or 0)
     cur_peak = row["peak_bucket_score"]
@@ -180,7 +217,9 @@ def process_bucket_score(
             reasons=_json_safe(bucket.reasons),
             peak_bucket_details=_json_safe(_set_green_streak(bucket.details, 0)),
         )
-        return EpisodeProcessResult(action="updated", episode_id=ep_id, episode_active=True)
+        return EpisodeProcessResult(
+            action="updated", episode_id=ep_id, episode_active=True
+        )
 
     # Not a new peak: only bump level + reset streak details
     db.execute(

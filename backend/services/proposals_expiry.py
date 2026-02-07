@@ -11,7 +11,9 @@ from db import SessionLocal
 from util.time import utcnow
 
 
-def expire_testing_proposals(db: Session, *, now: datetime | None = None) -> dict[str, Any]:
+def expire_testing_proposals(
+    db: Session, *, now: datetime | None = None
+) -> dict[str, Any]:
     """
     Policy (MVP, consistent):
       - If proposal.state == TESTING and test_until < now:
@@ -23,9 +25,10 @@ def expire_testing_proposals(db: Session, *, now: datetime | None = None) -> dic
     now = now or utcnow()
 
     # Lock candidates to avoid races with UI actions
-    rows = db.execute(
-        text(
-            """
+    rows = (
+        db.execute(
+            text(
+                """
             SELECT proposal_id
             FROM proposals
             WHERE state = 'TESTING'
@@ -34,19 +37,28 @@ def expire_testing_proposals(db: Session, *, now: datetime | None = None) -> dic
             ORDER BY test_until ASC
             FOR UPDATE
             """
-        ),
-        {"now": now},
-    ).mappings().all()
+            ),
+            {"now": now},
+        )
+        .mappings()
+        .all()
+    )
 
     expired = 0
     for r in rows:
         pid = int(r["proposal_id"])
 
         # Re-check under lock (defensive)
-        cur = db.execute(
-            text("SELECT proposal_id, state FROM proposals WHERE proposal_id=:id FOR UPDATE"),
-            {"id": pid},
-        ).mappings().one_or_none()
+        cur = (
+            db.execute(
+                text(
+                    "SELECT proposal_id, state FROM proposals WHERE proposal_id=:id FOR UPDATE"
+                ),
+                {"id": pid},
+            )
+            .mappings()
+            .one_or_none()
+        )
         if not cur or cur["state"] != "TESTING":
             continue
 
