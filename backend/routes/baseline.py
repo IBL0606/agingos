@@ -11,9 +11,15 @@ router = APIRouter(prefix="/baseline", tags=["baseline"])
 
 
 def _get_instance_user_id(db) -> str:
-    row = db.execute(text("SELECT id::text AS id FROM app_instance LIMIT 1")).mappings().first()
+    row = (
+        db.execute(text("SELECT id::text AS id FROM app_instance LIMIT 1"))
+        .mappings()
+        .first()
+    )
     if not row or not row.get("id"):
-        raise HTTPException(status_code=500, detail="app_instance missing (no instance user_id)")
+        raise HTTPException(
+            status_code=500, detail="app_instance missing (no instance user_id)"
+        )
     return row["id"]
 
 
@@ -23,9 +29,10 @@ def baseline_status() -> dict[str, Any]:
     try:
         uid = _get_instance_user_id(db)
 
-        row = db.execute(
-            text(
-                """
+        row = (
+            db.execute(
+                text(
+                    """
                 SELECT
                   user_id::text AS user_id,
                   model_start,
@@ -44,9 +51,12 @@ def baseline_status() -> dict[str, Any]:
                 ORDER BY model_end DESC
                 LIMIT 1
                 """
-            ),
-            {"uid": uid},
-        ).mappings().first()
+                ),
+                {"uid": uid},
+            )
+            .mappings()
+            .first()
+        )
 
         if not row:
             return {
@@ -57,7 +67,9 @@ def baseline_status() -> dict[str, Any]:
 
         room_bucket_coverage = None
         if row["room_bucket_rows"]:
-            room_bucket_coverage = row["room_bucket_supported"] / row["room_bucket_rows"]
+            room_bucket_coverage = (
+                row["room_bucket_supported"] / row["room_bucket_rows"]
+            )
 
         transition_coverage = None
         if row["transition_rows"]:
@@ -81,35 +93,44 @@ def baseline_dev(
     dow: Optional[int] = Query(default=None, ge=0, le=6),
     is_weekend: Optional[bool] = Query(default=None),
     limit: int = Query(default=500, ge=1, le=5000),
-    rooms: Optional[bool] = Query(default=None, description="If true, return available rooms summary"),
+    rooms: Optional[bool] = Query(
+        default=None, description="If true, return available rooms summary"
+    ),
 ) -> dict[str, Any]:
     db = SessionLocal()
     try:
         uid = _get_instance_user_id(db)
 
-        status = db.execute(
-            text(
-                """
+        status = (
+            db.execute(
+                text(
+                    """
                 SELECT model_end, model_start, baseline_ready, days_with_data
                 FROM baseline_model_status
                 WHERE user_id = CAST(:uid AS uuid)
                 ORDER BY model_end DESC
                 LIMIT 1
                 """
-            ),
-            {"uid": uid},
-        ).mappings().first()
+                ),
+                {"uid": uid},
+            )
+            .mappings()
+            .first()
+        )
 
         if not status:
-            raise HTTPException(status_code=404, detail="No baseline_model_status found yet")
+            raise HTTPException(
+                status_code=404, detail="No baseline_model_status found yet"
+            )
 
         model_end = status["model_end"]
 
         # Optional: rooms summary for discovery/debug
         if rooms:
-            rows = db.execute(
-                text(
-                    """
+            rows = (
+                db.execute(
+                    text(
+                        """
                     SELECT room_id, COUNT(*) AS n_rows,
                            MIN(bucket_idx) AS min_bucket, MAX(bucket_idx) AS max_bucket
                     FROM baseline_room_bucket
@@ -118,15 +139,17 @@ def baseline_dev(
                     GROUP BY room_id
                     ORDER BY room_id
                     """
-                ),
-                {"uid": uid, "model_end": model_end},
-            ).mappings().all()
+                    ),
+                    {"uid": uid, "model_end": model_end},
+                )
+                .mappings()
+                .all()
+            )
 
             return {
                 "status": dict(status),
                 "rooms": [dict(r) for r in rows],
             }
-
 
         where = ["user_id = CAST(:uid AS uuid)", "model_end = :model_end"]
         params: dict[str, Any] = {"uid": uid, "model_end": model_end}
@@ -144,9 +167,10 @@ def baseline_dev(
             where.append("is_weekend = :is_weekend")
             params["is_weekend"] = is_weekend
 
-        baseline_rows = db.execute(
-            text(
-                f"""
+        baseline_rows = (
+            db.execute(
+                text(
+                    f"""
                 SELECT
                   user_id::text AS user_id,
                   model_start,
@@ -166,13 +190,16 @@ def baseline_dev(
                   sigma_floor,
                   computed_at
                 FROM baseline_room_bucket
-                WHERE {' AND '.join(where)}
+                WHERE {" AND ".join(where)}
                 ORDER BY room_id, dow, bucket_idx
                 LIMIT :limit
                 """
-            ),
-            {**params, "limit": limit},
-        ).mappings().all()
+                ),
+                {**params, "limit": limit},
+            )
+            .mappings()
+            .all()
+        )
 
         transitions: list[dict[str, Any]] = []
         if room is not None:
@@ -214,13 +241,15 @@ def baseline_dev(
                           support_days,
                           computed_at
                         FROM baseline_transition
-                        WHERE {' AND '.join(t_where)}
+                        WHERE {" AND ".join(t_where)}
                         ORDER BY dow, bucket_idx, p_smoothed DESC NULLS LAST
                         LIMIT :limit
                         """
                     ),
                     {**t_params, "limit": limit},
-                ).mappings().all()
+                )
+                .mappings()
+                .all()
             ]
 
         return {

@@ -69,7 +69,9 @@ def _serialize_persisted(dev):
     explanation = (ctx.get("explanation") if isinstance(ctx, dict) else None) or ""
 
     # timestamp: prefer ctx.timestamp else last_seen_at
-    timestamp = (ctx.get("timestamp") if isinstance(ctx, dict) else None) or g("last_seen_at", default=None)
+    timestamp = (ctx.get("timestamp") if isinstance(ctx, dict) else None) or g(
+        "last_seen_at", default=None
+    )
 
     return {
         "deviation_id": g("deviation_id", "id"),
@@ -89,6 +91,8 @@ def _serialize_persisted(dev):
             "until": window.get("until"),
         },
     }
+
+
 @router.get("", response_model=List[DeviationPersisted])
 def list_deviations(
     status: DeviationStatus | None = Query(None),

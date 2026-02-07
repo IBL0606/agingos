@@ -355,9 +355,6 @@ def ai_proposals(
         }
 
 
-
-
-
 # -------------------------
 # Proposals (persistent MVP)
 # -------------------------
@@ -499,15 +496,21 @@ def _proposal_transition(
     db,
     *,
     proposal_id: int,
-    action: str,          # TEST | ACTIVATE | REJECT
+    action: str,  # TEST | ACTIVATE | REJECT
     actor: str | None,
     source: str,
     note: str | None,
 ):
-    row = db.execute(
-        text("SELECT proposal_id, state, action_target, room_id FROM proposals WHERE proposal_id = :id FOR UPDATE"),
-        {"id": proposal_id},
-    ).mappings().one_or_none()
+    row = (
+        db.execute(
+            text(
+                "SELECT proposal_id, state, action_target, room_id FROM proposals WHERE proposal_id = :id FOR UPDATE"
+            ),
+            {"id": proposal_id},
+        )
+        .mappings()
+        .one_or_none()
+    )
 
     if not row:
         return {"ok": False, "error": "not_found"}
@@ -515,7 +518,12 @@ def _proposal_transition(
     prev_state = row["state"]
 
     if not _transition_allowed(prev_state, action):
-        return {"ok": False, "error": "transition_not_allowed", "prev_state": prev_state, "action": action}
+        return {
+            "ok": False,
+            "error": "transition_not_allowed",
+            "prev_state": prev_state,
+            "action": action,
+        }
 
     if action == "TEST":
         new_state = "TESTING"
@@ -578,14 +586,15 @@ def _proposal_transition(
     else:
         return {"ok": False, "error": "bad_action"}
 
-
     # Apply real effect: monitor mode OFF|TEST|ON based on lifecycle action
     try:
         monitor_key = _monitor_key_from_action_target(row.get("action_target") or "")
         room_id = row.get("room_id") or "__GLOBAL__"
         mode = {"TEST": "TEST", "ACTIVATE": "ON", "REJECT": "OFF"}.get(action, "OFF")
         if monitor_key:
-            _upsert_monitor_mode(db, monitor_key=monitor_key, room_id=room_id, mode=mode)
+            _upsert_monitor_mode(
+                db, monitor_key=monitor_key, room_id=room_id, mode=mode
+            )
     except Exception:
         # fail-safe: do not break lifecycle if mode update fails
         pass
@@ -614,7 +623,12 @@ def _proposal_transition(
         },
     )
 
-    return {"ok": True, "proposal_id": proposal_id, "prev_state": prev_state, "new_state": new_state}
+    return {
+        "ok": True,
+        "proposal_id": proposal_id,
+        "prev_state": prev_state,
+        "new_state": new_state,
+    }
 
 
 @app.post("/proposals/{proposal_id}/test")
@@ -668,8 +682,8 @@ def reject_proposal(proposal_id: int, body: dict = Body(default={})):
         db.close()
 
 
-
 # --- Episodes (dev dashboard) -------------------------------------------------
+
 
 def _parse_duration_seconds(s: str) -> int:
     """
@@ -677,6 +691,7 @@ def _parse_duration_seconds(s: str) -> int:
     """
     s = (s or "").strip().lower()
     import re
+
     m = re.fullmatch(r"(\d+)\s*([smhdw])", s)
     if not m:
         raise ValueError("Invalid 'last' duration. Use like 24h, 7d, 30m, 90s, 2w")
@@ -736,7 +751,9 @@ def list_episodes(
         if classification:
             c = classification.strip().lower()
             if c not in ("human", "pet", "unknown"):
-                raise HTTPException(status_code=400, detail="classification must be human|pet|unknown")
+                raise HTTPException(
+                    status_code=400, detail="classification must be human|pet|unknown"
+                )
             where.append("class = :class")
             params["class"] = c
 
@@ -756,7 +773,9 @@ def list_episodes(
                 where.append("quality = :quality")
                 params["quality"] = q
             else:
-                raise HTTPException(status_code=400, detail="quality must be high|low|good|timeout")
+                raise HTTPException(
+                    status_code=400, detail="quality must be high|low|good|timeout"
+                )
 
         # Pagination cursor
         if before is not None:
@@ -767,11 +786,16 @@ def list_episodes(
 
             if before_id:
                 import uuid
+
                 try:
                     uuid.UUID(before_id)
                 except Exception:
-                    raise HTTPException(status_code=400, detail="before_id must be a UUID")
-                where.append("(start_ts < :before_ts OR (start_ts = :before_ts AND id < :before_id))")
+                    raise HTTPException(
+                        status_code=400, detail="before_id must be a UUID"
+                    )
+                where.append(
+                    "(start_ts < :before_ts OR (start_ts = :before_ts AND id < :before_id))"
+                )
                 params["before_ts"] = before_utc
                 params["before_id"] = before_id
             else:
@@ -790,7 +814,7 @@ def list_episodes(
                   class, p_human, p_pet, p_unknown,
                   classifier_version, feature_version, reasons, reason_summary
                 FROM episodes
-                WHERE {' AND '.join(where)}
+                WHERE {" AND ".join(where)}
                 ORDER BY start_ts DESC, id DESC
                 LIMIT :limit
         """
@@ -876,7 +900,9 @@ def list_episodes(
             from collections import defaultdict
 
             # Track undo relations: target_label_id -> undo_label_id (per episode)
-            undone_by = defaultdict(dict)  # episode_id -> {target_label_id: undo_label_id}
+            undone_by = defaultdict(
+                dict
+            )  # episode_id -> {target_label_id: undo_label_id}
 
             # Collect all non-undo labels in insertion order (oldest->newest)
             history = defaultdict(list)  # episode_id -> [label_item...]
@@ -898,9 +924,13 @@ def list_episodes(
                     item = {
                         "label_id": lid,
                         "label": m["label"],
-                        "source": "manual" if (m.get("actor") not in (None, "")) else "unknown",
+                        "source": "manual"
+                        if (m.get("actor") not in (None, ""))
+                        else "unknown",
                         "actor": m.get("actor"),
-                        "created_at": m["created_at"].isoformat() if m.get("created_at") else None,
+                        "created_at": m["created_at"].isoformat()
+                        if m.get("created_at")
+                        else None,
                         "note": m.get("note"),
                         "undone_by_label_id": None,  # filled after we know undo mapping
                     }
@@ -946,6 +976,7 @@ def list_episodes(
     finally:
         db.close()
 
+
 # -----------------------------------------------------------------------------
 
 
@@ -970,7 +1001,9 @@ def set_episode_label(episode_id: str, body: EpisodeLabelIn):
 
     lbl = (body.label or "").strip().lower()
     if lbl not in ("human", "pet", "unknown"):
-        raise HTTPException(status_code=400, detail="label must be one of: human, pet, unknown")
+        raise HTTPException(
+            status_code=400, detail="label must be one of: human, pet, unknown"
+        )
     actor = (body.actor or "").strip()
     if not actor:
         raise HTTPException(status_code=400, detail="actor is required")
@@ -978,7 +1011,9 @@ def set_episode_label(episode_id: str, body: EpisodeLabelIn):
     db = SessionLocal()
     try:
         # Ensure episode exists
-        ep = db.execute(text("SELECT id FROM episodes WHERE id = :id"), {"id": episode_id}).fetchone()
+        ep = db.execute(
+            text("SELECT id FROM episodes WHERE id = :id"), {"id": episode_id}
+        ).fetchone()
         if not ep:
             raise HTTPException(status_code=404, detail="episode not found")
 
@@ -999,7 +1034,9 @@ def set_episode_label(episode_id: str, body: EpisodeLabelIn):
             "episode_id": episode_id,
             "label_id": str(row._mapping["id"]),
             "current_label": lbl,
-            "created_at": row._mapping["created_at"].isoformat() if row._mapping["created_at"] else None,
+            "created_at": row._mapping["created_at"].isoformat()
+            if row._mapping["created_at"]
+            else None,
         }
     finally:
         db.close()
@@ -1023,7 +1060,9 @@ def undo_episode_label(episode_id: str, body: EpisodeUndoIn):
     db = SessionLocal()
     try:
         # Ensure episode exists
-        ep = db.execute(text("SELECT id FROM episodes WHERE id = :id"), {"id": episode_id}).fetchone()
+        ep = db.execute(
+            text("SELECT id FROM episodes WHERE id = :id"), {"id": episode_id}
+        ).fetchone()
         if not ep:
             raise HTTPException(status_code=404, detail="episode not found")
 
@@ -1039,7 +1078,9 @@ def undo_episode_label(episode_id: str, body: EpisodeUndoIn):
             {"label_id": target, "episode_id": episode_id},
         ).fetchone()
         if not t:
-            raise HTTPException(status_code=404, detail="label not found for this episode")
+            raise HTTPException(
+                status_code=404, detail="label not found for this episode"
+            )
         if bool(t._mapping["is_undo"]):
             raise HTTPException(status_code=400, detail="cannot undo an undo label")
 
@@ -1051,7 +1092,12 @@ def undo_episode_label(episode_id: str, body: EpisodeUndoIn):
                 RETURNING id, created_at
                 """
             ),
-            {"episode_id": episode_id, "actor": actor, "note": body.note, "undone_label_id": target},
+            {
+                "episode_id": episode_id,
+                "actor": actor,
+                "note": body.note,
+                "undone_label_id": target,
+            },
         ).fetchone()
         db.commit()
 
@@ -1060,12 +1106,12 @@ def undo_episode_label(episode_id: str, body: EpisodeUndoIn):
             "episode_id": episode_id,
             "undo_label_id": str(row._mapping["id"]),
             "undone_label_id": target,
-            "created_at": row._mapping["created_at"].isoformat() if row._mapping["created_at"] else None,
+            "created_at": row._mapping["created_at"].isoformat()
+            if row._mapping["created_at"]
+            else None,
         }
     finally:
         db.close()
-
-
 
 
 @app.get("/events")
@@ -1139,6 +1185,7 @@ def on_shutdown():
 # Proposals: test expiry (manual trigger)
 # -------------------------
 
+
 @app.post("/proposals/expire_once")
 def proposals_expire_once():
     db = SessionLocal()
@@ -1178,7 +1225,11 @@ def mine_once() -> dict:
                 "  last_error_msg = NULL, "
                 "  last_payload = EXCLUDED.last_payload"
             ),
-            {"payload": __import__("json").dumps(result, ensure_ascii=False, separators=(",", ":"))},
+            {
+                "payload": __import__("json").dumps(
+                    result, ensure_ascii=False, separators=(",", ":")
+                )
+            },
         )
         db.commit()
         return {"ok": True, **result}
@@ -1192,17 +1243,24 @@ def mine_once() -> dict:
 @app.get("/proposals/miner_status")
 def proposals_miner_status() -> dict:
     from db import SessionLocal
+
     db = SessionLocal()
     try:
-        row = db.execute(
-            text(
-                "SELECT job_key, last_run_at, last_ok_at, last_error_at, last_error_msg, last_payload "
-                "FROM job_status WHERE job_key = 'proposals_miner'"
+        row = (
+            db.execute(
+                text(
+                    "SELECT job_key, last_run_at, last_ok_at, last_error_at, last_error_msg, last_payload "
+                    "FROM job_status WHERE job_key = 'proposals_miner'"
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
         return {"ok": True, "status": (dict(row) if row else None)}
     finally:
         db.close()
+
+
 @app.get("/monitor_modes")
 def list_monitor_modes(
     monitor_key: str | None = None,
@@ -1267,17 +1325,20 @@ def set_monitor_mode(payload: dict) -> dict:
     try:
         _upsert_monitor_mode(db, monitor_key=monitor_key, room_id=room_id, mode=mode)
         db.commit()
-        row = db.execute(
-            text(
-                "SELECT monitor_key, room_id, mode, updated_at "
-                "FROM monitor_modes WHERE monitor_key=:k AND room_id=:r"
-            ),
-            {"k": monitor_key, "r": room_id},
-        ).mappings().first()
+        row = (
+            db.execute(
+                text(
+                    "SELECT monitor_key, room_id, mode, updated_at "
+                    "FROM monitor_modes WHERE monitor_key=:k AND room_id=:r"
+                ),
+                {"k": monitor_key, "r": room_id},
+            )
+            .mappings()
+            .first()
+        )
         return {"status": "ok", "row": (dict(row) if row else None)}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail={"error": str(e)})
     finally:
         db.close()
-

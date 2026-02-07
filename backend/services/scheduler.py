@@ -291,11 +291,17 @@ def _close_stale_deviations(
 
 def _get_monitor_mode(db, *, monitor_key: str, room_id: str = "__GLOBAL__") -> str:
     try:
-        row = db.execute(
-            text("SELECT mode FROM monitor_modes WHERE monitor_key=:k AND room_id=:r"),
-            {"k": monitor_key, "r": room_id},
-        ).mappings().one_or_none()
-        if row and row.get("mode") in ("OFF","TEST","ON"):
+        row = (
+            db.execute(
+                text(
+                    "SELECT mode FROM monitor_modes WHERE monitor_key=:k AND room_id=:r"
+                ),
+                {"k": monitor_key, "r": room_id},
+            )
+            .mappings()
+            .one_or_none()
+        )
+        if row and row.get("mode") in ("OFF", "TEST", "ON"):
             return row["mode"]
     except Exception:
         pass
@@ -376,9 +382,15 @@ def run_rule_engine_job():
                             if isinstance(ev, dict):
                                 ev["_monitor_mode"] = "TEST"
                             elif isinstance(ev, list):
-                                dct["evidence"] = {"event_ids": ev, "_monitor_mode": "TEST"}
+                                dct["evidence"] = {
+                                    "event_ids": ev,
+                                    "_monitor_mode": "TEST",
+                                }
                             else:
-                                dct["evidence"] = {"event_ids": [], "_monitor_mode": "TEST"}
+                                dct["evidence"] = {
+                                    "event_ids": [],
+                                    "_monitor_mode": "TEST",
+                                }
 
                         _upsert_open_deviation(
                             db,
@@ -480,7 +492,9 @@ def run_anomalies_job_safe():
         ANOMALIES_RUNNER_STATUS["last_ok_at"] = datetime.now(timezone.utc).isoformat()
         ANOMALIES_RUNNER_STATUS["last_error_at"] = None
         ANOMALIES_RUNNER_STATUS["last_error_msg"] = None
-        ANOMALIES_RUNNER_STATUS["last_scored_bucket_start"] = (out.get("bucket_start").isoformat() if out.get("bucket_start") else None)
+        ANOMALIES_RUNNER_STATUS["last_scored_bucket_start"] = (
+            out.get("bucket_start").isoformat() if out.get("bucket_start") else None
+        )
         ANOMALIES_RUNNER_STATUS["last_counts"] = out.get("counts")
         ANOMALIES_RUNNER_STATUS["last_rooms_scored"] = out.get("rooms_scored")
 
@@ -489,12 +503,16 @@ def run_anomalies_job_safe():
             event="anomalies_runner_tick",
             run_id=out.get("run_id"),
             msg="anomalies runner tick",
-            bucket_start=(out.get("bucket_start").isoformat() if out.get("bucket_start") else None),
+            bucket_start=(
+                out.get("bucket_start").isoformat() if out.get("bucket_start") else None
+            ),
             rooms_scored=out.get("rooms_scored"),
             counts=out.get("counts"),
         )
     except Exception as e:
-        ANOMALIES_RUNNER_STATUS["last_error_at"] = datetime.now(timezone.utc).isoformat()
+        ANOMALIES_RUNNER_STATUS["last_error_at"] = datetime.now(
+            timezone.utc
+        ).isoformat()
         ANOMALIES_RUNNER_STATUS["last_error_msg"] = str(e)
 
         _log_event(
@@ -512,7 +530,6 @@ def run_anomalies_job_safe():
 
 
 def setup_scheduler():
-
     cfg = load_rule_config()
     interval_minutes = cfg.scheduler_interval_minutes()
 
@@ -540,14 +557,12 @@ def setup_scheduler():
         replace_existing=True,
     )
 
-
     scheduler.add_job(
         run_proposals_miner_job,
         trigger=IntervalTrigger(hours=24),
         id="proposals_miner_job",
         replace_existing=True,
     )
-
 
     scheduler.add_job(
         run_proposals_expiry_job,
@@ -560,6 +575,7 @@ def setup_scheduler():
 # --- Anomalies runner (ID003_10) ---
 # Minimal deterministic runner helpers. Wiring into APScheduler comes in a later step.
 
+
 def run_anomalies_job_one(
     db,
     *,
@@ -569,10 +585,10 @@ def run_anomalies_job_one(
     pet_weight: float = 0.25,
     unknown_weight: float = 0.50,
 ) -> dict:
-    '''
+    """
     Score exactly one (room, bucket_start) and persist lifecycle via upsert_bucket_result.
     Deterministic given explicit args. Intended to be used by scheduler-job later.
-    '''
+    """
     from datetime import datetime
 
     # Parse bucket_start if string (accept Z)
@@ -584,7 +600,13 @@ def run_anomalies_job_one(
     from services.anomaly_scoring import score_room_bucket
     from services.anomalies_repo_lifecycle import upsert_bucket_result
 
-    scored = score_room_bucket(db, room=room, bucket_start=dt, pet_weight=pet_weight, unknown_weight=unknown_weight)
+    scored = score_room_bucket(
+        db,
+        room=room,
+        bucket_start=dt,
+        pet_weight=pet_weight,
+        unknown_weight=unknown_weight,
+    )
 
     ep = upsert_bucket_result(
         db,
@@ -628,10 +650,10 @@ def run_anomalies_job_one(
 
 
 def run_anomalies_job_deterministic() -> dict:
-    '''
+    """
     Debug helper: scores ONE room+bucket from env (or defaults) using a fresh DB session.
     Useful for verifying import-paths and lifecycle without wiring into scheduler yet.
-    '''
+    """
     import os
     from db import SessionLocal
 
@@ -653,8 +675,13 @@ def run_anomalies_job_deterministic() -> dict:
 def _anomaly_pick_one_room_id(db) -> str:
     """Deterministic: pick one known room_id from baseline_room_bucket (min(room_id))."""
     from sqlalchemy import text
-    row = db.execute(text("SELECT MIN(room_id) AS room_id FROM baseline_room_bucket")).mappings().first()
-    rid = (row.get("room_id") if row else None)
+
+    row = (
+        db.execute(text("SELECT MIN(room_id) AS room_id FROM baseline_room_bucket"))
+        .mappings()
+        .first()
+    )
+    rid = row.get("room_id") if row else None
     if not rid:
         raise RuntimeError("No baseline_room_bucket rows -> cannot pick room_id")
     return str(rid)
@@ -664,7 +691,6 @@ def run_anomalies_job_one_deterministic_room(db, *, bucket_start) -> dict:
     """Deterministic: pick room_id from baseline_room_bucket and score one bucket."""
     room_id = _anomaly_pick_one_room_id(db)
     return run_anomalies_job_one(db, room=room_id, bucket_start=bucket_start)
-
 
 
 def _latest_finished_bucket_start_utc(*, bucket_minutes: int = 15):
@@ -713,39 +739,51 @@ def _anomaly_list_room_ids(db) -> list[str]:
     """List known rooms for anomaly scoring. Source: baseline_room_bucket (latest model_end per user)."""
     from sqlalchemy import text
 
-    row = db.execute(text("SELECT id::text AS id FROM app_instance LIMIT 1")).mappings().first()
+    row = (
+        db.execute(text("SELECT id::text AS id FROM app_instance LIMIT 1"))
+        .mappings()
+        .first()
+    )
     if not row or not row.get("id"):
         raise RuntimeError("app_instance missing (cannot resolve user_id)")
     uid = row["id"]
 
-    me = db.execute(
-        text(
-            """
+    me = (
+        db.execute(
+            text(
+                """
             SELECT model_end
             FROM baseline_model_status
             WHERE user_id = CAST(:uid AS uuid)
             ORDER BY model_end DESC
             LIMIT 1
             """
-        ),
-        {"uid": uid},
-    ).mappings().first()
+            ),
+            {"uid": uid},
+        )
+        .mappings()
+        .first()
+    )
     model_end = me["model_end"] if me else None
     if not model_end:
         return []
 
-    rooms = db.execute(
-        text(
-            """
+    rooms = (
+        db.execute(
+            text(
+                """
             SELECT DISTINCT room_id
             FROM baseline_room_bucket
             WHERE user_id = CAST(:uid AS uuid)
               AND model_end = :model_end
             ORDER BY room_id ASC
             """
-        ),
-        {"uid": uid, "model_end": model_end},
-    ).mappings().all()
+            ),
+            {"uid": uid, "model_end": model_end},
+        )
+        .mappings()
+        .all()
+    )
     return [str(r["room_id"]) for r in rooms if r.get("room_id")]
 
 
@@ -802,4 +840,9 @@ def run_anomalies_job() -> dict:
     except Exception:
         pass
 
-    return {"run_id": run_id, "bucket_start": bucket_start, "rooms_scored": rooms_scored, "counts": counts}
+    return {
+        "run_id": run_id,
+        "bucket_start": bucket_start,
+        "rooms_scored": rooms_scored,
+        "counts": counts,
+    }
