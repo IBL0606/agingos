@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Any, List
+from typing import Any
 from datetime import datetime
 
 
