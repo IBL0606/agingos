@@ -88,7 +88,9 @@
         until: p.get("until"),
         category: p.get("category"),
         room: p.get("room"),
+        auto: p.get("auto"),
       };
+
     }
     const $ = (id) => document.getElementById(id);
 
@@ -152,7 +154,13 @@
         const tdI = document.createElement("td");
         const tdP = document.createElement("td");
 
-        tdT.textContent = ev.timestamp || "";
+      function fmtUtc(iso) {
+        if (!iso) return "";
+        const t = String(iso).replace("Z","").replace("T"," ");
+        return t.length >= 16 ? t.slice(0,16) : t;
+      }
+
+        tdT.textContent = fmtUtc(ev.timestamp || "");
         tdC.textContent = ev.category || "";
         tdI.innerHTML = `<code>${(ev.id || "").slice(0, 16)}…</code>`;
         tdP.innerHTML = `<code>${JSON.stringify(ev.payload || {}, null, 0)}</code>`;
@@ -192,6 +200,20 @@
       resetTable();
 
       const qs = getQS();
+
+      // Auto-fetch when deep-linking (auto=1 + since/until) - run once per tab
+      try {
+        const k = "agingos_events_autofetch_done";
+        if (qs.auto === "1" && qs.since && qs.until && sessionStorage.getItem(k) !== "1") {
+          sessionStorage.setItem(k, "1");
+          setTimeout(() => {
+            const btn = document.getElementById("loadBtn");
+            if (btn) btn.click();
+          }, 50);
+        }
+      } catch (_) {}
+
+
       if (qs.since && qs.until) {
         state.since = qs.since;
         state.until = qs.until;

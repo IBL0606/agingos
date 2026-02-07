@@ -13,10 +13,13 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from util.time import utcnow
 from db import SessionLocal
 from services.rule_engine import RULE_REGISTRY
+from services.proposals_miner import run_proposals_miner_job
+from services.proposals_expiry import run_proposals_expiry_job
 from config.rule_config import load_rule_config
 
 from models.rule import Rule, RuleType
@@ -26,6 +29,17 @@ from models.deviation import Deviation, DeviationStatus
 scheduler = BackgroundScheduler()
 
 logger = logging.getLogger("scheduler")
+
+ANOMALIES_RUNNER_STATUS = {
+    "last_run_at": None,
+    "last_ok_at": None,
+    "last_error_at": None,
+    "last_error_msg": None,
+    "last_scored_bucket_start": None,
+    "last_counts": None,
+    "last_rooms_scored": None,
+}
+
 
 # Ensure JSONL (message-only) output for this logger, without duplicate propagation.
 if not logger.handlers:
@@ -199,9 +213,20 @@ def _upsert_open_deviation(
         "severity_str": deviation_v1["severity"],
     }
 
-    evidence = {
-        "event_ids": deviation_v1.get("evidence", []),
-    }
+    ev = deviation_v1.get("evidence")
+
+    # evidence kan være enten list (legacy) eller dict (v1)
+    if isinstance(ev, dict):
+        event_ids = ev.get("event_ids", [])
+        extra = {k: v for k, v in ev.items() if k != "event_ids"}
+    elif isinstance(ev, list):
+        event_ids = ev
+        extra = {}
+    else:
+        event_ids = []
+        extra = {}
+
+    evidence = {"event_ids": event_ids, **extra}
 
     if existing:
         existing.last_seen_at = now
@@ -264,6 +289,25 @@ def _close_stale_deviations(
     return closed_count
 
 
+def _get_monitor_mode(db, *, monitor_key: str, room_id: str = "__GLOBAL__") -> str:
+    try:
+        row = (
+            db.execute(
+                text(
+                    "SELECT mode FROM monitor_modes WHERE monitor_key=:k AND room_id=:r"
+                ),
+                {"k": monitor_key, "r": room_id},
+            )
+            .mappings()
+            .one_or_none()
+        )
+        if row and row.get("mode") in ("OFF", "TEST", "ON"):
+            return row["mode"]
+    except Exception:
+        pass
+    return "ON"
+
+
 def run_rule_engine_job():
     run_id = str(uuid.uuid4())
     t0 = time.monotonic()
@@ -323,11 +367,31 @@ def run_rule_engine_job():
                     spec = RULE_REGISTRY[rid]
                     rule_devs = spec.eval_fn(db, since=r_since, until=r_until, now=now)
 
+                    mode = _get_monitor_mode(db, monitor_key=rid, room_id="__GLOBAL__")
+                    if mode == "OFF":
+                        rule_devs = []
+
                     # Persist alle avvik fra regelen (kan være 0..N)
                     rule_row = _get_or_create_rule_row(db, rule_key=rid)
 
                     for d in rule_devs:
                         dct = d.model_dump(mode="json")
+                        if mode == "TEST":
+                            # Persist stable marker on evidence (without dropping event_ids).
+                            ev = dct.get("evidence")
+                            if isinstance(ev, dict):
+                                ev["_monitor_mode"] = "TEST"
+                            elif isinstance(ev, list):
+                                dct["evidence"] = {
+                                    "event_ids": ev,
+                                    "_monitor_mode": "TEST",
+                                }
+                            else:
+                                dct["evidence"] = {
+                                    "event_ids": [],
+                                    "_monitor_mode": "TEST",
+                                }
+
                         _upsert_open_deviation(
                             db,
                             rule_row=rule_row,
@@ -415,6 +479,56 @@ def run_rule_engine_job():
         db.close()
 
 
+def run_anomalies_job_safe():
+    """Fail-safe wrapper for APScheduler: never raise; updates in-memory status; always logs."""
+    from datetime import datetime, timezone
+    import traceback
+
+    ANOMALIES_RUNNER_STATUS["last_run_at"] = datetime.now(timezone.utc).isoformat()
+
+    try:
+        out = run_anomalies_job()
+
+        ANOMALIES_RUNNER_STATUS["last_ok_at"] = datetime.now(timezone.utc).isoformat()
+        ANOMALIES_RUNNER_STATUS["last_error_at"] = None
+        ANOMALIES_RUNNER_STATUS["last_error_msg"] = None
+        ANOMALIES_RUNNER_STATUS["last_scored_bucket_start"] = (
+            out.get("bucket_start").isoformat() if out.get("bucket_start") else None
+        )
+        ANOMALIES_RUNNER_STATUS["last_counts"] = out.get("counts")
+        ANOMALIES_RUNNER_STATUS["last_rooms_scored"] = out.get("rooms_scored")
+
+        _log_event(
+            level="INFO",
+            event="anomalies_runner_tick",
+            run_id=out.get("run_id"),
+            msg="anomalies runner tick",
+            bucket_start=(
+                out.get("bucket_start").isoformat() if out.get("bucket_start") else None
+            ),
+            rooms_scored=out.get("rooms_scored"),
+            counts=out.get("counts"),
+        )
+    except Exception as e:
+        ANOMALIES_RUNNER_STATUS["last_error_at"] = datetime.now(
+            timezone.utc
+        ).isoformat()
+        ANOMALIES_RUNNER_STATUS["last_error_msg"] = str(e)
+
+        _log_event(
+            level="ERROR",
+            event="anomalies_runner_error",
+            run_id="n/a",
+            msg="anomalies runner failed",
+            error={
+                "type": type(e).__name__,
+                "message": str(e),
+                "stacktrace": traceback.format_exc(),
+            },
+        )
+        return
+
+
 def setup_scheduler():
     cfg = load_rule_config()
     interval_minutes = cfg.scheduler_interval_minutes()
@@ -435,3 +549,300 @@ def setup_scheduler():
         id="rule_engine_job",
         replace_existing=True,
     )
+
+    scheduler.add_job(
+        run_anomalies_job_safe,
+        trigger=IntervalTrigger(minutes=interval_minutes),
+        id="anomalies_job",
+        replace_existing=True,
+    )
+
+    scheduler.add_job(
+        run_proposals_miner_job,
+        trigger=IntervalTrigger(hours=24),
+        id="proposals_miner_job",
+        replace_existing=True,
+    )
+
+    scheduler.add_job(
+        run_proposals_expiry_job,
+        trigger=IntervalTrigger(minutes=10),
+        id="proposals_expiry_job",
+        replace_existing=True,
+    )
+
+
+# --- Anomalies runner (ID003_10) ---
+# Minimal deterministic runner helpers. Wiring into APScheduler comes in a later step.
+
+
+def run_anomalies_job_one(
+    db,
+    *,
+    room: str,
+    bucket_start,
+    close_after_green_buckets: int = 2,
+    pet_weight: float = 0.25,
+    unknown_weight: float = 0.50,
+) -> dict:
+    """
+    Score exactly one (room, bucket_start) and persist lifecycle via upsert_bucket_result.
+    Deterministic given explicit args. Intended to be used by scheduler-job later.
+    """
+    from datetime import datetime
+
+    # Parse bucket_start if string (accept Z)
+    dt = bucket_start
+    if isinstance(bucket_start, str):
+        bs = bucket_start.strip().replace("Z", "+00:00")
+        dt = datetime.fromisoformat(bs)
+
+    from services.anomaly_scoring import score_room_bucket
+    from services.anomalies_repo_lifecycle import upsert_bucket_result
+
+    scored = score_room_bucket(
+        db,
+        room=room,
+        bucket_start=dt,
+        pet_weight=pet_weight,
+        unknown_weight=unknown_weight,
+    )
+
+    ep = upsert_bucket_result(
+        db,
+        room=scored.room,
+        bucket_start=scored.bucket_start,
+        bucket_end=scored.bucket_end,
+        score_total=float(scored.score_total),
+        level=scored.level,
+        reasons=scored.reasons,
+        reasons_summary=(scored.details if hasattr(scored, "details") else None),
+        close_green_n=close_after_green_buckets,
+        close_timeout_minutes=90,
+    )
+
+    if ep is None:
+        proc_action = "NOOP"
+        proc_episode_id = None
+        proc_active = False
+    else:
+        if bool(getattr(ep, "_noop", False)):
+            proc_action = "NOOP"
+        elif not bool(getattr(ep, "active", True)):
+            proc_action = "CLOSE"
+        elif int(getattr(ep, "bucket_count", 0) or 0) <= 1:
+            proc_action = "OPEN"
+        else:
+            proc_action = "UPDATE"
+        proc_episode_id = ep.id
+        proc_active = bool(getattr(ep, "active", True))
+
+    return {
+        "room": scored.room,
+        "bucket_start": scored.bucket_start,
+        "bucket_end": scored.bucket_end,
+        "level": scored.level,
+        "score_total": float(scored.score_total),
+        "action": proc_action,
+        "episode_id": proc_episode_id,
+        "active": proc_active,
+    }
+
+
+def run_anomalies_job_deterministic() -> dict:
+    """
+    Debug helper: scores ONE room+bucket from env (or defaults) using a fresh DB session.
+    Useful for verifying import-paths and lifecycle without wiring into scheduler yet.
+    """
+    import os
+    from db import SessionLocal
+
+    room = os.environ.get("ANOMALY_TEST_ROOM", "soverom")
+    bucket_start = os.environ.get("ANOMALY_TEST_BUCKET_START", "2026-02-05T05:15:00Z")
+
+    db = SessionLocal()
+    try:
+        res = run_anomalies_job_one(db, room=room, bucket_start=bucket_start)
+        db.commit()
+        return {"ok": True, "result": res}
+    except Exception as e:
+        db.rollback()
+        return {"ok": False, "error": str(e)}
+    finally:
+        db.close()
+
+
+def _anomaly_pick_one_room_id(db) -> str:
+    """Deterministic: pick one known room_id from baseline_room_bucket (min(room_id))."""
+    from sqlalchemy import text
+
+    row = (
+        db.execute(text("SELECT MIN(room_id) AS room_id FROM baseline_room_bucket"))
+        .mappings()
+        .first()
+    )
+    rid = row.get("room_id") if row else None
+    if not rid:
+        raise RuntimeError("No baseline_room_bucket rows -> cannot pick room_id")
+    return str(rid)
+
+
+def run_anomalies_job_one_deterministic_room(db, *, bucket_start) -> dict:
+    """Deterministic: pick room_id from baseline_room_bucket and score one bucket."""
+    room_id = _anomaly_pick_one_room_id(db)
+    return run_anomalies_job_one(db, room=room_id, bucket_start=bucket_start)
+
+
+def _latest_finished_bucket_start_utc(*, bucket_minutes: int = 15):
+    """Return last finished bucket_start in UTC, aligned by Europe/Oslo local time (DST-safe)."""
+    from datetime import datetime, timedelta, timezone
+    from zoneinfo import ZoneInfo
+
+    if bucket_minutes <= 0:
+        raise ValueError("bucket_minutes must be > 0")
+
+    oslo = ZoneInfo("Europe/Oslo")
+    now_utc = datetime.now(timezone.utc)
+    now_local = now_utc.astimezone(oslo)
+
+    # floor to bucket boundary in LOCAL time
+    m = now_local.minute
+    floored_minute = (m // bucket_minutes) * bucket_minutes
+    floored_local = now_local.replace(minute=floored_minute, second=0, microsecond=0)
+
+    # last finished bucket start is previous bucket boundary
+    latest_finished_local = floored_local - timedelta(minutes=bucket_minutes)
+
+    # return as UTC-aware
+    return latest_finished_local.astimezone(timezone.utc)
+
+
+def run_anomalies_job_latest_one() -> dict:
+    """Debug helper: pick deterministic room_id and score the latest finished bucket."""
+    from db import SessionLocal
+
+    bs = _latest_finished_bucket_start_utc()
+    db = SessionLocal()
+    try:
+        room_id = _anomaly_pick_one_room_id(db)
+        res = run_anomalies_job_one(db, room=room_id, bucket_start=bs)
+        db.commit()
+        return {"ok": True, "room": room_id, "bucket_start": bs, "result": res}
+    except Exception as e:
+        db.rollback()
+        return {"ok": False, "error": str(e)}
+    finally:
+        db.close()
+
+
+def _anomaly_list_room_ids(db) -> list[str]:
+    """List known rooms for anomaly scoring. Source: baseline_room_bucket (latest model_end per user)."""
+    from sqlalchemy import text
+
+    row = (
+        db.execute(text("SELECT id::text AS id FROM app_instance LIMIT 1"))
+        .mappings()
+        .first()
+    )
+    if not row or not row.get("id"):
+        raise RuntimeError("app_instance missing (cannot resolve user_id)")
+    uid = row["id"]
+
+    me = (
+        db.execute(
+            text(
+                """
+            SELECT model_end
+            FROM baseline_model_status
+            WHERE user_id = CAST(:uid AS uuid)
+            ORDER BY model_end DESC
+            LIMIT 1
+            """
+            ),
+            {"uid": uid},
+        )
+        .mappings()
+        .first()
+    )
+    model_end = me["model_end"] if me else None
+    if not model_end:
+        return []
+
+    rooms = (
+        db.execute(
+            text(
+                """
+            SELECT DISTINCT room_id
+            FROM baseline_room_bucket
+            WHERE user_id = CAST(:uid AS uuid)
+              AND model_end = :model_end
+            ORDER BY room_id ASC
+            """
+            ),
+            {"uid": uid, "model_end": model_end},
+        )
+        .mappings()
+        .all()
+    )
+    return [str(r["room_id"]) for r in rooms if r.get("room_id")]
+
+
+def run_anomalies_job() -> dict:
+    """
+    Scheduler job: score latest finished 15-min bucket (Europe/Oslo aligned) for each room.
+    Idempotent via lifecycle upsert (NOOP when already processed).
+    """
+    from datetime import datetime, timezone
+    import uuid
+    from db import SessionLocal
+
+    run_id = str(uuid.uuid4())
+    started_at = datetime.now(timezone.utc)
+    bucket_start = _latest_finished_bucket_start_utc()
+
+    db = SessionLocal()
+    counts = {"OPEN": 0, "UPDATE": 0, "CLOSE": 0, "NOOP": 0, "ERROR": 0}
+    rooms_scored = 0
+    try:
+        rooms = _anomaly_list_room_ids(db)
+        for room_id in rooms:
+            try:
+                res = run_anomalies_job_one(db, room=room_id, bucket_start=bucket_start)
+                rooms_scored += 1
+                a = str(res.get("action") or "NOOP").upper()
+                if a not in counts:
+                    a = "NOOP"
+                counts[a] += 1
+            except Exception:
+                counts["ERROR"] += 1
+                # keep going; one room must not crash whole run
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+    # log summary in scheduler logger (JSONL style like existing scheduler)
+    try:
+        logger.info(
+            "",
+            extra={
+                "component": "scheduler",
+                "event": "anomalies_runner_summary",
+                "run_id": run_id,
+                "started_at": started_at.isoformat(),
+                "bucket_start": bucket_start.isoformat(),
+                "rooms_scored": rooms_scored,
+                **{f"count_{k.lower()}": v for k, v in counts.items()},
+            },
+        )
+    except Exception:
+        pass
+
+    return {
+        "run_id": run_id,
+        "bucket_start": bucket_start,
+        "rooms_scored": rooms_scored,
+        "counts": counts,
+    }

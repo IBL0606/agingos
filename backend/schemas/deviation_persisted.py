@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List
+from typing import Any
 from datetime import datetime
 
 
@@ -22,5 +22,6 @@ class DeviationPersisted(BaseModel):
     last_seen_at: datetime
 
     subject_key: str
-    evidence: List[str] = []
+    evidence: Any
+    evidence_event_ids: list[str] = []
     window: Window
