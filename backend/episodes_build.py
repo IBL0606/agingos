@@ -16,7 +16,7 @@ import os
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import psycopg2
 import psycopg2.extras
@@ -204,7 +204,6 @@ def build_episodes(events: List[RawEvent]) -> List[EpisodeDraft]:
         ep.end_ts = end_ts
         ep.close_reason = reason
         # duration
-        dur = max(0, int((ep.end_ts - ep.start_ts).total_seconds()))
         # quality
         if reason == "off_event":
             ep.quality = "high" if "missing_off" not in ep.quality_flags else ep.quality

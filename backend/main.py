@@ -3,7 +3,7 @@ import httpx
 
 
 # backend/main.py
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Body, Depends, FastAPI, HTTPException, Request
 
 from db import SessionLocal
 from models.event import Event
@@ -20,6 +20,7 @@ from routes.baseline import router as baseline_router
 from routes.anomalies import router as anomalies_router
 
 from fastapi import Query
+from sqlalchemy import text
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
@@ -359,8 +360,6 @@ def ai_proposals(
 # Proposals (persistent MVP)
 # -------------------------
 
-from fastapi import Body
-from sqlalchemy import text
 
 
 def _monitor_key_from_action_target(action_target: str) -> str:

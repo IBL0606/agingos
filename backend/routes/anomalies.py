@@ -10,7 +10,6 @@ from models.anomaly_episode import AnomalyLevel, AnomalyEpisode
 from schemas.anomaly_episode_persisted import AnomalyEpisodePersisted
 from services.anomalies_repo import list_episodes, parse_last_param_to_since
 from services.anomaly_scoring import score_room_bucket
-from services.anomaly_episode_engine import process_bucket_score
 from services.scheduler import scheduler, ANOMALIES_RUNNER_STATUS, run_anomalies_job
 
 
