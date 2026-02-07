@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AgingOS Dev – Proposals</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 16px; background:#0b0f14; color:#e6edf3; }
+    a { color:#7ee787; }
+    .row { display:flex; gap:16px; flex-wrap:wrap; }
+    .card { background:#0f1620; border:1px solid #1f2a37; border-radius:12px; padding:12px; box-shadow: 0 8px 20px rgba(0,0,0,0.25); }
+    .card h2 { margin:0 0 8px 0; font-size:14px; color:#9fb0c0; letter-spacing:0.02em; text-transform:uppercase; }
+    .muted { color:#9fb0c0; }
+    button { background:#1f6feb; color:white; border:0; padding:8px 10px; border-radius:10px; cursor:pointer; }
+    button.secondary { background:#30363d; }
+    button.danger { background:#da3633; }
+    button.ok { background:#238636; }
+    button:disabled { opacity:0.5; cursor:not-allowed; }
+    input, select { background:#0b0f14; color:#e6edf3; border:1px solid #30363d; border-radius:10px; padding:6px 8px; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { padding:8px; border-bottom:1px solid #1f2a37; vertical-align: top; }
+    th { text-align:left; color:#9fb0c0; font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:0.02em; }
+    code { background:#0b0f14; border:1px solid #1f2a37; padding:1px 6px; border-radius:8px; }
+    .pill { display:inline-block; padding:2px 8px; border-radius:999px; border:1px solid #30363d; font-size:12px; }
+    .pill.NEW { border-color:#1f6feb; }
+    .pill.TESTING { border-color:#d29922; }
+    .pill.ACTIVE { border-color:#238636; }
+    .pill.REJECTED { border-color:#8b949e; opacity:0.85; }
+    .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    @media (max-width: 980px) { .grid2 { grid-template-columns: 1fr; } }
+    .right { display:flex; gap:8px; align-items:center; justify-content:flex-end; flex-wrap:wrap; }
+    .small { font-size:12px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+  
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;line-height:18px;border:1px solid rgba(255,255,255,0.18);background:rgba(255,255,255,0.06);}
+.badge-test{border-color:rgba(255,170,0,0.55);}
+  .badge-on{border-color:rgba(35,134,54,0.55);}
+  .badge-off{border-color:rgba(218,54,51,0.55);}
+</style>
+</head>
+<body>
+  <div class="row" style="align-items:center; justify-content:space-between;">
+    <div>
+      <h1 style="margin:0; font-size:18px;">AgingOS Dev – Proposals</h1>
+      <div class="muted small">Verifikasjon: miner/expiry → DB → API → lifecycle actions → monitor_modes</div>
+      <div class="small"><a href="./index.html">← tilbake</a></div>
+    </div>
+
+    <div class="right">
+      <label class="small muted">API base</label>
+      <input id="baseUrl" value="/api" placeholder="(tom = same origin)" style="width:260px;" />
+      <label class="small muted">X-API-Key</label>
+      <input id="apiKey" value="" placeholder="optional" style="width:220px;" />
+      <button class="secondary" id="refreshBtn">Refresh</button>
+      <button id="mineBtn">Mine now</button>
+      <button class="secondary" id="expireBtn">Expire testing</button>
+    </div>
+  </div>
+
+  <div class="grid2" style="margin-top:12px;">
+    <div class="card">
+      <h2>Miner status</h2>
+      <div id="minerStatus" class="small mono muted">loading…</div>
+    </div>
+
+    <div class="card">
+      <h2>Monitor modes (GLOBAL)</h2>
+      <div class="small muted">Keys: <code>R-001</code> <code>R-002</code> <code>R-003</code></div>
+      <div style="margin-top:8px;">
+        <table>
+          <thead><tr><th>monitor_key</th><th>mode</th><th>updated_at</th><th class="right">set</th></tr></thead>
+          <tbody id="modesBody"></tbody>
+        </table>
+      </div>
+      <div class="small muted" style="margin-top:8px;">
+        NB: denne siden antar endpoints <code>GET /monitor_modes</code> og <code>POST /monitor_modes</code (eller tilsvarende). Hvis de ikke finnes, viser vi feilmelding.
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px;">
+    <div class="row" style="justify-content:space-between; align-items:flex-end;">
+      <div>
+        <h2>Proposals</h2>
+        <div class="small muted">Actions: <code>/proposals/{id}/test</code> <code>/activate</code> <code>/reject</code></div>
+      </div>
+      <div class="right">
+        <label class="small muted">filter</label>
+        <select id="stateFilter">
+          <option value="">(all)</option>
+          <option>NEW</option>
+          <option>TESTING</option>
+          <option>ACTIVE</option>
+          <option>REJECTED</option>
+        </select>
+        <input id="typeFilter" placeholder="proposal_type contains…" style="width:220px;" />
+      </div>
+    </div>
+
+    <div style="margin-top:8px;">
+      <table>
+        <thead>
+          <tr>
+            <th>id</th>
+            <th>type</th>
+            <th>state</th>
+            <th>subject</th>
+            <th>room</th>
+            <th>action_target</th>
+            <th>evidence</th>
+            <th class="right">actions</th>
+          </tr>
+        </thead>
+        <tbody id="proposalsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+function escapeHtml(x){
+  return String(x ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
+}
+function isTestDeviation(dev){
+  const ev = dev && dev.evidence;
+  return ev && typeof ev === 'object' && ev._monitor_mode === 'TEST';
+}
+function monitorBadgeHtml(mode, dev){
+  const m = String(mode ?? "").toUpperCase();
+
+  // CFG badge = hva monitor_modes faktisk er satt til (konfig).
+  let cfg = "";
+  if (m === "OFF") cfg = "<span class=\"badge badge-off\">CFG:OFF</span>";
+  else if (m === "ON") cfg = "<span class=\"badge badge-on\">CFG:ON</span>";
+  else if (m === "TEST") cfg = "<span class=\"badge badge-test\">CFG:TEST</span>";
+  else cfg = "<span class=\"badge\">CFG:?</span>";
+
+  // LAST badge = hva siste deviation faktisk indikerer (runtime / evidence).
+  // Akkurat nå: vi markerer eksplisitt TEST hvis _monitor_mode=TEST.
+  let last = "";
+  if (isTestDeviation(dev)) last = " <span class=\"badge badge-test\">LAST:TEST</span>";
+
+  return cfg + last;
+}
+const $ = (id) => document.getElementById(id);
+
+
+function _asRows(data){
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.rows)) return data.rows;
+  return [];
+}
+    // Persist settings like the main console
+    (function initFromLocalStorage(){
+      try {
+        const b = localStorage.getItem("apiBase");
+        const k = localStorage.getItem("apiKey");
+        if (b) $("baseUrl").value = b;
+        if (k) $("apiKey").value = k;
+      } catch {}
+    })();
+
+    function persistSettings(){
+      try {
+        localStorage.setItem("apiBase", $("baseUrl").value.trim() || "/api");
+        localStorage.setItem("apiKey", $("apiKey").value.trim() || "");
+      } catch {}
+    }
+
+    $("baseUrl").addEventListener("change", () => { persistSettings(); refreshAll(); });
+    $("apiKey").addEventListener("change", () => { persistSettings(); refreshAll(); });
+
+
+    function base() {
+      const v = $("baseUrl").value.trim();
+      return v ? v.replace(/\/+$/, "") : "";
+    }
+
+    function headers() {
+      const h = { "Content-Type": "application/json" };
+      const k = $("apiKey").value.trim();
+      if (k) h["X-API-Key"] = k;
+      return h;
+    }
+
+    async function api(path, opts = {}) {
+      const url = base() + path;
+      const res = await fetch(url, { ...opts, headers: { ...headers(), ...(opts.headers||{}) } });
+      if (!res.ok) {
+        const txt = await res.text().catch(()=>"(no body)");
+        throw new Error(`${res.status} ${res.statusText}: ${txt}`);
+      }
+      const ct = res.headers.get("content-type") || "";
+      return ct.includes("application/json") ? res.json() : res.text();
+    }
+
+    function fmtTs(s) {
+      if (!s) return "";
+      try { return new Date(s).toISOString(); } catch { return String(s); }
+    }
+
+    function summarizeEvidence(ev) {
+      if (!ev || typeof ev !== "object") return "";
+      const keys = ["count_7d","nights_window","min_nights","door_anomaly_count","window_days","anomaly_count"];
+      const parts = [];
+      for (const k of keys) if (ev[k] !== undefined) parts.push(`${k}=${ev[k]}`);
+      if (ev.night_dates?.length) parts.push(`dates=${ev.night_dates.length}`);
+      if (ev.episode_ids?.length) parts.push(`episodes=${ev.episode_ids.length}`);
+      return parts.join(", ");
+    }
+
+    async function refreshMinerStatus() {
+      const el = $("minerStatus");
+      el.textContent = "loading…";
+      try {
+        const j = await api("/proposals/miner_status");
+        if (!j.status) {
+          el.textContent = "status: null (ingen runs registrert ennå)";
+          return;
+        }
+        const s = j.status;
+        el.innerHTML =
+          `job_key=<code>${s.job_key}</code><br>` +
+          `last_run_at=<code>${fmtTs(s.last_run_at)}</code><br>` +
+          `last_ok_at=<code>${fmtTs(s.last_ok_at)}</code><br>` +
+          `last_error_at=<code>${fmtTs(s.last_error_at)}</code><br>` +
+          `last_error_msg=<code>${(s.last_error_msg||"")}</code><br>` +
+          `last_payload=<code>${JSON.stringify(s.last_payload||{}, null, 0)}</code>`;
+      } catch (e) {
+        el.textContent = "ERROR: " + e.message;
+      }
+    }
+
+    async function refreshProposals() {
+      const body = $("proposalsBody");
+      body.innerHTML = "";
+      const stateF = $("stateFilter").value.trim();
+      const typeF = $("typeFilter").value.trim().toLowerCase();
+
+      let list = [];
+      try {
+        list = await api("/proposals");
+      } catch (e) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td colspan="8" class="mono">ERROR loading /proposals: ${e.message}</td>`;
+        body.appendChild(tr);
+        return;
+      }
+
+      list = list.filter(p => !stateF || p.state === stateF);
+      list = list.filter(p => !typeF || String(p.proposal_type||"").toLowerCase().includes(typeF));
+
+      for (const p of list) {
+        const tr = document.createElement("tr");
+        const ev = summarizeEvidence(p.evidence);
+        tr.innerHTML = `
+          <td class="mono">${p.proposal_id}</td>
+          <td class="mono">${p.proposal_type || ""}</td>
+          <td><span class="pill ${p.state}">${p.state}</span></td>
+          <td class="mono small">${p.subject_id || ""}</td>
+          <td class="mono">${p.room_id ?? ""}</td>
+          <td class="mono">${p.action_target || ""}</td>
+          <td class="small mono">${ev}</td>
+          <td class="right">
+            <button class="secondary" data-act="test" ${p.state==="REJECTED"?"disabled":""}>Test</button>
+            <button class="ok" data-act="activate" ${p.state==="REJECTED"?"disabled":""}>Activate</button>
+            <button class="danger" data-act="reject" ${p.state==="REJECTED"?"disabled":""}>Reject</button>
+          </td>
+        `;
+        tr.querySelectorAll("button[data-act]").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const act = btn.getAttribute("data-act");
+            btn.disabled = true;
+            try {
+              await api(`/proposals/${p.proposal_id}/${act}`, { method: "POST", body: JSON.stringify({ note: "dev-dashboard" }) });
+              await refreshAll();
+            } catch (e) {
+              alert(`ERROR ${act}: ` + e.message);
+            } finally {
+              btn.disabled = false;
+            }
+          });
+        });
+        body.appendChild(tr);
+      }
+    }
+
+    async function refreshMonitorModes() {
+      const body = $("modesBody");
+      body.innerHTML = "";
+
+      // Pull latest deviations too, so we can show TEST/ON/OFF badge per rule
+      let devs = [];
+      try {
+        devs = await api("/deviations?limit=200");
+      } catch (e) {
+        devs = [];
+      }
+      const latestByRule = {};
+      for (const d of (Array.isArray(devs) ? devs : [])) {
+        const rid = d.rule_id;
+        if (!rid) continue;
+        const prev = latestByRule[rid];
+        const ts = d.last_seen_at || d.started_at || d.timestamp;
+        const prevTs = prev ? (prev.last_seen_at || prev.started_at || prev.timestamp) : null;
+        if (!prev || (ts && (!prevTs || ts > prevTs))) latestByRule[rid] = d;
+      }
+
+      let modes = null;
+        try {
+          const resp = await api("/monitor_modes");
+          modes = Array.isArray(resp) ? resp : (resp.rows || []);
+        } catch (e) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td colspan="4" class="mono">ERROR loading /monitor_modes: ${e.message}</td>`;
+          body.appendChild(tr);
+          return;
+        }
+
+      const keys = ["R-001","R-002","R-003"];
+      for (const k of keys) {
+        const row = (Array.isArray(modes) ? modes : []).find(x => x.monitor_key===k) || {};
+        const tr = document.createElement("tr");
+        const mode = row.mode || "(missing)";
+        const updated = row.updated_at || "";
+        tr.innerHTML = `
+          <td class="mono">${k} ${monitorBadgeHtml(mode, latestByRule[k])}</td>
+          <td class="mono">${mode}</td>
+          <td class="mono small">${fmtTs(updated)}</td>
+          <td class="right">
+            <button class="secondary" data-mode="OFF">OFF</button>
+            <button class="secondary" data-mode="TEST">TEST</button>
+            <button class="secondary" data-mode="ON">ON</button>
+          </td>
+        `;
+        tr.querySelectorAll("button[data-mode]").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const newMode = btn.getAttribute("data-mode");
+            btn.disabled = true;
+            try {
+              await api("/monitor_modes", { method:"POST", body: JSON.stringify({ monitor_key: k, room_id: "__GLOBAL__", mode: newMode }) });
+              await refreshMonitorModes();
+            } catch (e) {
+              alert(`ERROR set ${k}=${newMode}: ` + e.message);
+            } finally { btn.disabled = false; }
+          });
+        });
+        body.appendChild(tr);
+      }
+    }
+
+    async function mineNow() {
+      $("mineBtn").disabled = true;
+      try {
+        await api("/proposals/mine_once", { method:"POST" });
+        await refreshAll();
+      } catch (e) {
+        alert("ERROR mine_once: " + e.message);
+      } finally {
+        $("mineBtn").disabled = false;
+      }
+    }
+
+    async function expireNow() {
+      $("expireBtn").disabled = true;
+      try {
+        await api("/proposals/expire_once", { method:"POST" });
+        await refreshAll();
+      } catch (e) {
+        alert("ERROR expire_once: " + e.message);
+      } finally {
+        $("expireBtn").disabled = false;
+      }
+    }
+
+    async function refreshAll() {
+      await Promise.all([
+        refreshMinerStatus(),
+        refreshMonitorModes(),
+        refreshProposals(),
+      ]);
+    }
+
+    $("refreshBtn").addEventListener("click", refreshAll);
+    $("mineBtn").addEventListener("click", mineNow);
+    $("expireBtn").addEventListener("click", expireNow);
+
+    refreshAll();
+  </script>
+</body>
+</html>

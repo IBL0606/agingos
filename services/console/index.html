@@ -35,8 +35,18 @@
 
 </head>
 <body>
+<div style="margin:12px 0;"><a href="./proposals.html">Proposals (dev)</a></div>
+
   <h1>AgingOS Console (MVP)</h1>
-  <p class="muted">Statisk HTML/JS. Ingen automatikk. Henter data fra AgingOS API.</p>
+  <p class="muted">Statisk HTML/JS. Henter data fra AgingOS API.</p>
+
+<div class="statusbar" id="statusbar">
+  <span class="statuschip"><span class="dot" id="dotBackend"></span><span>Backend</span><span class="pill" id="stBackend">ukjent</span></span>
+  <span class="statuschip"><span class="dot" id="dotAI"></span><span>AI</span><span class="pill" id="stAI">ukjent</span></span>
+  <span class="statuschip"><span class="dot" id="dotScheduler"></span><span>Scheduler</span><span class="pill" id="stScheduler">ukjent</span></span>
+  <span class="statuschip"><span class="dot" id="dotAnom"></span><span>Anomali-runner</span><span class="pill" id="stAnom">ukjent</span></span>
+  <button class="smallbtn" id="refreshStatusBtn" type="button">Oppdater status</button>
+</div>
   <p><a href="/events.html">Gå til Events</a></p>
 
   <div class="card">
@@ -50,13 +60,49 @@
       <input id="apiKey" placeholder="sett X-API-Key" />
       <button id="saveBtn">Lagre</button>
       <button id="refreshBtn">Oppdater</button>
-</p>
+        <label style="margin-left:12px;width:auto"><input type="checkbox" id="proposalsTest" /> Proposals test</label>
+    </p>
     <div class="muted">Nøkkelen lagres lokalt i nettleseren (localStorage).</div>
   </div>
 
   <div class="row">
-    <div class="card">
-      <h2>AI-status</h2>
+
+<div class="card">
+  <h2>Systemstatus</h2>
+  <div class="muted">Viser om backend, scheduler og anomalies-runner faktisk kjører.</div>
+  <div style="margin-top:10px">
+    <button id="refreshStatusBtn">Oppdater status</button>
+    <button id="runAnomLatestBtn" style="margin-left:8px">Kjør anomalier (siste bucket)</button>
+  </div>
+  <pre id="sysStatus" style="margin-top:10px">Trykk "Oppdater status".</pre>
+</div>
+
+  <div class="card">
+    <h2>Systemstatus</h2>
+    <div class="grid2">
+      <div>
+        <div class="kv">
+          <div class="k">Backend /health</div><div class="v" id="sysHealth">—</div>
+          <div class="k">AI /ai/status</div><div class="v" id="sysAI">—</div>
+          <div class="k">Scheduler jobs</div><div class="v" id="sysJobs">—</div>
+          <div class="k">Anomali-runner</div><div class="v" id="sysAnom">—</div>
+        </div>
+        <div class="actions" style="margin-top:10px">
+          <button class="smallbtn" id="runAnomLatestBtn" type="button">Kjør anomalier (siste bucket)</button>
+        </div>
+        <div class="muted" id="sysMsg" style="margin-top:8px">—</div>
+      </div>
+      <div>
+        <details class="details">
+          <summary>Vis detaljer (JSON)</summary>
+          <pre id="sysDetails">Trykk "Oppdater".</pre>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>AI-status</h2>
       <pre id="aiStatus">Trykk "Oppdater".</pre>
     </div>
 
@@ -95,21 +141,23 @@
     const $ = (id) => document.getElementById(id);
 
     function loadSettings() {
+        const proposalsTestEl = $("proposalsTest");
       const apiBase = localStorage.getItem("agingos_api_base") || $("apiBase").value;
       const apiKey = localStorage.getItem("agingos_api_key") || "";
       $("apiBase").value = apiBase;
       $("apiKey").value = apiKey;
-      }
+    }
 
     function saveSettings() {
+        const proposalsTestEl = $("proposalsTest");
       localStorage.setItem("agingos_api_base", $("apiBase").value.trim());
       localStorage.setItem("agingos_api_key", $("apiKey").value.trim());
-      }
+    }
 
     function getQS(name) {
       const v = new URLSearchParams(window.location.search).get(name);
       return (v && v.trim()) ? v.trim() : null;
-      }
+    }
 
     async function apiGet(path) {
       const base = $("apiBase").value.trim().replace(/\/$/, "");
@@ -130,16 +178,17 @@
             const d = (j && (j.detail || j.message || j.error)) ? (j.detail || j.message || j.error) : null;
             if (d) msg += ` (${typeof d === "string" ? d : JSON.stringify(d)})`;
           } catch (_) {}
-          }
+        }
 
         throw new Error(msg);
-        }
+      }
+
       try {
         return JSON.parse(text);
       } catch (_) {
         throw new Error(`${path} -> invalid JSON (${ct || "unknown content-type"})`);
-        }
       }
+    }
 
     async function apiSend(method, path, payload) {
       console.log("API SEND", method, path, payload);
@@ -164,49 +213,37 @@
             const d = (j && (j.detail || j.message || j.error)) ? (j.detail || j.message || j.error) : null;
             if (d) msg += ` (${typeof d === "string" ? d : JSON.stringify(d)})`;
           } catch (_) {}
-          }
+        }
 
         throw new Error(msg);
-        }
+      }
+
       try {
         return JSON.parse(text);
       } catch (_) {
         throw new Error(`${path} -> invalid JSON (${ct || "unknown content-type"})`);
-        }
       }
+    }
 
-          async function createRuleFromProposal(p, action) {
-        // action: test_7_days | activate | reject
-        const room = (p && p.rule_draft && p.rule_draft.room) ? p.rule_draft.room : ((p && p.normal && p.normal.room) ? p.normal.room : null);
-
-        const status =
-          (action === "activate") ? "active" :
-          (action === "reject") ? "rejected" :
-          "testing";
-
-        // Requirement:
-        // - test_7_days => is_enabled=false
-        // - activate   => is_enabled=true
-        // - reject     => is_enabled=false
-        const is_enabled = (action === "activate");
-
-        const payload = {
-          name: (p && p.id) ? (p.id + ":" + action) : ("proposal-" + Date.now() + ":" + action),
-          rule_type: "NO_MOTION",
-          params: {
-            source: "proposal",
-            room: room,
-            proposal_id: (p && p.id) ? p.id : null,
-            proposal_action: action,
-            proposal_status: status,
-            rule_draft: (p && p.rule_draft) ? p.rule_draft : null
-          },
-          is_enabled: is_enabled,
-          severity: 2
-        };
-        return apiSend("POST", "/rules", payload);
-
-      }
+    async function createRuleFromProposal(p, action) {
+      const room = (p && p.rule_draft && p.rule_draft.room) ? p.rule_draft.room : ((p && p.normal && p.normal.room) ? p.normal.room : null);
+      const status = (action === "reject") ? "rejected" : ((action === "activate") ? "active" : "testing");
+      const is_enabled = action !== "reject";
+      const payload = {
+        name: (p && p.id) ? p.id : ("proposal-" + Date.now()),
+        rule_type: "NO_MOTION",
+        params: {
+          room: room,
+          proposal_id: (p && p.id) ? p.id : null,
+          proposal_action: action,
+          proposal_status: status,
+          rule_draft: (p && p.rule_draft) ? p.rule_draft : null
+        },
+        is_enabled: (action !== "reject"),
+        severity: 2
+      };
+      return apiSend("POST", "/rules", payload);
+    }
 
     function buildEvidenceLink(finding) {
       const ev = finding.evidence || {};
@@ -223,21 +260,70 @@
       if (ev.room) qs.push("room=" + encodeURIComponent(ev.room));
       if (qs.length) url += "?" + qs.join("&");
       return url;
+    }
 
-      }
 
     function renderAnomalies(payload) {
       const host = $("anomaliesList");
       host.innerHTML = "";
 
+        // Backend episodes support: if payload is an array, render it as episodes.
+        if (Array.isArray(payload)) {
+        const roomFilter = ((document.getElementById("anomalyRoom") && document.getElementById("anomalyRoom").value) ? String(document.getElementById("anomalyRoom").value).trim() : "") || (new URLSearchParams(window.location.search).get("anomaly_room") || "");
+          const list = roomFilter ? payload.filter(e => String(e.room || "") === String(roomFilter)) : payload;
+
+          if (list.length === 0) {
+            host.textContent = "Ingen anomalier funnet.";
+            return;
+          }
+
+          for (const e of list) {
+            const div = document.createElement("div");
+            div.className = "finding";
+
+            const title = document.createElement("div");
+            title.className = "finding-title";
+            const lvl = String(e.level || "").toUpperCase();
+            const st = (e.active === true) ? "ACTIVE" : "CLOSED";
+            title.textContent = `${lvl} · ${e.room || "(ukjent rom)"} · ${st}`;
+
+            const summary = document.createElement("div");
+            summary.className = "muted";
+            const fmtUtc = (iso) => {
+              if (!iso) return "—";
+              const t = String(iso).replace("Z", "").replace("T", " ");
+              return t.length >= 16 ? t.slice(0,16) : t;
+            };
+            const score = (typeof e.score_total === "number") ? e.score_total.toFixed(2) : (e.score_total || "");
+            summary.textContent = `Start: ${fmtUtc(e.start_ts)}  Slutt: ${fmtUtc(e.end_ts)}  Score: ${score}`;
+
+            div.appendChild(title);
+            div.appendChild(summary);
+            host.appendChild(div);
+            // Drill-down: link to Events for this episode window
+            const link = document.createElement("a");
+            link.className = "muted";
+            link.style.display = "inline-block";
+            link.style.marginTop = "4px";
+            const since = encodeURIComponent(e.start_ts || "");
+            const until = encodeURIComponent(e.end_ts || "");
+            const room = encodeURIComponent(e.room || "");
+            link.href = `/events.html?since=${since}&until=${until}&room=${room}&auto=1`;
+            link.textContent = "Vis events (grunnlag)";
+            div.appendChild(link);
+
+          }
+          return;
+        }
+
       const findings = (payload && payload.findings) ? payload.findings : [];
-      const roomFilter = new URLSearchParams(window.location.search).get("anomaly_room");
+        const roomFilter = ((document.getElementById("anomalyRoom") && document.getElementById("anomalyRoom").value) ? String(document.getElementById("anomalyRoom").value).trim() : "") || (new URLSearchParams(window.location.search).get("anomaly_room") || "");
       const filtered = roomFilter ? findings.filter(f => (f.normal && f.normal.room) ? (String(f.normal.room) === String(roomFilter)) : true) : findings;
       const list = filtered;
       if (list.length === 0) {
         host.textContent = "Ingen anomalier funnet.";
         return;
-        }
+      }
 
       for (const f of list) {
         const div = document.createElement("div");
@@ -281,10 +367,10 @@
             normalLine.textContent = `Normal: baseline (siste ${n.baseline_window_days} dager)`;
           } else {
             normalLine.textContent = "Normal: (tilgjengelig)";
-            }
+          }
 
           div.appendChild(normalLine);
-          }
+        }
 
         if (Array.isArray(f.because) && f.because.length) {
           const ul = document.createElement("ul");
@@ -294,9 +380,9 @@
             ul.appendChild(li);
           }
           div.appendChild(ul);
-          }
+        }
 
-const actions = document.createElement("div");
+        const actions = document.createElement("div");
         actions.className = "actions";
         const a = document.createElement("a");
         a.href = buildEvidenceLink(f);
@@ -305,169 +391,157 @@ const actions = document.createElement("div");
         div.appendChild(actions);
 
         host.appendChild(div);
-        }
       }
-
-    function renderInsights(insights) {
-  const host = $("insightsList");
-  host.innerHTML = "";
-
-  const findings = (insights && insights.findings) ? insights.findings : [];
-  if (!findings.length) {
-    host.textContent = "Ingen innsikt ennå.";
-    return;
-  }
-
-  for (const f of findings) {
-    const div = document.createElement("div");
-    div.className = "finding";
-
-    const title = document.createElement("div");
-    title.className = "finding-title";
-    title.textContent = f.title || "(uten tittel)";
-
-    const summary = document.createElement("div");
-    summary.className = "muted";
-    summary.textContent = f.summary || "";
-
-    div.appendChild(title);
-    div.appendChild(summary);
-
-    if (Array.isArray(f.because) && f.because.length) {
-      const ul = document.createElement("ul");
-      for (const item of f.because) {
-        const li = document.createElement("li");
-        li.textContent = item;
-        ul.appendChild(li);
-      }
-      div.appendChild(ul);
     }
 
-    const actions = document.createElement("div");
-    actions.className = "actions";
-    const a = document.createElement("a");
-    a.href = buildEvidenceLink(f);
-    a.textContent = "Vis grunnlag (events)";
-    actions.appendChild(a);
-    div.appendChild(actions);
+    function renderInsights(insights) {
+      const host = $("insightsList");
+      host.innerHTML = "";
 
-    host.appendChild(div);
-  }
-}
-
-
-
-      function renderProposals(payload) {
-        const host = $("proposalsList");
-        host.innerHTML = "";
-
-        const proposals = (payload && payload.proposals) ? payload.proposals : [];
-        if (!proposals.length) {
-          host.textContent = "Ingen forslag.";
-          return;
-        }
-
-        for (const p of proposals) {
-          const div = document.createElement("div");
-          div.className = "finding";
-
-          const title = document.createElement("div");
-          title.className = "finding-title";
-          title.textContent = p.title || "(uten tittel)";
-
-          const summary = document.createElement("div");
-          summary.className = "muted";
-          summary.textContent = p.summary || "";
-
-          div.appendChild(title);
-          div.appendChild(summary);
-
-          // Status + timestamp fra persisted rule (references.rule)
-          const refRule = (p && p.references && p.references.rule) ? p.references.rule : null;
-          if (refRule && refRule.proposal_status) {
-            const meta = document.createElement("div");
-            meta.className = "muted";
-
-            const st = String(refRule.proposal_status || "");
-            const testIso = refRule.proposal_test_started_at || "";
-            const actIso  = refRule.proposal_activated_at || "";
-            const rejIso  = refRule.proposal_rejected_at || "";
-
-            let ts = "";
-            if (st === "active" && actIso) ts = actIso;
-            else if (st === "testing" && testIso) ts = testIso;
-            else if (st === "rejected" && rejIso) ts = rejIso;
-
-            const label =
-              (st === "active") ? "Aktiv" :
-              (st === "testing") ? "Testing" :
-              (st === "rejected") ? "Avvist" :
-              ("Status: " + st);
-
-            meta.textContent = label + (ts ? (" " + ts.replace("T"," ").replace("Z"," UTC")) : "");
-            div.appendChild(meta);
-          }
-
-          if (Array.isArray(p.because) && p.because.length) {
-            const ul = document.createElement("ul");
-            for (const item of p.because) {
-              const li = document.createElement("li");
-              li.textContent = item;
-              ul.appendChild(li);
-            }
-            div.appendChild(ul);
-          }
-
-          const actions = document.createElement("div");
-          actions.className = "actions";
-
-          const a = document.createElement("a");
-          a.href = buildEvidenceLink(p);
-          a.textContent = "Vis grunnlag (events)";
-          actions.appendChild(a);
-
-          // Buttons: kun når vi ikke har persisted status (draft).
-          // Når status er active/testing/rejected: UI read-only.
-          const persisted = refRule && refRule.proposal_status ? String(refRule.proposal_status) : "";
-          if (p.lifecycle && Array.isArray(p.lifecycle.actions) && p.lifecycle.actions.length) {
-            const btnWrap = document.createElement("div");
-            btnWrap.style.marginTop = "6px";
-
-            for (const act of p.lifecycle.actions) {
-              if (persisted === "active" || persisted === "rejected" || persisted === "testing") continue;
-
-              const b = document.createElement("button");
-              b.textContent = act.label || act.action;
-
-              b.addEventListener("click", async () => {
-                b.disabled = true;
-                try {
-                  console.log("CLICK PROPOSAL", p.id, "action=", act.action);
-                  await createRuleFromProposal(p, act.action);
-                  await refresh();
-                } catch (e) {
-                  alert("Feil: " + e.message);
-                } finally {
-                  b.disabled = false;
-                }
-              });
-
-              btnWrap.appendChild(b);
-            }
-
-            if (btnWrap.childNodes && btnWrap.childNodes.length) {
-              actions.appendChild(btnWrap);
-            }
-          }
-
-          div.appendChild(actions);
-          host.appendChild(div);
-        }
+      const findings = insights.findings || [];
+      if (findings.length === 0) {
+        host.textContent = "Ingen innsikt ennå.";
+        return;
       }
 
-    async function refresh() {
-  console.log("[UI] refresh() start", { apiBase: ($("apiBase") && $("apiBase").value), keyLen: ($("apiKey") && $("apiKey").value ? $("apiKey").value.length : 0) });
+      for (const f of findings) {
+        const div = document.createElement("div");
+        div.className = "finding";
 
+        const title = document.createElement("div");
+        title.className = "finding-title";
+        title.textContent = f.title || "(uten tittel)";
+
+        const summary = document.createElement("div");
+        summary.className = "muted";
+        summary.textContent = f.summary || "";
+
+        div.appendChild(title);
+        div.appendChild(summary);
+
+        if (Array.isArray(f.because) && f.because.length) {
+          const ul = document.createElement("ul");
+          for (const item of f.because) {
+            const li = document.createElement("li");
+            li.textContent = item;
+            ul.appendChild(li);
+          }
+          div.appendChild(ul);
+        }
+
+        const actions = document.createElement("div");
+        actions.className = "actions";
+        const a = document.createElement("a");
+        a.href = buildEvidenceLink(f);
+        a.textContent = "Vis grunnlag (events)";
+        actions.appendChild(a);
+        div.appendChild(actions);
+
+        host.appendChild(div);
+      }
+    }
+
+
+    function renderProposals(payload) {
+      const host = $("proposalsList");
+      host.innerHTML = "";
+
+      const proposals = (payload && payload.proposals) ? payload.proposals : [];
+      if (proposals.length === 0) {
+        host.textContent = "Ingen forslag.";
+        return;
+      }
+
+      for (const p of proposals) {
+        const div = document.createElement("div");
+        div.className = "finding";
+
+        const title = document.createElement("div");
+        title.className = "finding-title";
+        title.textContent = p.title || "(uten tittel)";
+
+        const summary = document.createElement("div");
+        summary.className = "muted";
+        summary.textContent = p.summary || "";
+
+        div.appendChild(title);
+        div.appendChild(summary);
+
+        // Show activation timestamp (from persisted rule info)
+        const refRule = (p && p.references && p.references.rule) ? p.references.rule : null;
+        if (refRule && refRule.proposal_status === "active" && refRule.proposal_activated_at) {
+          const meta = document.createElement("div");
+          meta.className = "muted";
+          meta.textContent = "Aktivert " + refRule.proposal_activated_at.replace("T"," ").replace("Z"," UTC");
+          div.appendChild(meta);
+        }
+
+          const statusLine = document.createElement("div");
+          statusLine.className = "muted";
+          statusLine.id = "proposalStatus-" + (p.id || "");
+          statusLine.textContent = localStorage.getItem("agingos_proposal_status_" + (p.id || "")) || "Status: (ingen)";
+          div.appendChild(statusLine);
+        if (Array.isArray(p.because) && p.because.length) {
+          const ul = document.createElement("ul");
+          for (const item of p.because) {
+            const li = document.createElement("li");
+            li.textContent = item;
+            ul.appendChild(li);
+          }
+          div.appendChild(ul);
+        }
+
+        const actions = document.createElement("div");
+        actions.className = "actions";
+        const a = document.createElement("a");
+        a.href = buildEvidenceLink(p);
+        a.textContent = "Vis grunnlag (events)";
+        actions.appendChild(a);
+
+        console.log("PROPOSAL ACTIONS", p.id, p.lifecycle.actions);
+
+        if (p.lifecycle && Array.isArray(p.lifecycle.actions) && p.lifecycle.actions.length) {
+          const btnWrap = document.createElement("div");
+          btnWrap.style.marginTop = "6px";
+          for (const act of p.lifecycle.actions) {
+            const b = document.createElement("button");
+            b.textContent = act.label || act.action;
+            b.addEventListener("click", async () => {
+              b.disabled = true;
+              try {
+                const res = console.log("CLICK PROPOSAL", p.id, "action=", act.action);
+                  await createRuleFromProposal(p, act.action);
+                  try {
+                    const el = document.getElementById("proposalStatus-" + (p.id || ""));
+                    if (el) {
+                      const label = (act.action === "activate") ? "Aktivert" : ((act.action === "reject") ? "Avvist" : "Test startet");
+                      const iso = (res && (res.created_at || res.updated_at)) ? (res.created_at || res.updated_at) : null;
+                      const d = iso ? new Date(iso) : new Date();
+                      const ts = d.toLocaleDateString("nb-NO") + " - " + d.toLocaleTimeString("nb-NO", { hour12: false });
+                      el.textContent = label + " " + ts;
+                      try { localStorage.setItem("agingos_proposal_status_" + (p.id || ""), el.textContent); } catch (e) {}
+
+                    }
+                  } catch (e) {}
+                  await refresh();
+              } catch (e) {
+                alert("Feil: " + e.message);
+              } finally {
+                b.disabled = false;
+              }
+            });
+            btnWrap.appendChild(b);
+          }
+          actions.appendChild(btnWrap);
+        }
+
+        div.appendChild(actions);
+
+        host.appendChild(div);
+      }
+    }
+
+    async function refresh() {
       function setNote(id, note) {
         const el = $(id);
         if (!el) return;
@@ -477,8 +551,8 @@ const actions = document.createElement("div");
         } else {
           el.style.display = "none";
           el.textContent = "";
-          }
         }
+      }
 
       $("aiStatus").textContent = "Laster...";
       $("insightsList").textContent = "Laster...";
@@ -494,7 +568,7 @@ const actions = document.createElement("div");
         $("aiStatus").textContent = JSON.stringify(status, null, 2);
       } catch (e) {
         $("aiStatus").textContent = "Feil: " + e.message;
-        }
+      }
 
       // Insights
       try {
@@ -504,7 +578,7 @@ const actions = document.createElement("div");
       } catch (e) {
         $("insightsList").textContent = "Feil: " + e.message;
         setNote("insightsNote", "");
-        }
+      }
 
       // Anomalies (with existing QS knobs)
       const qs = [];
@@ -520,30 +594,35 @@ const actions = document.createElement("div");
       if (a_floor) qs.push("meaningful_recent_floor=" + encodeURIComponent(a_floor));
       if (a_min) qs.push("min_abs_increase=" + encodeURIComponent(a_min));
       if (a_z) qs.push("z_threshold=" + encodeURIComponent(a_z));
-      const anomaliesPath = qs.length ? ("/ai/anomalies?" + qs.join("&")) : "/ai/anomalies";
+      const baseAnom = "last=7d&min_level=YELLOW";
+      const anomaliesPath = qs.length ? ("/anomalies?" + baseAnom + "&" + qs.join("&")) : ("/anomalies?" + baseAnom);
       try {
-        const anomalies = await apiGet(anomaliesPath);
-        renderAnomalies(anomalies);
+        const anomalies = await apiGet(anomaliesPath);        renderAnomalies(anomalies);
         setNote("anomaliesNote", anomalies && anomalies.note ? anomalies.note : "");
       } catch (e) {
         $("anomaliesList").textContent = "Feil: " + e.message;
         setNote("anomaliesNote", "");
-        }
+      }
 
       // Proposals (re-use anomaly qs + deterministic test mode)
       const pqs = qs.slice();
-        // (test mode) removed hardcoded until; keep only relaxed thresholds
-
-              const proposalsPath = pqs.length ? ("/ai/proposals?" + pqs.join("&")) : "/ai/proposals";
-        try {
-          const proposals = await apiGet(proposalsPath);
-          renderProposals(proposals);
-          setNote("proposalsNote", proposals && proposals.note ? proposals.note : "");
-        } catch (e) {
+      const proposalsTest = (($("proposalsTest") && $("proposalsTest").checked) || ((localStorage.getItem("agingos_proposals_test") || "0") === "1"));
+      if (proposalsTest) {
+        pqs.push("until=2026-01-24T07:00:00Z");
+        pqs.push("meaningful_recent_floor=0");
+        pqs.push("min_abs_increase=0");
+        pqs.push("z_threshold=0");
+        pqs.push("quiet_min_room_baseline_mean=0");
+      }
+      const proposalsPath = pqs.length ? ("/ai/proposals?" + pqs.join("&")) : "/ai/proposals";      try {
+        const proposals = await apiGet(proposalsPath);
+        renderProposals(proposals);
+        setNote("proposalsNote", proposals && proposals.note ? proposals.note : "");
+      } catch (e) {
         $("proposalsList").textContent = "Feil: " + e.message;
         setNote("proposalsNote", "");
-        }
       }
+    }
 
     function syncAnomalyRoomToQS() {
       const v = ($("anomalyRoom").value || "").trim();
@@ -554,22 +633,38 @@ const actions = document.createElement("div");
       window.history.replaceState({}, "", newUrl);
     }
 
+    $("saveBtn").addEventListener("click", () => { saveSettings(); refresh(); });
+    $("refreshBtn").addEventListener("click", () => { syncAnomalyRoomToQS(); refresh(); });
 
-      window.addEventListener("load", () => {
-        loadSettings();
-        $("saveBtn").addEventListener("click", () => { saveSettings(); refresh(); });
-        $("refreshBtn").addEventListener("click", () => {
-  try {
-    syncAnomalyRoomToQS();
-    const r = refresh();
-    if (r && typeof r.catch === "function") r.catch(e => { console.error("[UI] refresh() failed", e); $("aiStatus").textContent = "Feil i refresh(): " + (e && e.message ? e.message : String(e)); });
-  } catch (e) {
-    console.error("[UI] refresh() threw", e);
-    $("aiStatus").textContent = "Feil i refresh(): " + (e && e.message ? e.message : String(e));
-  }
-});
-        refresh();
-      });
+    loadSettings();
+  
+    // --- Systemstatus (vNext minimal) ---
+    async function refreshSystemStatus() {
+      try {
+        const out = {};
+        out.health = await apiGet("/health");
+        try { out.scheduler_jobs = await apiGet("/anomalies/scheduler_jobs"); } catch (e) { out.scheduler_jobs_error = String(e); }
+        try { out.runner_status = await apiGet("/anomalies/runner_status"); } catch (e) { out.runner_status_error = String(e); }
+        try { out.ai_status = await apiGet("/ai/status"); } catch (e) { out.ai_status_error = String(e); }
+        $("sysStatus").textContent = JSON.stringify(out, null, 2);
+      } catch (e) {
+        $("sysStatus").textContent = "Feil: " + (e.message || String(e));
+      }
+    }
+
+    if ($("refreshStatusBtn")) $("refreshStatusBtn").onclick = () => refreshSystemStatus();
+
+    if ($("runAnomLatestBtn")) $("runAnomLatestBtn").onclick = async () => {
+      try {
+        $("sysStatus").textContent = "Kjører anomalier...";
+        const out = await apiSend("POST", "/anomalies/run_latest", {});
+        $("sysStatus").textContent = "OK:\n" + JSON.stringify(out, null, 2);
+      } catch (e) {
+        $("sysStatus").textContent = "Feil ved /anomalies/run_latest: " + (e.message || String(e));
+      }
+      try { await refreshSystemStatus(); } catch (_) {}
+    };
+
 </script>
 <section id="agingos-observability" style="margin:16px;padding:12px;border:1px solid #ddd;border-radius:8px;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif">
   <h2 style="margin:0 0 8px 0;font-size:16px">AgingOS observability</h2>
@@ -584,125 +679,149 @@ const actions = document.createElement("div");
     <div style="font-size:13px;margin-bottom:6px"><b>Live feed</b> (siste 10)</div>
     <pre id="ao-feed" style="margin:0;padding:10px;background:#fafafa;border:1px solid #eee;border-radius:6px;max-height:260px;overflow:auto;font-size:12px;line-height:1.35"></pre>
   </div>
-    <div style="margin-top:10px">
-      <div style="font-size:13px;margin-bottom:6px"><b>Events per rom</b></div>
-      <pre id="ao-roomstats" style="margin:0;padding:10px;background:#fafafa;border:1px solid #eee;border-radius:6px;max-height:260px;overflow:auto;font-size:12px;line-height:1.35"></pre>
-    </div>
 </section>
 
 <script>
-  // AO_OBS_FIX_V1: Robust observability (ES5/promise; no async/await, no optional chaining)
-  (function(){
-    function $(id){ return document.getElementById(id); }
-    function setText(id, txt){
-      var el = $(id);
-      if (el) el.textContent = (txt === undefined || txt === null) ? "" : String(txt);
-    }
-    function fmt(s){ return s ? String(s) : "-"; }
+// AO_OBS_FIX_V1: Robust observability (ES5/promise; no async/await, no optional chaining)
+(function(){
+  function $(id){ return document.getElementById(id); }
+  function setText(id, txt){
+    var el = $(id);
+    if (el) el.textContent = (txt === undefined || txt === null) ? "" : String(txt);
+  }
+  function fmt(s){ return s ? String(s) : "-"; }
 
-    function fetchJson(url, key){
-      var headers = key ? { "X-API-Key": key } : {};
-      return fetch(url, { headers: headers }).then(function(r){
-        if (!r.ok) throw new Error(url + " -> " + r.status);
-        return r.json();
-      });
-    }
-
-    function sinceIso(mins){
-      return new Date(Date.now() - mins*60*1000).toISOString();
-    }
-
-    function countSince(events, iso){
-      var t0 = Date.parse(iso);
-      var n = 0;
-      for (var i=0; i<(events||[]).length; i++){
-        var ts = Date.parse(events[i] && events[i].timestamp);
-        if (!Number.isNaN(ts) && ts >= t0) n++;
-      }
-      return n;
-    }
-
-    function fmtShort(iso){
-      if (!iso) return "-";
-      var d = new Date(iso);
-      if (isNaN(d.getTime())) return String(iso);
-      return d.toLocaleString("nb-NO", { timeZone:"Europe/Oslo", day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit" });
-    }
-
-    function tick(){
-      var keyEl = document.getElementById("apiKey");
-      var key = (keyEl && keyEl.value) ? keyEl.value : (localStorage.getItem("agingos_api_key") || "");
-
-      fetchJson("/api/health", key).then(function(){
-        setText("ao-backend", "OK");
-      }).catch(function(){
-        setText("ao-backend", "FEIL");
-      });
-
-      fetchJson("/api/ai/status", key).then(function(st){
-        var ok = st && st.enabled && st.reachable;
-        var txt = ok ? "OK" : (st && st.enabled ? "ENABLED, MEN IKKE REACHABLE" : "DISABLED");
-        setText("ao-ai", txt);
-      }).catch(function(){
-        setText("ao-ai", "FEIL");
-      });
-
-      fetchJson("/api/events?limit=200", key).then(function(events){
-        var last = (events && events.length) ? events[0] : null;
-        setText("ao-last-ts", last ? fmt(last.timestamp) : "(ingen)");
-        setText("ao-c5", String(countSince(events, sinceIso(5))));
-        setText("ao-c60", String(countSince(events, sinceIso(60))));
-
-        // live feed (10)
-        var lines = [];
-        for (var i=0; i<Math.min(10, (events||[]).length); i++){
-          var e = events[i] || {};
-          var payload = e.payload || {};
-          var room = (payload.room || payload.area) ? (payload.room || payload.area) : "-";
-          lines.push(fmt(e.timestamp) + "  " + fmt(e.category) + "  room=" + room + "  id=" + fmt(e.id));
-        }
-        setText("ao-feed", lines.join("\n"));
-
-        // per-room stats
-        var byRoom = {};
-        for (var j=0; j<(events||[]).length; j++){
-          var evj = events[j] || {};
-          var plj = evj.payload || {};
-          var rname = (plj.room || plj.area) ? (plj.room || plj.area) : "-";
-          var tms = Date.parse(evj.timestamp);
-          if (!byRoom[rname]) byRoom[rname] = { n: 0, min: null, max: null, minIso: "", maxIso: "" };
-          byRoom[rname].n += 1;
-          if (!Number.isNaN(tms)) {
-            if (byRoom[rname].min === null || tms < byRoom[rname].min) { byRoom[rname].min = tms; byRoom[rname].minIso = evj.timestamp; }
-            if (byRoom[rname].max === null || tms > byRoom[rname].max) { byRoom[rname].max = tms; byRoom[rname].maxIso = evj.timestamp; }
-          }
-        }
-        var rooms = Object.keys(byRoom).sort();
-        var out = [];
-        for (var k=0; k<rooms.length; k++){
-          var rn = rooms[k];
-          var it = byRoom[rn];
-          out.push(rn + ": " + it.n + " | siste: <" + fmtShort(it.maxIso) + "> | første: <" + fmtShort(it.minIso) + ">");
-        }
-        setText("ao-roomstats", out.join("\n"));
-
-      }).catch(function(){
-        setText("ao-last-ts", "?");
-        setText("ao-c5", "?");
-        setText("ao-c60", "?");
-        setText("ao-feed", "Kunne ikke hente /api/events (sjekk API-key / proxy).");
-        setText("ao-roomstats", "");
-      });
-    }
-
-    window.addEventListener("load", function(){
-      try { tick(); } catch(_) {}
-      setInterval(function(){ try { tick(); } catch(_) {} }, 5000);
+  function fetchJson(url, key){
+    var headers = key ? { "X-API-Key": key } : {};
+    return fetch(url, { headers: headers }).then(function(r){
+      if (!r.ok) throw new Error(url + " -> " + r.status);
+      return r.json();
     });
-  })();
-  </script>
+  }
 
-  <script>
+  function sinceIso(mins){
+    return new Date(Date.now() - mins*60*1000).toISOString();
+  }
+
+  function countSince(events, iso){
+    var t0 = Date.parse(iso);
+    var n = 0;
+    for (var i=0; i<(events||[]).length; i++){
+      var ts = Date.parse(events[i] && events[i].timestamp);
+      if (!Number.isNaN(ts) && ts >= t0) n++;
+    }
+    return n;
+  }
+
+  function tick(){
+    var keyEl = document.getElementById("apiKey");
+    var key = (keyEl && keyEl.value) ? keyEl.value : (localStorage.getItem("agingos_api_key") || "");
+
+    fetchJson("/api/health", key).then(function(){
+      setText("ao-backend", "OK");
+    }).catch(function(){
+      setText("ao-backend", "FEIL");
+    });
+
+    fetchJson("/api/ai/status", key).then(function(st){
+      var ok = st && st.enabled && st.reachable;
+      var txt = ok ? "OK" : (st && st.enabled ? "ENABLED, MEN IKKE REACHABLE" : "DISABLED");
+      setText("ao-ai", txt);
+    }).catch(function(){
+      setText("ao-ai", "FEIL");
+    });
+
+    fetchJson("/api/events?limit=50", key).then(function(events){
+      var last = (events && events.length) ? events[0] : null;
+      setText("ao-last-ts", last ? fmt(last.timestamp) : "(ingen)");
+      setText("ao-c5", String(countSince(events, sinceIso(5))));
+      setText("ao-c60", String(countSince(events, sinceIso(60))));
+
+      var lines = [];
+      for (var i=0; i<Math.min(10, (events||[]).length); i++){
+        var e = events[i] || {};
+        var payload = e.payload || {};
+        var room = (payload.room || payload.area) ? (payload.room || payload.area) : "-";
+        lines.push(fmt(e.timestamp) + "  " + fmt(e.category) + "  room=" + room + "  id=" + fmt(e.id));
+      }
+      setText("ao-feed", lines.join("\n"));
+    }).catch(function(){
+      setText("ao-last-ts", "?");
+      setText("ao-c5", "?");
+      setText("ao-c60", "?");
+      setText("ao-feed", "Kunne ikke hente /api/events (sjekk API-key / proxy).");
+    });
+  }
+
+  window.addEventListener("load", function(){
+    try { tick(); } catch(_) {}
+    setInterval(function(){ try { tick(); } catch(_) {} }, 5000);
+  });
+})();
+</script>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const fmt = (s) => (s ? String(s) : "-");
+  const sinceIso = (mins) => new Date(Date.now() - mins*60*1000).toISOString();
+
+  async function fetchJson(url){
+    const key = (document.getElementById("apiKey") && document.getElementById("apiKey").value) || localStorage.getItem("agingos_api_key") || "";
+    const headers = key ? { "X-API-Key": key } : {};
+    const r = await fetch(url, { headers });
+    if (!r.ok) throw new Error(url + " -> " + r.status);
+    return await r.json();
+  }
+
+  function countSince(events, iso){
+    const t0 = Date.parse(iso);
+    let n = 0;
+    for (const e of events){
+      const ts = Date.parse(e.timestamp);
+      if (!Number.isNaN(ts) && ts >= t0) n++;
+    }
+    return n;
+  }
+
+  async function tick(){
+    try {
+      await fetchJson("/api/health");
+      $("ao-backend").textContent = "OK";
+    } catch (e) {
+      $("ao-backend").textContent = "FEIL";
+    }
+
+    try {
+      const st = await fetchJson("/api/ai/status");
+      $("ao-ai").textContent = (st.enabled && st.reachable) ? "OK" : (st.enabled ? "ENABLED, MEN IKKE REACHABLE" : "DISABLED");
+    } catch (e) {
+      $("ao-ai").textContent = "FEIL";
+    }
+
+    try {
+      const events = await fetchJson("/api/events?limit=50");
+      const last = (events && events.length) ? events[0] : null;
+      $("ao-last-ts").textContent = last ? fmt(last.timestamp) : "(ingen)";
+      $("ao-c5").textContent = String(countSince(events, sinceIso(5)));
+      $("ao-c60").textContent = String(countSince(events, sinceIso(60)));
+      const lines = (events || []).slice(0, 10).map(e => {
+        const room = e.payload && (e.payload.room || e.payload.area) ? (e.payload.room || e.payload.area) : "-";
+        return `${e.timestamp}  ${e.category}  room=${room}  id=${e.id}`;
+      });
+      $("ao-feed").textContent = lines.join("\n");
+    } catch (e) {
+      $("ao-last-ts").textContent = "?";
+      $("ao-c5").textContent = "?";
+      $("ao-c60").textContent = "?";
+      $("ao-feed").textContent = "Kunne ikke hente /api/events (sjekk API-key / proxy).";
+    }
+  }
+
+  tick();
+  setInterval(tick, 5000);
+})();
+
   // --- Rules UI (GET /rules) ---
   (function () {
     function $(id) { return document.getElementById(id); }
@@ -714,6 +833,7 @@ const actions = document.createElement("div");
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+    }
 
     function formatOslo(iso) {
       if (!iso) return "";
@@ -728,22 +848,27 @@ const actions = document.createElement("div");
         minute: "2-digit",
         second: "2-digit",
       });
+    }
 
     function pickRoom(rule) {
       var p = (rule && rule.params) ? rule.params : {};
       var rd = (p && p.rule_draft) ? p.rule_draft : {};
       return (p.room || rd.room || "");
+    }
 
     function pickStatus(rule) {
       var p = (rule && rule.params) ? rule.params : {};
       return (p.proposal_status || "");
+    }
 
     function renderList(targetEl, htmlList) {
       if (!targetEl) return;
       if (!htmlList || !htmlList.length) {
         targetEl.innerHTML = '<p class="muted">Ingen</p>';
         return;
+      }
       targetEl.innerHTML = '<div class="rules-grid">' + htmlList.join("") + "</div>";
+    }
 
     function fmtRule(r) {
       var name = (r && r.name) ? r.name : "";
@@ -771,6 +896,7 @@ const actions = document.createElement("div");
           metaHtml +
         "</div>"
       );
+    }
 
     async function loadRules() {
       var err = $("rules-error");
@@ -785,13 +911,15 @@ const actions = document.createElement("div");
         if (err) {
           err.style.display = "block";
           err.textContent = "Rules UI: Mangler #rules-active/#rules-testing/#rules-other i HTML.";
+        }
         return;
+      }
 
       if (err) { err.style.display = "none"; err.textContent = ""; }
 
       try {
         var qsKey = new URLSearchParams(window.location.search).get("api_key");
-        var key = (qsKey && qsKey.trim()) ? qsKey.trim() :s*"";
+        var key = (qsKey && qsKey.trim()) ? qsKey.trim() : "dev-key-2";
 
         var resp = await fetch("/rules", { headers: { "X-API-Key": key } });
         if (resp.status === 401 || resp.status === 403) resp = await fetch("/rules");
@@ -817,9 +945,12 @@ const actions = document.createElement("div");
         if (err) {
           err.style.display = "block";
           err.textContent = "Kunne ikke hente regler: " + (e && e.message ? e.message : String(e));
+        }
         renderList(activeEl, []);
         renderList(testingEl, []);
         renderList(otherEl, []);
+      }
+    }
 
     window.addEventListener("load", function () {
       try { loadRules(); } catch (_) {}
