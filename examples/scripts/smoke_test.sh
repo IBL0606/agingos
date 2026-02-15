@@ -36,7 +36,7 @@ for i in $(seq 1 30); do
   sleep 1
 done
   # (Safety) NEVER clear real events unless explicitly requested
-  if [[ "-e" == "1" ]]; then
+  if [[ "${SMOKE_TRUNCATE:-0}" == "1" ]]; then
     echo "WARN: SMOKE_TRUNCATE=1 -> TRUNCATE events"
     docker compose exec -T db psql -U agingos -d agingos -c "TRUNCATE TABLE events;" >/dev/null || true
   else
@@ -46,7 +46,7 @@ done
 # 1) Health
 echo "[1/8] GET /health"
 health_json=""
-for i in 1 2 3 4 5 6 7 8 9 10; do
+for ((i=1; i<=10; i++)); do
   health_json="$(curl -sS "${API_KEY_HEADER[@]}" "$BASE_URL/health" || true)"
   echo "$health_json" | grep -q '"status"' && break
   sleep 0.5

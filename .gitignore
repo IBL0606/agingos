@@ -36,3 +36,29 @@ _handoff/
 *.bak.*
 index.html
 ps.txt
+
+# Local env / venv / tooling caches
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.cache/
+
+# Snapshots / dumps / evidence artifacts
+evidence/
+_specdump_*/
+specdump_*.tgz
+*_snapshot_*.tgz
+full_snapshot_*.tgz
+source_snapshot_*.tgz
+
+# Local working dirs
+agingos_env/
+
+# Backup files created by patch scripts
+*.bak
+*.bak_*
