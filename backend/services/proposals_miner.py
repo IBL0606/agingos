@@ -230,7 +230,9 @@ def mine_proposals(db: Session, *, now: datetime | None = None) -> dict[str, Any
           SELECT
             (peak_bucket_details->>'user_id') AS subject_id,
             start_ts,
-            reasons
+            reasons,
+            reasons_last,
+            COALESCE((peak_bucket_details->'observed'->>'door_obs')::int, 0) AS door_obs_peak
           FROM anomaly_episodes
           WHERE start_ts >= (now() - interval '14 days')
             AND peak_bucket_details ? 'user_id'
@@ -241,10 +243,13 @@ def mine_proposals(db: Session, *, now: datetime | None = None) -> dict[str, Any
             (start_ts AT TIME ZONE 'Europe/Oslo')::date AS local_date,
             COUNT(*)::int AS cnt
           FROM ae
-          WHERE EXISTS (
-            SELECT 1
-            FROM jsonb_array_elements(COALESCE(reasons, '[]'::jsonb)) elem
-            WHERE (elem->>'reason_code') LIKE 'EVENT_DOOR%'
+          WHERE (
+            door_obs_peak > 0
+            OR EXISTS (
+              SELECT 1
+              FROM jsonb_array_elements(COALESCE(reasons_last, reasons, '[]'::jsonb)) elem
+              WHERE (elem->>'reason_code') LIKE 'EVENT_DOOR%'
+            )
           )
           GROUP BY 1,2
         ),
@@ -320,7 +325,7 @@ def mine_proposals(db: Session, *, now: datetime | None = None) -> dict[str, Any
         FROM anomaly_episodes
         WHERE start_ts >= (now() - interval '7 days')
           AND peak_bucket_details ? 'user_id'
-          AND level >= 2
+          AND level >= 1
         GROUP BY 1
         HAVING COUNT(*) >= 1
         ;
@@ -334,15 +339,15 @@ def mine_proposals(db: Session, *, now: datetime | None = None) -> dict[str, Any
         anomaly_count = int(r["anomaly_count"])
         evidence = {
             "window_days": 7,
-            "level_min": 2,
+            "level_min": 1,
             "anomaly_count": anomaly_count,
             "last_ts": (r["last_ts"].isoformat() if r["last_ts"] else None),
-            "mvp_bootstrap": True,
+            "bootstrap": True,
         }
         why = [
             {
-                "reason_code": "MVP_BOOTSTRAP_ANY_L2_1_OF_7",
-                "text": "Bootstrap-proposal for å teste lifecycle/API/UI: minst én L2+ anomaly siste 7 dager.",
+                "reason_code": "BOOTSTRAP_MONITORING_TEST",
+                "text": "Testforslag: sett overvåkning til TEST for å verifisere forslag/tiltak-flyt i pilot.",
                 "weight": 1.0,
                 "data": {"anomaly_count": anomaly_count},
             }
@@ -352,8 +357,8 @@ def mine_proposals(db: Session, *, now: datetime | None = None) -> dict[str, Any
             org_id=org_id,
             subject_id=subject_id,
             room_id=None,
-            proposal_type="MVP_BOOTSTRAP_ANY_L2_1_OF_7",
-            dedupe_key="mvp_bootstrap:any_l2",
+            proposal_type="BOOTSTRAP_MONITORING_TEST",
+            dedupe_key="bootstrap:monitoring_test",
             priority=10,
             evidence=evidence,
             why=why,

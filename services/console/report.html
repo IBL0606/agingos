@@ -1,0 +1,1097 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AgingOS Console — Rapport</title>
+  <style>
+  /* THEME_TOKENS_V1 (source: proposals.html) */
+  :root{
+    --bg:#0b0f14;
+    --fg:#e6edf3;
+    --muted:#9fb0c0;
+    --link:#7ee787;
+    --card:#0f1620;
+    --border:#1f2a37;
+    --border2:#30363d;
+    --shadow:0 8px 20px rgba(0,0,0,0.25);
+    --primary:#1f6feb;
+    --secondary:#30363d;
+    --ok:#238636;
+    --deg:#d29922;
+    --err:#da3633;
+  }
+
+  body{
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    margin: 16px;
+    max-width: 1400px;
+    background: var(--bg);
+    color: var(--fg);
+  }
+  /* Center wide layouts */
+  @media (min-width: 900px){
+    body{ margin-left:auto; margin-right:auto; }
+  }
+
+  a{ color: var(--link); }
+  .row{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+  @media (max-width: 980px){ .grid2{ grid-template-columns: 1fr; } }
+
+  .card{
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: var(--shadow);
+  }
+  .muted{ color: var(--muted); font-size: 14px; }
+
+  .pill{
+    display:inline-block;
+    padding:2px 8px;
+    border-radius:999px;
+    border:1px solid var(--border2);
+    background: rgba(255,255,255,0.06);
+    font-size:12px;
+  }
+
+  button{
+    background: var(--primary);
+    color: white;
+    border: 0;
+    padding: 8px 10px;
+    border-radius: 12px;
+    cursor: pointer;
+  }
+  button.secondary{ background: var(--secondary); }
+  button:disabled{ opacity:0.5; cursor:not-allowed; }
+
+  input, select{
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    padding: 6px 8px;
+  }
+
+  table{ width:100%; border-collapse: collapse; }
+  th, td{ padding:8px; border-bottom: 1px solid var(--border); vertical-align: top; text-align:left; }
+  th{ color: var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:0.02em; background: transparent; }
+
+  pre{
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 10px;
+    border-radius: 12px;
+    overflow:auto;
+  }
+
+  .notice{
+    margin: 8px 0 12px;
+    padding: 10px 12px;
+    border:1px solid rgba(210,153,34,0.55);
+    background: rgba(210,153,34,0.10);
+    border-radius: 12px;
+    font-size: 13px;
+    display:none;
+    color: var(--fg);
+  }
+
+  /* Make the Step-8 topbar match proposals theme */
+  .topbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:12px;
+    margin:0 0 12px;
+    padding:10px 12px;
+    border:1px solid var(--border);
+    border-radius:12px;
+    background: var(--card);
+    box-shadow: var(--shadow);
+  }
+  .topbar-title{ font-weight:700; color: var(--fg); }
+  .nav{ margin-top:4px; display:flex; gap:10px; flex-wrap:wrap; font-size:13px; }
+  .navlink{ color: var(--link); text-decoration:none; }
+  .navlink.active{ font-weight:700; text-decoration:underline; }
+  .topbar-right{ display:flex; align-items:center; gap:8px; font-size:12px; color: var(--muted); flex-wrap:wrap; justify-content:flex-end; }
+  @media (max-width: 900px){ .topbar{flex-direction:column;align-items:stretch} .topbar-right{justify-content:flex-start} }
+
+  /* Common chips (anomalies/report) */
+  .statuschip{
+    display:inline-flex;
+    gap:6px;
+    align-items:center;
+    padding:6px 10px;
+    border:1px solid var(--border);
+    border-radius:999px;
+    background: rgba(255,255,255,0.04);
+    font-size:13px;
+  }
+
+  /* Report warnbox */
+  .warnbox{
+    margin-top:10px;
+    padding:8px 10px;
+    border:1px solid rgba(210,153,34,0.55);
+    background: rgba(210,153,34,0.10);
+    border-radius: 12px;
+    font-size:12px;
+  }
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 16px; max-width: 1400px; background: var(--bg); color: var(--fg); }
+    .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+    .card { border: 1px solid var(--border); border-radius: 12px; padding: 14px; flex: 1; min-width: 340px; }
+    .muted { color: var(--muted); font-size: 14px; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,0.06); font-size: 12px; }
+    label { display: inline-block; width: 150px; }
+    input { padding: 6px 8px; width: 360px; max-width: 100%; }
+    button { padding: 7px 10px; cursor: pointer; }
+    pre { background: var(--card); border: 1px solid var(--border); padding: 10px; border-radius: 8px; overflow:auto; }
+    h2 { margin-top: 0; }
+    a { text-decoration: none; }
+    .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 980px) { .grid2 { grid-template-columns: 1fr; } }
+    .kv { display:grid; grid-template-columns: 220px 1fr; row-gap: 6px; column-gap: 10px; align-items:baseline; }
+    .k { color: var(--muted); font-size: 13px; }
+    .v { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+    .smallbtn { padding: 6px 9px; font-size: 13px; }
+    .statusbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin: 10px 0 16px; }
+    .statuschip { display:inline-flex; gap:6px; align-items:center; padding: 6px 10px; border:1px solid var(--border); border-radius: 999px; background:var(--card); font-size: 13px; }
+    .dot { width: 10px; height: 10px; border-radius: 999px; background: rgba(255,255,255,0.18); display:inline-block; }
+    .dot.ok { background: var(--ok); }
+    .dot.deg { background: var(--deg); }
+    .dot.err { background: var(--err); }
+    .details summary { cursor:pointer; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid var(--border); padding: 6px 8px; font-size: 13px; text-align: left; }
+    th { background: transparent; }
+    .warnbox { margin-top:10px; padding:8px 10px; border:1px solid rgba(210,153,34,0.55); background:rgba(210,153,34,0.10); border-radius:8px; font-size:12px; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  
+      /* Step 8 (Nav/IA/UX): consistent topbar/nav */
+      .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin:0 0 12px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--card);}
+      .topbar-title{font-weight:700;}
+      .nav{margin-top:4px;display:flex;gap:10px;flex-wrap:wrap;font-size:14px;}
+      .navlink{color:var(--link);text-decoration:none;}
+      .navlink.active{font-weight:700;text-decoration:underline;}
+      .topbar-right{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);}
+      @media (max-width: 700px){.topbar{flex-direction:column;align-items:stretch}.topbar-right{justify-content:flex-start}}
+
+
+      /* REPORT_NOTICE_V1: clear empty/auth state */
+      .notice { margin: 8px 0 12px; padding: 10px 12px; border:1px solid rgba(210,153,34,0.55); background:rgba(210,153,34,0.10); border-radius:10px; font-size:13px; display:none; }
+
+  /* LEGACY_CSS_TOKENIZED_V1 */
+</style>
+</head>
+<body>
+  <div class="topbar">
+      <div>
+        <div class="topbar-title">AgingOS Console</div>
+        
+
+    <div class="notice" id="globalNotice">—</div>
+<div class="nav">
+          <a class="navlink" href="./index.html">Status</a>
+          <a class="navlink" href="./events.html">Events</a>
+          <a class="navlink" href="./anomalies.html">Anomalier</a>
+          <a class="navlink" href="./proposals.html">Proposals</a>
+          <a class="navlink active" href="./report.html">Rapport</a>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <span class="pill" id="apiMini">API: —</span>
+      </div>
+    </div>
+
+<h1>Ukentlig rapport</h1>
+  <p class="muted">
+    Henter snapshot fra API og genererer <b>Driftpakke v0</b> (JSON) med ærlige felter (kun det vi faktisk kan hente).
+  </p>
+
+  <div class="statusbar">
+    <span class="statuschip"><span class="dot" id="dotSystem"></span><span>SYSTEM</span><span class="pill" id="stSystem">ukjent</span></span>
+    <span class="statuschip"><span class="dot" id="dotBackend"></span><span>Backend</span><span class="pill" id="stBackend">ukjent</span></span>
+    <span class="statuschip"><span class="dot" id="dotCoverage"></span><span>Coverage</span><span class="pill" id="stCoverage">ukjent</span></span>
+    <span class="statuschip"><span class="dot" id="dotRunner"></span><span>Runner</span><span class="pill" id="stRunner">ukjent</span></span>
+    <span class="statuschip"><span class="dot" id="dotBaseline"></span><span>Baseline</span><span class="pill" id="stBaseline">ukjent</span></span>
+    <span class="statuschip"><span class="dot" id="dotAI"></span><span>AI</span><span class="pill" id="stAI">ukjent</span></span>
+    <button class="smallbtn" id="refreshBtn" type="button">Oppdater rapport</button>
+    <button class="smallbtn" id="exportBtn" type="button">Last ned driftpakke (JSON)</button>
+  </div>
+
+  <div class="card">
+    <div><span class="pill">Tilkobling</span></div>
+    <p>
+      <label>API Base:</label>
+      <input id="apiBase" value="/api" />
+    </p>
+    <p>
+      <label>X-API-Key:</label>
+      <input id="apiKey" placeholder="sett X-API-Key" />
+      <button id="saveBtn" type="button">Lagre</button>
+    </p>
+    <div class="muted">localStorage: <code>agingos_api_base</code>, <code>agingos_api_key</code></div>
+    <div class="muted" id="authLine">Auth: —</div>
+  </div>
+
+  <div class="row">
+    <div class="card">
+      <h2>Terskler (UI-knobs)</h2>
+      <div class="muted">Brukes av rapport/warnings (ikke backend). Kan også overstyres med URL-parametre.</div>
+
+      <div style="margin-top:10px" class="kv">
+        <div class="k">Expected rooms</div><div class="v"><input id="expectedRooms" placeholder="f.eks: soverom,baderom,stue" /></div>
+
+        <div class="k">min_events_24h</div><div class="v"><input id="thrMin24h" placeholder="5" /></div>
+        <div class="k">stale_event_minutes</div><div class="v"><input id="thrStaleEventMin" placeholder="60" /></div>
+        <div class="k">runner_stale_minutes</div><div class="v"><input id="thrRunnerStaleMin" placeholder="10" /></div>
+        <div class="k">baseline_cov_min</div><div class="v"><input id="thrBaselineCovMin" placeholder="0.2" /></div>
+        <div class="k">events_limit</div><div class="v"><input id="thrEventsLimit" placeholder="200" /></div>
+      </div>
+
+      <div style="margin-top:10px">
+        <button class="smallbtn" id="saveThrBtn" type="button">Lagre terskler</button>
+      </div>
+
+      <div class="muted" style="margin-top:8px">
+        localStorage: <code>agingos_expected_rooms</code>, <code>agingos_report_thresholds_v0</code>
+      </div>
+
+      <div class="warnbox" id="thrInfo" style="display:none"></div>
+    </div>
+
+    <div class="card">
+      <h2>Oppsummering</h2>
+      <div class="muted">Warnings er grunnlaget for driftpakke v0.</div>
+      <div class="warnbox" id="warningsBox">Trykk “Oppdater rapport”.</div>
+      <details class="details" style="margin-top:10px" open>
+        <summary>Snapshot (JSON)</summary>
+        <pre id="snapshotOut">{}</pre>
+      </details>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="card">
+      <h2>Coverage (ingest per rom)</h2>
+      <div class="muted">Beregnes fra <code>/api/events?limit=N</code>. Room = payload.room fallback payload.area.</div>
+
+      <div class="kv" style="margin-top:10px">
+        <div class="k">Rooms seen</div><div class="v" id="covRoomsSeen">—</div>
+        <div class="k">Rooms expected</div><div class="v" id="covRoomsExpected">—</div>
+        <div class="k">Missing expected</div><div class="v" id="covRoomsMissing">—</div>
+        <div class="k">Unknown room events</div><div class="v" id="covUnknown">—</div>
+      </div>
+
+      <div style="margin-top:10px; overflow:auto; max-height:360px">
+        <table>
+          <thead><tr><th>Rom</th><th>Last seen</th><th>5m</th><th>60m</th><th>24h</th></tr></thead>
+          <tbody id="covTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Baseline</h2>
+      <div class="muted">Global status fra <code>/api/baseline/status</code> + per-rom summary fra <code>/api/baseline</code>.</div>
+
+      <div class="kv" style="margin-top:10px">
+        <div class="k">Global</div><div class="v" id="baseGlobal">—</div>
+        <div class="k">Model window</div><div class="v" id="baseWindow">—</div>
+        <div class="k">Days with data</div><div class="v" id="baseDays">—</div>
+        <div class="k">Coverage (room_bucket)</div><div class="v" id="baseCovRb">—</div>
+        <div class="k">Coverage (transition)</div><div class="v" id="baseCovTr">—</div>
+      </div>
+
+      <div style="margin-top:10px; overflow:auto; max-height:360px">
+        <table>
+          <thead><tr><th>Rom</th><th>Rows</th><th>Supported</th><th>Act median</th><th>Door median</th><th>support_days max</th></tr></thead>
+          <tbody id="baseTbody"></tbody>
+        </table>
+      </div>
+
+      <div class="muted" id="baseMsg" style="margin-top:10px">—</div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="card">
+      <h2>Anomali-runner</h2>
+      <div class="muted">GET <code>/api/anomalies/runner_status</code></div>
+
+      <div class="kv" style="margin-top:10px">
+        <div class="k">last_run_at</div><div class="v" id="rsLastRun">—</div>
+        <div class="k">last_ok_at</div><div class="v" id="rsLastOk">—</div>
+        <div class="k">last_error_at</div><div class="v" id="rsLastErrAt">—</div>
+        <div class="k">last_error_msg</div><div class="v" id="rsLastErrMsg">—</div>
+        <div class="k">last_scored_bucket_start</div><div class="v" id="rsLastBucket">—</div>
+      </div>
+
+      <div class="muted" style="margin-top:10px">Siste counts</div>
+      <div class="kv" style="margin-top:6px">
+        <div class="k">OPEN</div><div class="v" id="rsOpen">—</div>
+        <div class="k">UPDATE</div><div class="v" id="rsUpdate">—</div>
+        <div class="k">CLOSE</div><div class="v" id="rsClose">—</div>
+        <div class="k">NOOP</div><div class="v" id="rsNoop">—</div>
+        <div class="k">ERROR</div><div class="v" id="rsErr">—</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>AI-status</h2>
+      <div class="muted">GET <code>/api/ai/status</code> (AI offline => DEGRADED, ikke ERROR)</div>
+      <details class="details" style="margin-top:10px" open>
+        <summary>ai/status (JSON)</summary>
+        <pre id="aiOut">{}</pre>
+      </details>
+      <div class="muted" id="aiMsg" style="margin-top:8px">—</div>
+    </div>
+  </div>
+
+<script>
+  // TOPBAR_API_MINI v1
+
+  // REPORT_NOTICE_V1
+  function _reportUpdateNotice() {
+    const el = document.getElementById("globalNotice");
+    if (!el) return;
+    const key = _topbarGetApiKey();
+    if (!key) {
+      el.style.display = "block";
+      el.textContent = "Mangler X-API-Key. Sett nøkkel på Status-siden (/) og trykk “Lagre”.";
+      return;
+    }
+    el.style.display = "none";
+    el.textContent = "";
+  }
+
+  function _topbarGetApiBase() {
+    try {
+      const el = document.getElementById("apiBase");
+      if (el && el.value) return String(el.value).trim().replace(/\/+$/, "");
+    } catch(e) {}
+    try { return String(localStorage.getItem("agingos_api_base") || localStorage.getItem("apiBase") || "/api").trim().replace(/\/+$/, ""); }
+    catch(e) { return "/api"; }
+  }
+  function _topbarGetApiKey() {
+    try {
+      const el = document.getElementById("apiKey");
+      if (el && el.value) return String(el.value).trim();
+    } catch(e) {}
+    try { return String(localStorage.getItem("agingos_api_key") || localStorage.getItem("apiKey") || "").trim(); }
+    catch(e) { return ""; }
+  }
+  function _topbarUpdateApiMini() {
+    const el = document.getElementById("apiMini");
+    if (!el) return;
+    const base = _topbarGetApiBase();
+    const key  = _topbarGetApiKey();
+    el.textContent = "API: " + base + " | key: " + (key ? "SET" : "NOT SET");
+  }
+  (function(){
+    try { _topbarUpdateApiMini(); } catch(e) {}
+    try { _reportUpdateNotice(); } catch(e) {}
+    ["apiBase","apiKey"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener("input", () => { try { _topbarUpdateApiMini(); } catch(e) {} });
+      el.addEventListener("change", () => { try { _topbarUpdateApiMini(); } catch(e) {} });
+    });
+    window.addEventListener("storage", (ev) => {
+      const k = ev && ev.key ? String(ev.key) : "";
+      if (!k) return;
+      if (k.startsWith("agingos_api_") || k === "apiBase" || k === "apiKey") {
+        try { _topbarUpdateApiMini(); } catch(e) {}
+      }
+    });
+    setTimeout(() => { try { _topbarUpdateApiMini(); } catch(e) {} }, 0);
+  })();
+
+  const $ = (id) => document.getElementById(id);
+
+  function fmtUtc(iso) {
+    if (!iso) return "—";
+    const t = String(iso).replace("Z","").replace("T"," ");
+    return t.length >= 19 ? t.slice(0,19) : (t.length >= 16 ? t.slice(0,16) : t);
+  }
+
+  function setChip(which, level, text) {
+    const dot = $("dot" + which);
+    const pill = $("st" + which);
+    dot.classList.remove("ok","deg","err");
+    if (level === "ok") dot.classList.add("ok");
+    else if (level === "deg") dot.classList.add("deg");
+    else if (level === "err") dot.classList.add("err");
+    pill.textContent = text;
+  }
+
+  function getQS(name) {
+    const v = new URLSearchParams(window.location.search).get(name);
+    return (v && v.trim()) ? v.trim() : null;
+  }
+
+  function loadSettings() {
+    const apiBase = localStorage.getItem("agingos_api_base") || localStorage.getItem("apiBase") || $("apiBase").value;
+    const apiKey  = localStorage.getItem("agingos_api_key")  || localStorage.getItem("apiKey")  || "";
+    $("apiBase").value = apiBase;
+    $("apiKey").value = apiKey;
+    updateAuthLine();
+
+    const exp = localStorage.getItem("agingos_expected_rooms") || "";
+    $("expectedRooms").value = exp;
+
+    const raw = localStorage.getItem("agingos_report_thresholds_v0");
+    let t = {};
+    try { t = raw ? JSON.parse(raw) : {}; } catch (_) { t = {}; }
+
+    // defaults
+    $("thrMin24h").value = String(t.min_events_24h ?? "5");
+    $("thrStaleEventMin").value = String(t.stale_event_minutes ?? "60");
+    $("thrRunnerStaleMin").value = String(t.runner_stale_minutes ?? "10");
+    $("thrBaselineCovMin").value = String(t.baseline_cov_min ?? "0.2");
+    $("thrEventsLimit").value = String(t.events_limit ?? "200");
+
+    applyQSOverrides();
+  }
+
+  function applyQSOverrides() {
+    // URL knobs (weekly tuning)
+    const map = [
+      ["min24h", "thrMin24h"],
+      ["staleEventMin", "thrStaleEventMin"],
+      ["runnerStaleMin", "thrRunnerStaleMin"],
+      ["baselineCovMin", "thrBaselineCovMin"],
+      ["eventsLimit", "thrEventsLimit"],
+    ];
+    const applied = [];
+    for (const [q, id] of map) {
+      const v = getQS(q);
+      if (v != null) { $(id).value = v; applied.push(q + "=" + v); }
+    }
+    if (applied.length) {
+      const box = $("thrInfo");
+      box.style.display = "block";
+      box.textContent = "URL overrides: " + applied.join(", ");
+    }
+  }
+
+  function saveSettings() {
+    localStorage.setItem("agingos_api_base", $("apiBase").value.trim());
+    localStorage.setItem("agingos_api_key", $("apiKey").value.trim());
+    // kompat
+    localStorage.setItem("apiBase", $("apiBase").value.trim());
+    localStorage.setItem("apiKey", $("apiKey").value.trim());
+    updateAuthLine();
+  }
+
+  function saveThresholds() {
+    localStorage.setItem("agingos_expected_rooms", $("expectedRooms").value.trim());
+    const t = {
+      min_events_24h: Number($("thrMin24h").value),
+      stale_event_minutes: Number($("thrStaleEventMin").value),
+      runner_stale_minutes: Number($("thrRunnerStaleMin").value),
+      baseline_cov_min: Number($("thrBaselineCovMin").value),
+      events_limit: Number($("thrEventsLimit").value),
+    };
+    localStorage.setItem("agingos_report_thresholds_v0", JSON.stringify(t));
+    const box = $("thrInfo");
+    box.style.display = "block";
+    box.textContent = "Lagret terskler.";
+  }
+
+  function updateAuthLine() {
+    const key = $("apiKey").value.trim();
+    $("authLine").textContent = "Auth: X-API-Key " + (key ? "SET" : "NOT SET");
+  }
+
+  async function fetchRaw(path, headers) {
+    const base = $("apiBase").value.trim().replace(/\/$/, "");
+    const res = await fetch(base + path, { headers: headers || {} });
+    const ct = (res.headers.get("content-type") || "").toLowerCase();
+    const text = await res.text();
+    return { ok: res.ok, status: res.status, statusText: res.statusText || "", ct, text };
+  }
+
+  async function apiGet(path) {
+    const key = $("apiKey").value.trim();
+    const headers = key ? { "X-API-Key": key } : {};
+    const rr = await fetchRaw(path, headers);
+    if (!rr.ok) {
+      let msg = `${path} -> ${rr.status} ${rr.statusText}`.trim();
+      if (rr.ct.includes("application/json")) {
+        try {
+          const j = JSON.parse(rr.text);
+          const d = (j && (j.detail || j.message || j.error)) ? (j.detail || j.message || j.error) : null;
+          if (d) msg += ` (${typeof d === "string" ? d : JSON.stringify(d)})`;
+        } catch (_) {}
+      }
+      throw new Error(msg);
+    }
+    try { return JSON.parse(rr.text); }
+    catch (_) { throw new Error(`${path} -> invalid JSON (${rr.ct || "unknown content-type"})`); }
+  }
+
+  function parseRoomFromEvent(ev) {
+    const p = ev && ev.payload ? ev.payload : {};
+    const r = (p && (p.room || p.area)) ? String(p.room || p.area).trim() : "";
+    return r ? r : "(ukjent rom)";
+  }
+
+  function parseEventTs(ev) {
+    const cand = (ev && (ev.timestamp || ev.ts || ev.time || ev.created_at)) ? (ev.timestamp || ev.ts || ev.time || ev.created_at) : null;
+    if (!cand) return null;
+    const t = Date.parse(String(cand));
+    return Number.isFinite(t) ? t : null;
+  }
+
+  function loadThresholds() {
+    const raw = localStorage.getItem("agingos_report_thresholds_v0");
+    let t = {};
+    try { t = raw ? JSON.parse(raw) : {}; } catch (_) { t = {}; }
+    // Effective thresholds are UI fields (possibly URL overridden)
+    return {
+      min_events_24h: Number($("thrMin24h").value || (t.min_events_24h ?? 5)),
+      stale_event_minutes: Number($("thrStaleEventMin").value || (t.stale_event_minutes ?? 60)),
+      runner_stale_minutes: Number($("thrRunnerStaleMin").value || (t.runner_stale_minutes ?? 10)),
+      baseline_cov_min: Number($("thrBaselineCovMin").value || (t.baseline_cov_min ?? 0.2)),
+      events_limit: Number($("thrEventsLimit").value || (t.events_limit ?? 200)),
+    };
+  }
+
+  function expectedRoomsList() {
+    const raw = (localStorage.getItem("agingos_expected_rooms") || $("expectedRooms").value || "").trim();
+    if (!raw) return [];
+    return raw.split(",").map(s => s.trim()).filter(Boolean);
+  }
+
+  async function detectAuthMode() {
+    // Try /health WITHOUT key. If ok => auth off. If 401 => api_key. Else unknown.
+    try {
+      const rr = await fetchRaw("/health", {}); // no headers
+      if (rr.ok) return "off";
+      if (rr.status === 401) return "api_key";
+      return "unknown";
+    } catch (_) {
+      return "unknown";
+    }
+  }
+
+  function renderCoverageTable(perRoom) {
+    const tbody = $("covTbody");
+    tbody.innerHTML = "";
+    const rooms = Object.keys(perRoom).sort((a,b) => a.localeCompare(b));
+    for (const room of rooms) {
+      const r = perRoom[room];
+      const tr = document.createElement("tr");
+      const tdR = document.createElement("td"); tdR.textContent = room;
+      const tdL = document.createElement("td"); tdL.textContent = r.last_seen ? fmtUtc(r.last_seen) : "—";
+      const td5 = document.createElement("td"); td5.textContent = String(r.c5m ?? 0);
+      const td60 = document.createElement("td"); td60.textContent = String(r.c60m ?? 0);
+      const td24 = document.createElement("td"); td24.textContent = String(r.c24h ?? 0);
+      tr.appendChild(tdR); tr.appendChild(tdL); tr.appendChild(td5); tr.appendChild(td60); tr.appendChild(td24);
+      tbody.appendChild(tr);
+    }
+  }
+
+  function renderBaselineTable(rows) {
+    const tbody = $("baseTbody");
+    tbody.innerHTML = "";
+    const sorted = rows.slice().sort((a,b) => String(a.room_id||"").localeCompare(String(b.room_id||"")));
+    for (const r of sorted) {
+      const tr = document.createElement("tr");
+      const tdRoom = document.createElement("td"); tdRoom.textContent = r.room_id || "(ukjent)";
+      const tdRows = document.createElement("td"); tdRows.textContent = (r.n_rows ?? "—");
+      const tdSupp = document.createElement("td"); tdSupp.textContent = (r.n_rows_supported ?? r.supported_rows ?? "—");
+      const tdAct = document.createElement("td"); tdAct.textContent = (r.activity_median ?? "—");
+      const tdDoor = document.createElement("td"); tdDoor.textContent = (r.door_median ?? "—");
+      const tdDays = document.createElement("td"); tdDays.textContent = (r.support_days_max ?? r.supportDaysMax ?? "—");
+      tr.appendChild(tdRoom); tr.appendChild(tdRows); tr.appendChild(tdSupp); tr.appendChild(tdAct); tr.appendChild(tdDoor); tr.appendChild(tdDays);
+      tbody.appendChild(tr);
+    }
+  }
+
+  function calcRunnerOk(rs, thr) {
+    if (!rs) return { ok:false, degraded:true, reason:"runner_status_missing" };
+    if (rs.last_error_at || rs.last_error_msg) return { ok:false, degraded:true, reason:"runner_error_recent" };
+    const t = rs.last_run_at ? Date.parse(rs.last_run_at) : NaN;
+    if (!Number.isFinite(t)) return { ok:false, degraded:true, reason:"runner_last_run_unknown" };
+    const ageMin = (Date.now() - t) / 60000.0;
+    if (ageMin > thr.runner_stale_minutes) return { ok:false, degraded:true, reason:"runner_stale" };
+    return { ok:true, degraded:false, reason:null };
+  }
+
+  function calcCoverageOk(cov, thr, expected) {
+    if (!cov) return { ok:false, degraded:true, reason:"coverage_missing" };
+    if (!expected.length) return { ok:false, degraded:true, reason:"expected_rooms_not_set" };
+
+    // For each expected: must have last_seen not stale and c24h >= min_events_24h
+    const staleMs = thr.stale_event_minutes * 60000;
+    const now = Date.now();
+    for (const room of expected) {
+      const r = cov.per_room[room];
+      if (!r) return { ok:false, degraded:true, reason:"missing_expected_room_events" };
+      const t = r.last_seen ? Date.parse(r.last_seen) : NaN;
+      if (!Number.isFinite(t)) return { ok:false, degraded:true, reason:"expected_room_last_seen_unknown" };
+      if ((now - t) > staleMs) return { ok:false, degraded:true, reason:"expected_room_stale" };
+      if ((r.c24h ?? 0) < thr.min_events_24h) return { ok:false, degraded:true, reason:"expected_room_low_24h" };
+    }
+    return { ok:true, degraded:false, reason:null };
+  }
+
+  function calcBaselineOk(bs, br, thr, expected) {
+    // bs: baseline/status, br: baseline details (per-room)
+    if (!bs) return { ok:false, degraded:true, reason:"baseline_status_missing" };
+
+    // baseline_ready flag lives under status.baseline_ready per earlier tests
+    const ready = (bs && bs.status && typeof bs.status.baseline_ready === "boolean") ? bs.status.baseline_ready : null;
+    // removed invalid placeholder (was: is False)
+
+    // We'll compute in JS without python placeholders:
+    return { ok:false, degraded:true, reason:"baseline_unknown" };
+  }
+
+  function computeWarnings(ctx) {
+    const w = [];
+    if (!ctx.api_key_set) w.push("api_key_not_set");
+    if (!ctx.backend_ok) w.push("backend_unreachable_or_unauthorized");
+
+    if (ctx.auth_mode && ctx.auth_mode === "unknown") w.push("auth_mode_unknown");
+
+    if (!ctx.expected_rooms.length) w.push("expected_rooms_not_set");
+    if (ctx.coverage && ctx.coverage.unknown_room_events > 0) w.push("unknown_room_events_present");
+
+    if (ctx.runner && (ctx.runner.last_error_at || ctx.runner.last_error_msg)) w.push("runner_error_recent");
+    if (ctx.runner_stale) w.push("runner_stale");
+
+    if (ctx.coverage_degraded_reason) w.push("coverage_degraded:" + ctx.coverage_degraded_reason);
+
+    if (ctx.baseline_degraded_reason) w.push("baseline_degraded:" + ctx.baseline_degraded_reason);
+
+    if (ctx.ai_degraded_reason) w.push("ai_degraded:" + ctx.ai_degraded_reason);
+
+    return w;
+  }
+
+  function asBool(v) { return !!v; }
+
+  // NOTE: we implement baseline evaluation in refreshAll() (needs parsed bs + per-room list)
+  function evaluateBaseline(bs, baselineRows, thr, expected) {
+    if (!bs) return { ok:false, degraded:true, reason:"baseline_status_missing" };
+
+    // Global ready
+    const ready = (bs.status && typeof bs.status.baseline_ready === "boolean") ? bs.status.baseline_ready : null;
+    // removed invalid placeholder (was: is False)
+    return { ok:false, degraded:true, reason:"baseline_unknown" };
+  }
+
+  async function refreshAll() {
+    // Init chips
+    setChip("System", "deg", "ukjent");
+    setChip("Backend", "deg", "ukjent");
+    setChip("Coverage", "deg", "ukjent");
+    setChip("Runner", "deg", "ukjent");
+    setChip("Baseline", "deg", "ukjent");
+    setChip("AI", "deg", "ukjent");
+
+    const thr = loadThresholds();
+    const expected = expectedRoomsList();
+
+    const ctx = {
+      generated_at: new Date().toISOString(),
+      api_base: $("apiBase").value.trim(),
+      api_key_set: !!$("apiKey").value.trim(),
+      expected_rooms: expected,
+      thresholds: thr,
+      auth_mode: "unknown",
+      backend_ok: false,
+      runner: null,
+      runner_stale: false,
+      coverage: null,
+      baseline_status: null,
+      baseline_rows: [],
+      ai_status: null,
+      errors: {}
+    };
+
+    // Detect auth_mode (best-effort)
+    ctx.auth_mode = await detectAuthMode();
+
+    // Backend health (required)
+    let health = null;
+    try {
+      health = await apiGet("/health");
+      ctx.backend_ok = true;
+      setChip("Backend", "ok", "OK");
+    } catch (e) {
+      ctx.errors.health = String(e.message || e);
+      setChip("Backend", "err", "ERROR");
+      setChip("System", "err", "ERROR");
+      $("warningsBox").textContent = "ERROR: " + ctx.errors.health;
+      $("snapshotOut").textContent = JSON.stringify(ctx, null, 2);
+      return ctx;
+    }
+
+    // Runner status
+    let rs = null;
+    try {
+      rs = await apiGet("/anomalies/runner_status");
+      ctx.runner = rs;
+
+      $("rsLastRun").textContent = fmtUtc(rs.last_run_at);
+      $("rsLastOk").textContent = fmtUtc(rs.last_ok_at);
+      $("rsLastErrAt").textContent = fmtUtc(rs.last_error_at);
+      $("rsLastErrMsg").textContent = (rs.last_error_msg || "—");
+      $("rsLastBucket").textContent = fmtUtc(rs.last_scored_bucket_start);
+
+      const c = rs.last_counts || {};
+      $("rsOpen").textContent = (c.OPEN ?? "—");
+      $("rsUpdate").textContent = (c.UPDATE ?? "—");
+      $("rsClose").textContent = (c.CLOSE ?? "—");
+      $("rsNoop").textContent = (c.NOOP ?? "—");
+      $("rsErr").textContent = (c.ERROR ?? "—");
+
+      const rsev = calcRunnerOk(rs, thr);
+      ctx.runner_stale = (rsev.reason === "runner_stale");
+      if (rsev.ok) setChip("Runner", "ok", "OK");
+      else setChip("Runner", "deg", "DEGRADED");
+    } catch (e) {
+      ctx.errors.runner_status = String(e.message || e);
+      setChip("Runner", "deg", "DEGRADED");
+    }
+
+    // AI status (optional; offline => degraded)
+    try {
+      const ai = await apiGet("/ai/status");
+      ctx.ai_status = ai;
+      $("aiOut").textContent = JSON.stringify(ai, null, 2);
+
+      // heuristic: if ai.enabled false OR ai.status indicates offline/disabled => degraded
+      const enabled = (ai && typeof ai.enabled === "boolean") ? ai.enabled : null;
+      const st = (ai && ai.status) ? String(ai.status).toLowerCase() : "";
+      let aiDeg = false;
+      let aiReason = null;
+      // removed invalid placeholder (was: is False)
+      if (enabled === false) { aiDeg = true; aiReason = "ai_disabled"; }
+      // removed invalid placeholder (was: pythonic and/or)
+      // Fix without pythonic ops:
+      if (!aiDeg && st && (st.includes("off") || st.includes("disabled") || st.includes("down"))) { aiDeg = true; aiReason = "ai_offline"; }
+
+      if (aiDeg) {
+        setChip("AI", "deg", "DEGRADED");
+        $("aiMsg").textContent = "AI: " + aiReason;
+        ctx.ai_degraded_reason = aiReason;
+      } else {
+        setChip("AI", "ok", "OK");
+        $("aiMsg").textContent = "AI: OK";
+      }
+    } catch (e) {
+      ctx.errors.ai_status = String(e.message || e);
+      $("aiOut").textContent = "{}";
+      $("aiMsg").textContent = "AI: utilgjengelig (DEGRADED)";
+      setChip("AI", "deg", "DEGRADED");
+      ctx.ai_degraded_reason = "ai_status_unavailable";
+    }
+
+    // Events coverage
+    let events = [];
+    try {
+      const ev = await apiGet("/events?limit=" + encodeURIComponent(String(thr.events_limit)));
+      // backend seems to return list; keep it flexible
+      events = Array.isArray(ev) ? ev : (ev && Array.isArray(ev.events) ? ev.events : []);
+    } catch (e) {
+      ctx.errors.events = String(e.message || e);
+      events = [];
+    }
+
+    const now = Date.now();
+    const per_room = {};
+    let unknown = 0;
+
+    for (const ev of events) {
+      const room = parseRoomFromEvent(ev);
+      if (room === "(ukjent rom)") unknown += 1;
+
+      const ts = parseEventTs(ev);
+      if (!per_room[room]) per_room[room] = { last_seen: null, c5m: 0, c60m: 0, c24h: 0 };
+      if (ts != null) {
+        // windows
+        if ((now - ts) <= 5*60*1000) per_room[room].c5m += 1;
+        if ((now - ts) <= 60*60*1000) per_room[room].c60m += 1;
+        if ((now - ts) <= 24*60*60*1000) per_room[room].c24h += 1;
+        // last seen
+        const cur = per_room[room].last_seen ? Date.parse(per_room[room].last_seen) : NaN;
+      }
+    }
+    // Fix last_seen handling without python NaN
+    for (const ev of events) {
+      const room = parseRoomFromEvent(ev);
+      const ts = parseEventTs(ev);
+      if (ts == null) continue;
+      const prev = per_room[room].last_seen ? Date.parse(per_room[room].last_seen) : NaN;
+      if (!Number.isFinite(prev) || ts > prev) per_room[room].last_seen = new Date(ts).toISOString();
+    }
+
+    const roomsSeen = Object.keys(per_room).filter(r => r !== "(ukjent rom)").sort();
+    const missingExpected = expected.filter(r => !per_room[r]);
+
+    ctx.coverage = {
+      rooms_seen: roomsSeen,
+      rooms_expected: expected,
+      missing_expected: missingExpected,
+      unknown_room_events: unknown,
+      per_room: per_room
+    };
+
+    $("covRoomsSeen").textContent = roomsSeen.length ? roomsSeen.join(", ") : "—";
+    $("covRoomsExpected").textContent = expected.length ? expected.join(", ") : "—";
+    $("covRoomsMissing").textContent = missingExpected.length ? missingExpected.join(", ") : "(ingen)";
+    $("covUnknown").textContent = String(unknown);
+
+    renderCoverageTable(per_room);
+
+    const covEval = calcCoverageOk(ctx.coverage, thr, expected);
+    if (covEval.ok) setChip("Coverage", "ok", "OK");
+    else setChip("Coverage", "deg", "DEGRADED");
+    ctx.coverage_degraded_reason = covEval.reason;
+
+    // Baseline (status + per-room)
+    let bs = null;
+    let br = null;
+    let baselineBucketRows = [];
+    try { bs = await apiGet("/baseline/status"); } catch (e) { ctx.errors.baseline_status = String(e.message || e); }
+    // Fetch baseline rows (avoid rooms= param; backend currently rejects it).
+    // Use baseline_status.room_bucket_rows to pull enough rows, with a hard cap.
+    const rbTotal = (bs && typeof bs.room_bucket_rows === "number") ? bs.room_bucket_rows :
+      (bs && bs.status && typeof bs.status.room_bucket_rows === "number") ? bs.status.room_bucket_rows : null;
+    const wanted = rbTotal ? Math.min(Math.max(500, rbTotal), 5000) : 2000;
+    try { br = await apiGet("/baseline?limit=" + encodeURIComponent(String(wanted))); } catch (e) { ctx.errors.baseline = String(e.message || e); }
+
+    ctx.baseline_status = bs;
+
+    // Render global baseline (supports both flat and nested shapes)
+    const bsReady =
+      (bs && typeof bs.baseline_ready === "boolean") ? bs.baseline_ready :
+      (bs && bs.status && typeof bs.status.baseline_ready === "boolean") ? bs.status.baseline_ready : null;
+
+    const bsModelStart =
+      (bs && bs.model_start) ? bs.model_start :
+      (bs && bs.status && bs.status.model_start) ? bs.status.model_start : null;
+
+    const bsModelEnd =
+      (bs && bs.model_end) ? bs.model_end :
+      (bs && bs.status && bs.status.model_end) ? bs.status.model_end : null;
+
+    const bsDaysWithData =
+      (bs && bs.days_with_data != null) ? bs.days_with_data :
+      (bs && bs.status && bs.status.days_with_data != null) ? bs.status.days_with_data : null;
+
+    const bsMinDays =
+      (bs && bs.min_days_required != null) ? bs.min_days_required :
+      (bs && bs.status && bs.status.min_days_required != null) ? bs.status.min_days_required : null;
+
+    const bsCovRb =
+      (bs && bs.coverage && bs.coverage.room_bucket != null) ? Number(bs.coverage.room_bucket) :
+      (bs && bs.coverage_room_bucket != null) ? Number(bs.coverage_room_bucket) :
+      (bs && bs.status && bs.status.coverage_room_bucket != null) ? Number(bs.status.coverage_room_bucket) :
+      (bs && bs.status && bs.status.coverage && bs.status.coverage.room_bucket != null) ? Number(bs.status.coverage.room_bucket) :
+      null;
+
+    const bsCovTr =
+      (bs && bs.coverage && bs.coverage.transition != null) ? Number(bs.coverage.transition) :
+      (bs && bs.coverage_transition != null) ? Number(bs.coverage_transition) :
+      (bs && bs.status && bs.status.coverage_transition != null) ? Number(bs.status.coverage_transition) :
+      (bs && bs.status && bs.status.coverage && bs.status.coverage.transition != null) ? Number(bs.status.coverage.transition) :
+      null;
+
+    $("baseGlobal").textContent = (bsReady === true) ? "READY" : (bsReady === false ? "NOT READY" : "UNKNOWN");
+    $("baseWindow").textContent = (bsModelStart && bsModelEnd) ? (String(bsModelStart) + " → " + String(bsModelEnd)) : "—";
+    $("baseDays").textContent = (bsDaysWithData != null) ? String(bsDaysWithData) : "—";
+    // We keep these two fields in the UI, even if they are null
+    $("baseCovRb").textContent = (bsCovRb != null && Number.isFinite(bsCovRb)) ? String(bsCovRb) : "—";
+    $("baseCovTr").textContent = (bsCovTr != null && Number.isFinite(bsCovTr)) ? String(bsCovTr) : "—";
+
+    // Parse /baseline payload (dict with baseline_room_bucket[] expected)
+    if (br && typeof br === "object" && Array.isArray(br.baseline_room_bucket)) {
+      baselineBucketRows = br.baseline_room_bucket;
+    } else if (Array.isArray(br)) {
+      // fallback: if backend ever returns list directly
+      baselineBucketRows = br;
+    } else if (br && typeof br === "object" && Array.isArray(br.rows)) {
+      baselineBucketRows = br.rows;
+    } else {
+      baselineBucketRows = [];
+    }
+
+    // Aggregate baseline_room_bucket -> per-room summary (derived, but honest: from API rows)
+    function median(arr) {
+      const xs = arr.filter(x => typeof x === "number" && Number.isFinite(x)).slice().sort((a,b) => a-b);
+      if (!xs.length) return null;
+      const mid = Math.floor(xs.length / 2);
+      return (xs.length % 2) ? xs[mid] : ((xs[mid-1] + xs[mid]) / 2.0);
+    }
+
+    const byRoom = new Map();
+    for (const row of baselineBucketRows) {
+      if (!row || typeof row !== "object") continue;
+      const room = (row.room_id != null && String(row.room_id).trim()) ? String(row.room_id).trim() : "(ukjent)";
+      if (!byRoom.has(room)) {
+        byRoom.set(room, { room_id: room, n_rows: 0, n_rows_supported: 0, _act: [], _door: [], support_days_max: 0 });
+      }
+      const agg = byRoom.get(room);
+      agg.n_rows += 1;
+
+      const asn = Number(row.activity_support_n || 0);
+      const dsn = Number(row.door_support_n || 0);
+      if ((Number.isFinite(asn) && asn > 0) || (Number.isFinite(dsn) && dsn > 0)) agg.n_rows_supported += 1;
+
+      if (typeof row.activity_median === "number" && Number.isFinite(row.activity_median)) agg._act.push(row.activity_median);
+      if (typeof row.door_median === "number" && Number.isFinite(row.door_median)) agg._door.push(row.door_median);
+
+      const asd = Number(row.activity_support_days || 0);
+      const dsd = Number(row.door_support_days || 0);
+      const sd = Math.max(Number.isFinite(asd) ? asd : 0, Number.isFinite(dsd) ? dsd : 0);
+      if (sd > agg.support_days_max) agg.support_days_max = sd;
+    }
+
+    const norm = [];
+    for (const agg of byRoom.values()) {
+      norm.push({
+        room_id: agg.room_id,
+        n_rows: agg.n_rows,
+        n_rows_supported: agg.n_rows_supported,
+        activity_median: median(agg._act),
+        door_median: median(agg._door),
+        support_days_max: agg.support_days_max
+      });
+    }
+
+    ctx.baseline_rows = norm;
+    renderBaselineTable(norm);
+
+    // Evaluate baseline degraded/ok (pilot rules)
+    let baselineOk2 = false;
+    let baselineReason = null;
+
+    if (bsReady === false) {
+      baselineOk2 = false;
+      baselineReason = "baseline_not_ready";
+    } else if (bsReady === true) {
+      if (Number.isFinite(bsCovRb) && bsCovRb < thr.baseline_cov_min) {
+        baselineOk2 = false;
+        baselineReason = "baseline_low_coverage_room_bucket";
+      } else if (expected.length) {
+        const have = new Set(norm.map(x => String(x.room_id || "").trim()).filter(Boolean));
+        const missing = expected.filter(r => !have.has(r));
+        if (missing.length) {
+          baselineOk2 = false;
+          baselineReason = "baseline_missing_expected";
+        } else {
+          baselineOk2 = true;
+          baselineReason = null;
+        }
+      } else {
+        baselineOk2 = false;
+        baselineReason = "expected_rooms_not_set";
+      }
+    } else {
+      baselineOk2 = false;
+      baselineReason = "baseline_unknown";
+    }
+
+    if (baselineOk2) setChip("Baseline", "ok", "OK");
+    else setChip("Baseline", "deg", "DEGRADED");
+    ctx.baseline_degraded_reason = baselineReason;
+    $("baseMsg").textContent = baselineOk2 ? "Baseline OK." : ("Baseline: " + (baselineReason || "DEGRADED"));
+
+// System evaluation
+    // ERROR only if backend fails (already returned early); otherwise OK if backend ok + coverage ok + runner ok.
+    const runnerEval = calcRunnerOk(rs, thr);
+    const ok = ctx.backend_ok && covEval.ok && runnerEval.ok;
+    const anyDegraded = (!covEval.ok) || (!runnerEval.ok) || (!baselineOk2) || (!!ctx.ai_degraded_reason);
+    if (ok && !anyDegraded) setChip("System", "ok", "OK");
+    else setChip("System", "deg", "DEGRADED");
+
+    // Warnings + snapshot
+    const warnings = computeWarnings(ctx);
+    ctx.warnings = warnings;
+    $("warningsBox").textContent = warnings.length ? ("warnings: " + warnings.join(", ")) : "Ingen warnings.";
+
+    // Driftpakke v0 snapshot
+    const drift = {
+      schema: "driftpakke_v0",
+      generated_at: ctx.generated_at,
+      console: {
+        page: "report",
+        version: "unknown",
+        build_id: "unknown"
+      },
+      config: {
+        api_base: ctx.api_base,
+        auth_mode_detected: ctx.auth_mode,
+        api_key_set: ctx.api_key_set,
+        expected_rooms: ctx.expected_rooms,
+        thresholds: ctx.thresholds
+      },
+      status: {
+        health: health,
+        ai_status: ctx.ai_status,
+        runner_status: ctx.runner,
+        baseline_status: ctx.baseline_status
+      },
+      coverage: ctx.coverage,
+      baseline_summary: ctx.baseline_rows,
+      errors: ctx.errors,
+      warnings: warnings
+    };
+
+    window.__driftpakke_v0 = drift;
+    $("snapshotOut").textContent = JSON.stringify(drift, null, 2);
+    return drift;
+  }
+
+  function downloadJson(obj, filename) {
+    const data = JSON.stringify(obj, null, 2);
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+
+  function exportDriftpakke() {
+    const obj = window.__driftpakke_v0;
+    if (!obj) {
+      $("warningsBox").textContent = "Ingen snapshot ennå. Trykk “Oppdater rapport” først.";
+      return;
+    }
+    const ts = new Date().toISOString().replaceAll(":","").replaceAll("-","").replace(".","").replace("Z","Z");
+    downloadJson(obj, "agingos_driftpakke_" + ts + ".json");
+  }
+
+  window.addEventListener("DOMContentLoaded", () => {
+    loadSettings();
+    $("saveBtn").addEventListener("click", saveSettings);
+    $("saveThrBtn").addEventListener("click", saveThresholds);
+    $("refreshBtn").addEventListener("click", () => refreshAll().catch(e => {
+      $("warningsBox").textContent = "ERROR: " + String(e.message || e);
+    }));
+    $("exportBtn").addEventListener("click", exportDriftpakke);
+
+    // auto refresh
+    refreshAll().catch(e => {
+      $("warningsBox").textContent = "ERROR: " + String(e.message || e);
+      setChip("Backend","err","ERROR");
+      setChip("System","err","ERROR");
+    });
+  });
+</script>
+
+</body>
+</html>

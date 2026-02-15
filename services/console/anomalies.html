@@ -1,0 +1,774 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AgingOS Console — Anomalier</title>
+  <style>
+  /* THEME_TOKENS_V1 (source: proposals.html) */
+  :root{
+    --bg:#0b0f14;
+    --fg:#e6edf3;
+    --muted:#9fb0c0;
+    --link:#7ee787;
+    --card:#0f1620;
+    --border:#1f2a37;
+    --border2:#30363d;
+    --shadow:0 8px 20px rgba(0,0,0,0.25);
+    --primary:#1f6feb;
+    --secondary:#30363d;
+    --ok:#238636;
+    --deg:#d29922;
+    --err:#da3633;
+  }
+
+  body{
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    margin: 16px;
+    max-width: 1400px;
+    background: var(--bg);
+    color: var(--fg);
+  }
+  /* Center wide layouts */
+  @media (min-width: 900px){
+    body{ margin-left:auto; margin-right:auto; }
+  }
+
+  a{ color: var(--link); }
+  .row{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+  @media (max-width: 980px){ .grid2{ grid-template-columns: 1fr; } }
+
+  .card{
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: var(--shadow);
+  }
+  .muted{ color: var(--muted); font-size: 14px; }
+
+  .pill{
+    display:inline-block;
+    padding:2px 8px;
+    border-radius:999px;
+    border:1px solid var(--border2);
+    background: rgba(255,255,255,0.06);
+    font-size:12px;
+  }
+
+  button{
+    background: var(--primary);
+    color: white;
+    border: 0;
+    padding: 8px 10px;
+    border-radius: 12px;
+    cursor: pointer;
+  }
+  button.secondary{ background: var(--secondary); }
+  button:disabled{ opacity:0.5; cursor:not-allowed; }
+
+  input, select{
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    padding: 6px 8px;
+  }
+
+  table{ width:100%; border-collapse: collapse; }
+  th, td{ padding:8px; border-bottom: 1px solid var(--border); vertical-align: top; text-align:left; }
+  th{ color: var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:0.02em; background: transparent; }
+
+  pre{
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 10px;
+    border-radius: 12px;
+    overflow:auto;
+  }
+
+  .notice{
+    margin: 8px 0 12px;
+    padding: 10px 12px;
+    border:1px solid rgba(210,153,34,0.55);
+    background: rgba(210,153,34,0.10);
+    border-radius: 12px;
+    font-size: 13px;
+    display:none;
+    color: var(--fg);
+  }
+
+  /* Make the Step-8 topbar match proposals theme */
+  .topbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:12px;
+    margin:0 0 12px;
+    padding:10px 12px;
+    border:1px solid var(--border);
+    border-radius:12px;
+    background: var(--card);
+    box-shadow: var(--shadow);
+  }
+  .topbar-title{ font-weight:700; color: var(--fg); }
+  .nav{ margin-top:4px; display:flex; gap:10px; flex-wrap:wrap; font-size:13px; }
+  .navlink{ color: var(--link); text-decoration:none; }
+  .navlink.active{ font-weight:700; text-decoration:underline; }
+  .topbar-right{ display:flex; align-items:center; gap:8px; font-size:12px; color: var(--muted); flex-wrap:wrap; justify-content:flex-end; }
+  @media (max-width: 900px){ .topbar{flex-direction:column;align-items:stretch} .topbar-right{justify-content:flex-start} }
+
+  /* Common chips (anomalies/report) */
+  .statuschip{
+    display:inline-flex;
+    gap:6px;
+    align-items:center;
+    padding:6px 10px;
+    border:1px solid var(--border);
+    border-radius:999px;
+    background: rgba(255,255,255,0.04);
+    font-size:13px;
+  }
+
+  /* Report warnbox */
+  .warnbox{
+    margin-top:10px;
+    padding:8px 10px;
+    border:1px solid rgba(210,153,34,0.55);
+    background: rgba(210,153,34,0.10);
+    border-radius: 12px;
+    font-size:12px;
+  }
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 16px; max-width: 1400px; background: var(--bg); color: var(--fg); }
+    .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+    .card { border: 1px solid var(--border); border-radius: 12px; padding: 14px; flex: 1; min-width: 320px; }
+    .muted { color: var(--muted); font-size: 14px; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,0.06); font-size: 12px; }
+    label { display: inline-block; width: 110px; }
+    input { padding: 6px 8px; width: 320px; }
+    button { padding: 7px 10px; cursor: pointer; }
+    pre { background: var(--card); border: 1px solid var(--border); padding: 10px; border-radius: 8px; overflow:auto; }
+    h2 { margin-top: 0; }
+    a { text-decoration: none; }
+    .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+    .kv { display:grid; grid-template-columns: 210px 1fr; row-gap: 6px; column-gap: 10px; align-items:baseline; }
+    .k { color: var(--muted); font-size: 13px; }
+    .v { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+    .smallbtn { padding: 6px 9px; font-size: 13px; }
+    .statusbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin: 10px 0 16px; }
+    .statuschip { display:inline-flex; gap:6px; align-items:center; padding: 6px 10px; border:1px solid var(--border); border-radius: 999px; background:var(--card); font-size: 13px; }
+    .dot { width: 10px; height: 10px; border-radius: 999px; background: rgba(255,255,255,0.18); display:inline-block; }
+    .dot.ok { background: var(--ok); }
+    .dot.deg { background: var(--deg); }
+    .dot.err { background: var(--err); }
+    .details summary { cursor:pointer; }
+  
+      /* Step 8 (Nav/IA/UX): consistent topbar/nav */
+      .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin:0 0 12px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--card);}
+      .topbar-title{font-weight:700;}
+      .nav{margin-top:4px;display:flex;gap:10px;flex-wrap:wrap;font-size:14px;}
+      .navlink{color:var(--link);text-decoration:none;}
+      .navlink.active{font-weight:700;text-decoration:underline;}
+      .topbar-right{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);}
+      @media (max-width: 700px){.topbar{flex-direction:column;align-items:stretch}.topbar-right{justify-content:flex-start}}
+
+
+      /* ANOM_NOTICE_V1: clear empty/auth state */
+      .notice { margin: 8px 0 12px; padding: 10px 12px; border:1px solid rgba(210,153,34,0.55); background:rgba(210,153,34,0.10); border-radius:10px; font-size:13px; display:none; }
+
+  /* LEGACY_CSS_TOKENIZED_V1 */
+</style>
+</head>
+<body>
+  <div class="topbar">
+      <div>
+        <div class="topbar-title">AgingOS Console</div>
+        
+
+    <div class="notice" id="globalNotice">—</div>
+<div class="nav">
+          <a class="navlink" href="./index.html">Status</a>
+          <a class="navlink" href="./events.html">Events</a>
+          <a class="navlink active" href="./anomalies.html">Anomalier</a>
+          <a class="navlink" href="./proposals.html">Proposals</a>
+          <a class="navlink" href="./report.html">Rapport</a>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <span class="pill" id="apiMini">API: —</span>
+      </div>
+    </div>
+
+<h1>Anomalier</h1>
+  <p class="muted">Pilot: manuell kjøring + runner-status (OPEN/UPDATE/CLOSE/NOOP/ERROR) + tydelig degradering.</p>
+
+  <div class="statusbar" id="statusbar">
+    <span class="statuschip"><span class="dot" id="dotSystem"></span><span>SYSTEM</span><span class="pill" id="stSystem">ukjent</span></span>
+    <span class="statuschip"><span class="dot" id="dotBackend"></span><span>Backend</span><span class="pill" id="stBackend">ukjent</span></span>
+    <span class="statuschip"><span class="dot" id="dotAnom"></span><span>Anomali-runner</span><span class="pill" id="stAnom">ukjent</span></span>
+    <button class="smallbtn" id="refreshStatusBtn" type="button">Oppdater</button>
+  </div>
+
+  <div class="card">
+    <div><span class="pill">Tilkobling</span></div>
+    <p>
+      <label>API Base:</label>
+      <input id="apiBase" value="/api" />
+    </p>
+    <p>
+      <label>X-API-Key:</label>
+      <input id="apiKey" placeholder="sett X-API-Key" />
+      <button id="saveBtn" type="button">Lagre</button>
+    </p>
+    <div class="muted">Lagrer lokalt (localStorage): <code>agingos_api_base</code>, <code>agingos_api_key</code></div>
+    <div class="muted" id="authLine">Auth: —</div>
+  </div>
+
+  <div class="row">
+    <div class="card">
+      <h2>Kjør anomalier</h2>
+      <div class="muted">POST <code>/api/anomalies/run_latest</code>. Brukes i daglig drift for å verifisere at runner fungerer.</div>
+      <div style="margin-top:10px">
+        <button class="smallbtn" id="runLatestBtn" type="button">Kjør anomalier (siste bucket)</button>
+      </div>
+      <div class="muted" id="runMsg" style="margin-top:10px">—</div>
+      <details class="details" style="margin-top:10px" open>
+        <summary>Respons (JSON)</summary>
+        <pre id="runOut">{}</pre>
+      </details>
+    </div>
+
+    <div class="card">
+      <h2>Runner status</h2>
+      <div class="muted">GET <code>/api/anomalies/runner_status</code>. MVP: vis siste kjøring + last_counts.</div>
+      <div style="margin-top:10px" class="kv">
+        <div class="k">last_run_at</div><div class="v" id="rsLastRun">—</div>
+        <div class="k">last_ok_at</div><div class="v" id="rsLastOk">—</div>
+        <div class="k">last_error_at</div><div class="v" id="rsLastErrAt">—</div>
+        <div class="k">last_error_msg</div><div class="v" id="rsLastErrMsg">—</div>
+        <div class="k">last_scored_bucket_start</div><div class="v" id="rsLastBucket">—</div>
+      </div>
+
+      <div style="margin-top:12px">
+        <div class="muted">Siste counts (runner_status.last_counts)</div>
+        <div class="kv" style="margin-top:6px">
+          <div class="k">OPEN</div><div class="v" id="rsOpen">—</div>
+          <div class="k">UPDATE</div><div class="v" id="rsUpdate">—</div>
+          <div class="k">CLOSE</div><div class="v" id="rsClose">—</div>
+          <div class="k">NOOP</div><div class="v" id="rsNoop">—</div>
+          <div class="k">ERROR</div><div class="v" id="rsErr">—</div>
+        </div>
+      </div>
+
+      <div class="muted" id="rsMsg" style="margin-top:10px">—</div>
+      <details class="details" style="margin-top:10px">
+        <summary>runner_status (JSON)</summary>
+        <pre id="rsJson">{}</pre>
+      </details>
+    </div>
+  </div>
+
+  
+    <!-- ANOM_EPISODES_LIST_V1 -->
+    <div class="row" style="margin-top:12px">
+      <div class="card" style="flex:2">
+        <h2>Episoder (anomalier)</h2>
+        <div class="muted">
+          Henter episoder fra <code>GET /api/anomalies</code>.
+          Klikk <b>Bevis</b> for å hente observasjoner for peak-bucket via <code>GET /api/anomalies/score</code>.
+        </div>
+
+        <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end">
+          <div>
+            <div class="muted" style="margin-bottom:4px">Periode (last)</div>
+            <input id="epLast" value="14d" style="width:110px" />
+          </div>
+          <div>
+            <div class="muted" style="margin-bottom:4px">Min level</div>
+            <select id="epMinLevel">
+              <option value="1" selected>YELLOW+</option>
+              <option value="2">ORANGE+</option>
+              <option value="3">RED+</option>
+              <option value="">(alle)</option>
+            </select>
+          </div>
+          <div>
+            <div class="muted" style="margin-bottom:4px">Active only</div>
+            <label class="muted" style="display:flex; gap:8px; align-items:center">
+              <input id="epActiveOnly" type="checkbox" />
+              <span>kun aktive</span>
+            </label>
+          </div>
+          <div>
+            <div class="muted" style="margin-bottom:4px">Limit</div>
+            <input id="epLimit" value="50" style="width:90px" />
+          </div>
+          <div>
+            <button class="smallbtn" id="epRefreshBtn" type="button">Hent episoder</button>
+          </div>
+        </div>
+
+        <div class="muted" id="epMsg" style="margin-top:10px">—</div>
+
+        <div style="margin-top:10px; overflow:auto">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Rom</th>
+                <th>Level</th>
+                <th>Aktiv</th>
+                <th>Start</th>
+                <th>Slutt</th>
+                <th>Peak bucket</th>
+                <th>Peak score</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="epTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" style="flex:1">
+        <h2>Bevis (valgt episode)</h2>
+        <div class="muted" id="evMsg">Velg en episode og trykk <b>Bevis</b>.</div>
+
+        <div style="margin-top:10px">
+          <div class="muted" style="margin-bottom:6px">Kort forklaring (deterministisk)</div>
+          <pre id="evSummary" style="white-space:pre-wrap; margin:0">{}</pre>
+        </div>
+
+        <details class="details" style="margin-top:10px">
+          <summary>Bevis (JSON)</summary>
+          <pre id="evJson">{}</pre>
+        </details>
+      </div>
+    </div>
+
+<script>
+      // TOPBAR_API_MINI v1
+
+      // ANOM_NOTICE_V1
+      function _anomUpdateNotice() {
+        const el = document.getElementById("globalNotice");
+        if (!el) return;
+        const key = _topbarGetApiKey();
+        if (!key) {
+          el.style.display = "block";
+          el.textContent = "Mangler X-API-Key. Sett nøkkel på Status-siden (/) og trykk “Lagre”.";
+          return;
+        }
+        el.style.display = "none";
+        el.textContent = "";
+      }
+
+      function _topbarGetApiBase() {
+        try {
+          const el = document.getElementById("apiBase");
+          if (el && el.value) return String(el.value).trim().replace(/\/+$/, "");
+        } catch(e) {}
+        try { return String(localStorage.getItem("agingos_api_base") || localStorage.getItem("apiBase") || "/api").trim().replace(/\/+$/, ""); }
+        catch(e) { return "/api"; }
+      }
+      function _topbarGetApiKey() {
+        try {
+          const el = document.getElementById("apiKey");
+          if (el && el.value) return String(el.value).trim();
+        } catch(e) {}
+        try { return String(localStorage.getItem("agingos_api_key") || localStorage.getItem("apiKey") || "").trim(); }
+        catch(e) { return ""; }
+      }
+      function _topbarUpdateApiMini() {
+        const el = document.getElementById("apiMini");
+        if (!el) return;
+        const base = _topbarGetApiBase();
+        const key  = _topbarGetApiKey();
+        el.textContent = "API: " + base + " | key: " + (key ? "SET" : "NOT SET");
+      }
+      (function(){
+        try { _topbarUpdateApiMini(); } catch(e) {}
+        try { _anomUpdateNotice(); } catch(e) {}
+        ["apiBase","apiKey"].forEach((id) => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          el.addEventListener("input", () => { try { _topbarUpdateApiMini(); } catch(e) {} });
+          el.addEventListener("change", () => { try { _topbarUpdateApiMini(); } catch(e) {} });
+        });
+        window.addEventListener("storage", (ev) => {
+          const k = ev && ev.key ? String(ev.key) : "";
+          if (!k) return;
+          if (k.startsWith("agingos_api_") || k === "apiBase" || k === "apiKey") {
+            try { _topbarUpdateApiMini(); } catch(e) {}
+          }
+        });
+        setTimeout(() => { try { _topbarUpdateApiMini(); } catch(e) {} }, 0);
+      })();
+
+    const $ = (id) => document.getElementById(id);
+
+    function loadSettings() {
+      const apiBase = localStorage.getItem("agingos_api_base") || localStorage.getItem("apiBase") || $("apiBase").value;
+      const apiKey  = localStorage.getItem("agingos_api_key")  || localStorage.getItem("apiKey")  || "";
+      $("apiBase").value = apiBase;
+      $("apiKey").value  = apiKey;
+      updateAuthLine();
+    }
+
+    function saveSettings() {
+      localStorage.setItem("agingos_api_base", $("apiBase").value.trim());
+      localStorage.setItem("agingos_api_key", $("apiKey").value.trim());
+      // kompat: behold gamle keys også
+      localStorage.setItem("apiBase", $("apiBase").value.trim());
+      localStorage.setItem("apiKey", $("apiKey").value.trim());
+      updateAuthLine();
+    }
+
+    function updateAuthLine() {
+      const key = $("apiKey").value.trim();
+      $("authLine").textContent = "Auth: X-API-Key " + (key ? "SET" : "NOT SET");
+    }
+
+    function fmtUtc(iso) {
+      if (!iso) return "—";
+      const t = String(iso).replace("Z","").replace("T"," ");
+      return t.length >= 19 ? t.slice(0,19) : (t.length >= 16 ? t.slice(0,16) : t);
+    }
+
+    function setChip(which, level, text) {
+      // level: ok | deg | err
+      const dot = $("dot" + which);
+      const pill = $("st" + which);
+      dot.classList.remove("ok","deg","err");
+      if (level === "ok") dot.classList.add("ok");
+      else if (level === "deg") dot.classList.add("deg");
+      else if (level === "err") dot.classList.add("err");
+      pill.textContent = text;
+    }
+
+    async function apiGet(path) {
+      const base = $("apiBase").value.trim().replace(/\/$/, "");
+      const key = $("apiKey").value.trim();
+      const headers = key ? { "X-API-Key": key } : {};
+      const res = await fetch(base + path, { headers });
+
+      const ct = (res.headers.get("content-type") || "").toLowerCase();
+      const text = await res.text();
+
+      if (!res.ok) {
+        let msg = `${path} -> ${res.status} ${res.statusText || ""}`.trim();
+        if (ct.includes("application/json")) {
+          try {
+            const j = JSON.parse(text);
+            const d = (j && (j.detail || j.message || j.error)) ? (j.detail || j.message || j.error) : null;
+            if (d) msg += ` (${typeof d === "string" ? d : JSON.stringify(d)})`;
+          } catch (_) {}
+        }
+        throw new Error(msg);
+      }
+
+      try { return JSON.parse(text); }
+      catch (_) { throw new Error(`${path} -> invalid JSON (${ct || "unknown content-type"})`); }
+    }
+
+    async function apiSend(method, path, payload) {
+      const base = $("apiBase").value.trim().replace(/\/$/, "");
+      const key = $("apiKey").value.trim();
+      const headers = { "Content-Type": "application/json" };
+      if (key) headers["X-API-Key"] = key;
+
+      const res = await fetch(base + path, { method, headers, body: JSON.stringify(payload || {}) });
+      const ct = (res.headers.get("content-type") || "").toLowerCase();
+      const text = await res.text();
+
+      if (!res.ok) {
+        let msg = `${path} -> ${res.status} ${res.statusText || ""}`.trim();
+        if (ct.includes("application/json")) {
+          try {
+            const j = JSON.parse(text);
+            const d = (j && (j.detail || j.message || j.error)) ? (j.detail || j.message || j.error) : null;
+            if (d) msg += ` (${typeof d === "string" ? d : JSON.stringify(d)})`;
+          } catch (_) {}
+        }
+        throw new Error(msg);
+      }
+
+      try { return JSON.parse(text); }
+      catch (_) { throw new Error(`${path} -> invalid JSON (${ct || "unknown content-type"})`); }
+    }
+
+    function severitySystem(backendOk, runner) {
+      // ERROR (red): backend/auth failures (api calls fail)
+      // DEGRADED (yellow): backend ok, but runner stale / last error present / missing data
+      // OK (green): backend ok + runner ok and fresh
+      if (!backendOk) return { level:"err", label:"ERROR" };
+
+      // runner is optional if endpoint missing; treat as DEGRADED not ERROR
+      if (!runner) return { level:"deg", label:"DEGRADED" };
+
+      const hasErr = !!runner.last_error_at || !!runner.last_error_msg;
+      // freshness heuristic: if last_run older than 10 minutes => degraded
+      let stale = false;
+      try {
+        const t = runner.last_run_at ? Date.parse(runner.last_run_at) : NaN;
+        if (Number.isFinite(t)) {
+          stale = (Date.now() - t) > (10 * 60 * 1000);
+        } else {
+          stale = true;
+        }
+      } catch (_) { stale = true; }
+
+      if (hasErr) return { level:"deg", label:"DEGRADED" };
+      if (stale) return { level:"deg", label:"DEGRADED" };
+      return { level:"ok", label:"OK" };
+    }
+
+    async function refreshRunnerStatus() {
+      const rs = await apiGet("/anomalies/runner_status");
+      $("rsLastRun").textContent = fmtUtc(rs.last_run_at);
+      $("rsLastOk").textContent  = fmtUtc(rs.last_ok_at);
+      $("rsLastErrAt").textContent = fmtUtc(rs.last_error_at);
+      $("rsLastErrMsg").textContent = (rs.last_error_msg || "—");
+      $("rsLastBucket").textContent = fmtUtc(rs.last_scored_bucket_start);
+
+      const c = rs.last_counts || {};
+      $("rsOpen").textContent = (c.OPEN ?? "—");
+      $("rsUpdate").textContent = (c.UPDATE ?? "—");
+      $("rsClose").textContent = (c.CLOSE ?? "—");
+      $("rsNoop").textContent = (c.NOOP ?? "—");
+      $("rsErr").textContent = (c.ERROR ?? "—");
+
+      $("rsJson").textContent = JSON.stringify(rs, null, 2);
+
+      // Message
+      const parts = [];
+      if (rs.last_error_at || rs.last_error_msg) parts.push("Runner har nylig error (DEGRADED).");
+      $("rsMsg").textContent = parts.length ? parts.join(" ") : "Runner status hentet.";
+      return rs;
+    }
+
+    async function refreshAll() {
+      // Default unknown
+      setChip("Backend", "deg", "ukjent");
+      setChip("Anom", "deg", "ukjent");
+      setChip("System", "deg", "ukjent");
+
+      let backendOk = false;
+      let rs = null;
+
+      try {
+        await apiGet("/health");
+        backendOk = true;
+        setChip("Backend", "ok", "OK");
+      } catch (e) {
+        setChip("Backend", "err", "ERROR");
+        setChip("System", "err", "ERROR");
+        $("rsMsg").textContent = String(e.message || e);
+        return;
+      }
+
+      try {
+        rs = await refreshRunnerStatus();
+        // runner chip based on rs
+        const sev = severitySystem(true, rs);
+        if (sev.level === "ok") setChip("Anom", "ok", "OK");
+        else if (sev.level === "deg") setChip("Anom", "deg", "DEGRADED");
+        else setChip("Anom", "err", "ERROR");
+      } catch (e) {
+        // runner endpoint failing: degraded (backend ok)
+        setChip("Anom", "deg", "DEGRADED");
+        $("rsMsg").textContent = "Kunne ikke hente runner_status: " + String(e.message || e);
+      }
+
+      const sys = severitySystem(backendOk, rs);
+      setChip("System", sys.level, sys.label);
+    }
+
+    async function runLatest() {
+      $("runMsg").textContent = "Kjører...";
+      try {
+        const payload = await apiSend("POST", "/anomalies/run_latest", {});
+        $("runOut").textContent = JSON.stringify(payload, null, 2);
+        $("runMsg").textContent = "OK: run_latest fullført.";
+        // refresh runner status afterwards
+        try { await refreshAll(); } catch (_) {}
+      } catch (e) {
+        $("runMsg").textContent = "ERROR: " + String(e.message || e);
+      }
+    }
+
+    
+      // ANOM_EPISODES_LIST_V1
+
+      function _rcHuman(reason, obs) {
+          const rc = (reason && reason.reason_code) ? String(reason.reason_code) : "";
+          const ev = (reason && reason.evidence && typeof reason.evidence === "object") ? reason.evidence : {};
+
+        // Deterministisk, enkel mapping. Fallback: vis reason_code.
+        try {
+            if (rc === "EVENT_DOOR_Z") {
+              const n  = (ev && ev.door_obs != null) ? ev.door_obs : ((obs && obs.door_obs != null) ? obs.door_obs : "—");
+              const mu = (ev && ev.mu != null) ? ev.mu : "—";
+              const z  = (ev && ev.z  != null) ? ev.z  : "—";
+              const sn = (ev && ev.support_n != null) ? ev.support_n : "—";
+              return `Døraktivitet avviker fra baseline (door_obs=${n}, forventet≈${mu}, z=${z}, support_n=${sn}).`;
+            }
+          if (rc === "EVENT_DOOR_BURST") {
+            const n = (obs && (obs.door_obs ?? obs.doorObs)) ?? "—";
+            return `Uvanlig mange dør-hendelser i et kort tidsvindu (door_obs=${n}).`;
+          }
+          if (rc === "BASELINE_MISSING_ROOM_BUCKET") {
+            return "Baseline mangler for dette rommet/tidsvinduet. Scoring kan være mindre pålitelig til baseline er bygget ut.";
+          }
+          if (rc === "TRANSITION_BASELINE_MISSING") {
+            const prev = (obs && (obs.prev_room ?? obs.prevRoom)) ?? "—";
+            return `Baseline mangler for rom-overgang (prev_room=${prev}).`;
+          }
+        } catch(e) {}
+        return `Uvanlig mønster: ${rc}`;
+      }
+
+      function _truthy(v) { return v === true || v === "true" || v === 1; }
+
+      async function refreshEpisodes() {
+        const msg = $("epMsg");
+        const tbody = $("epTbody");
+        if (!tbody) return;
+
+        msg.textContent = "Henter episoder...";
+        tbody.innerHTML = "";
+
+        const last = (($("epLast") && $("epLast").value) || "14d").trim() || "14d";
+        const minLevel = ($("epMinLevel") && $("epMinLevel").value) || "1";
+        const limit = (($("epLimit") && $("epLimit").value) || "50").trim() || "50";
+        const activeOnly = !!($("epActiveOnly") && $("epActiveOnly").checked);
+
+        const qs = new URLSearchParams();
+        qs.set("last", last);
+        if (minLevel) qs.set("min_level", minLevel);
+        if (activeOnly) qs.set("active_only", "true");
+        if (limit) qs.set("limit", limit);
+
+        const items = await apiGet("/anomalies?" + qs.toString());
+        if (!Array.isArray(items)) throw new Error("GET /anomalies -> forventet JSON array");
+
+        msg.textContent = `OK: ${items.length} episoder hentet. Klikk “Bevis” for å se observasjoner for peak-bucket.`;
+
+        const esc = (x) => String(x ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+        const mkBtn = (room, bucket, id) => {
+          if (!room || !bucket) return "";
+          return `<button class="smallbtn" type="button" data-action="evidence" data-room="${esc(room)}" data-bucket="${esc(bucket)}" data-id="${esc(id)}">Bevis</button>`;
+        };
+
+        for (const a of items) {
+          const id = a.id ?? "";
+          const room = a.room ?? "";
+          const level = a.level ?? "";
+          const active = _truthy(a.active);
+          const start = a.start_ts ?? "";
+          const end = a.end_ts ?? "";
+          const peakBucket = a.peak_bucket_start_ts ?? "";
+          const peakScore = (a.peak_bucket_score ?? "");
+
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${esc(id)}</td>
+            <td>${esc(room)}</td>
+            <td>${esc(level)}</td>
+            <td>${active ? "true" : "false"}</td>
+            <td>${esc(start)}</td>
+            <td>${esc(end || "—")}</td>
+            <td>${esc(peakBucket)}</td>
+            <td>${esc(peakScore)}</td>
+            <td>${mkBtn(room, peakBucket, id)}</td>
+          `;
+          tbody.appendChild(tr);
+        }
+      }
+
+      async function loadEvidence(room, bucketStart, anomId) {
+        const evMsg = $("evMsg");
+        const evJson = $("evJson");
+        const evSummary = $("evSummary");
+        if (evMsg) evMsg.textContent = "Henter bevis...";
+        if (evSummary) evSummary.textContent = "{}";
+        if (evJson) evJson.textContent = "{}";
+
+        if (!room || !bucketStart) throw new Error("Mangler room/bucket_start for bevis");
+
+        const url = "/anomalies/score?room=" + encodeURIComponent(room) + "&bucket_start=" + encodeURIComponent(bucketStart);
+        const payload = await apiGet(url);
+
+        const details = payload.details || {};
+        const obs = (details && details.observed) ? details.observed : {};
+        const reasons = Array.isArray(payload.reasons) ? payload.reasons : [];
+        const lines = [];
+        lines.push(`Episode: id=${anomId || "—"} rom=${room}`);
+        lines.push(`Peak bucket: ${bucketStart}`);
+
+        if (obs && typeof obs === "object") {
+          const parts = [];
+          if (obs.door_obs != null) parts.push(`door_obs=${obs.door_obs}`);
+          if (obs.activity_obs != null) parts.push(`activity_obs=${obs.activity_obs}`);
+          if (obs.prev_room != null) parts.push(`prev_room=${obs.prev_room}`);
+          if (obs.pet_weight != null) parts.push(`pet_weight=${obs.pet_weight}`);
+          if (obs.unknown_weight != null) parts.push(`unknown_weight=${obs.unknown_weight}`);
+          if (parts.length) lines.push("Observasjoner: " + parts.join(", "));
+        }
+
+        lines.push("");
+        if (reasons.length) {
+            lines.push("Hvorfor (reason_codes):");
+            for (const r of reasons) lines.push("• " + _rcHuman(r, obs));
+          } else {
+          lines.push("Hvorfor: (ingen reason_codes i score-responsen)");
+        }
+
+        if (evSummary) evSummary.textContent = lines.join("\n");
+        if (evJson) evJson.textContent = JSON.stringify(payload, null, 2);
+        if (evMsg) evMsg.textContent = "OK: bevis hentet.";
+      }
+
+      window.addEventListener("DOMContentLoaded", () => {
+      loadSettings();
+      $("saveBtn").addEventListener("click", saveSettings);
+      $("refreshStatusBtn").addEventListener("click", refreshAll);
+      $("runLatestBtn").addEventListener("click", runLatest);
+
+        // ANOM_EPISODES_LIST_V1 wiring
+        try {
+          $("epRefreshBtn").addEventListener("click", () => {
+            refreshEpisodes().catch(e => {
+              const m = $("epMsg"); if (m) m.textContent = "ERROR: " + String(e.message || e);
+            });
+          });
+        } catch(_) {}
+
+        try {
+          const tb = $("epTbody");
+          if (tb) tb.addEventListener("click", (ev) => {
+            const btn = ev && ev.target ? ev.target.closest('button[data-action="evidence"]') : null;
+            if (!btn) return;
+            loadEvidence(btn.dataset.room, btn.dataset.bucket, btn.dataset.id).catch(e => {
+              const m = $("evMsg"); if (m) m.textContent = "ERROR: " + String(e.message || e);
+            });
+          });
+        } catch(_) {}
+
+        // auto-load episodes on page load
+        refreshEpisodes().catch(e => {
+          const m = $("epMsg"); if (m) m.textContent = "ERROR: " + String(e.message || e);
+        });
+
+      // auto refresh on load
+      refreshAll().catch(err => {
+        setChip("Backend", "err", "ERROR");
+        setChip("System", "err", "ERROR");
+        $("rsMsg").textContent = String(err.message || err);
+      });
+    });
+  </script>
+</body>
+</html>

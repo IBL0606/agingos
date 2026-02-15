@@ -1,5 +1,7 @@
 services:
   heartbeat:
+    env_file:
+      - .env
     image: curlimages/curl:8.5.0
     depends_on:
       - backend

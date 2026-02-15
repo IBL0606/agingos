@@ -22,6 +22,24 @@ def _jsonable(x):
     return x
 
 
+def _extract_peak_details(
+    reasons_summary: Optional[dict[str, Any]], reasons: list[dict[str, Any]]
+) -> Optional[dict[str, Any]]:
+    """Derive peak_bucket_details deterministically from scoring output.
+    Prefer reasons_summary (scored.details) which includes user_id; fall back to first reason dict if present.
+    Returns JSON-serializable dict or None.
+    """
+    src = None
+    if isinstance(reasons_summary, dict):
+        src = reasons_summary
+    elif isinstance(reasons, list) and reasons and isinstance(reasons[0], dict):
+        # weak fallback: do NOT invent user_id here
+        src = reasons[0]
+    if not isinstance(src, dict):
+        return None
+    return _jsonable(src)
+
+
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -137,6 +155,7 @@ def upsert_bucket_result(
             bucket_count=1,
             reasons_last=_jsonable(reasons),
             reasons_peak=_jsonable(reasons_summary or reasons),
+            peak_bucket_details=_extract_peak_details(reasons_summary, reasons),
             level=level_int,
             score_intensity=0.0,
             score_sequence=0.0,
@@ -156,7 +175,9 @@ def upsert_bucket_result(
     active_ep.last_score = score_total
     active_ep.score_total = score_total
     active_ep.last_level = level_text
-    active_ep.level = level_int
+    # Keep episode severity monotonic (represents max severity seen), not last bucket.
+    cur_level = int(getattr(active_ep, "level", 0) or 0)
+    active_ep.level = cur_level if cur_level >= level_int else level_int
     active_ep.reasons_last = _jsonable(reasons)
     active_ep.bucket_count = int(active_ep.bucket_count or 0) + 1
     active_ep.updated_at = now
@@ -168,6 +189,17 @@ def upsert_bucket_result(
         active_ep.peak_bucket = bucket_start
         active_ep.peak_bucket_start_ts = bucket_start
         active_ep.reasons_peak = _jsonable(reasons_summary or reasons)
+        active_ep.peak_bucket_details = _extract_peak_details(reasons_summary, reasons)
+
+    # If peak_bucket_details was never set (legacy rows), fill it once deterministically.
+    if getattr(active_ep, "peak_bucket_details", None) is None:
+        try:
+            active_ep.peak_bucket_details = _extract_peak_details(
+                reasons_summary, reasons
+            )
+        except Exception:
+            # Do not fail lifecycle on metadata persistence
+            pass
 
     # Green streak
     if _is_green(level_text):

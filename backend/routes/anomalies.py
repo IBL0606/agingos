@@ -164,14 +164,14 @@ def run_once_anomaly(
     else:
         if bool(getattr(ep, "_noop", False)):
             proc_action = "NOOP"
-        elif not bool(getattr(ep, "active", True)):
+        elif getattr(ep, "end_ts", None) is not None:
             proc_action = "CLOSE"
         elif int(getattr(ep, "bucket_count", 0) or 0) <= 1:
             proc_action = "OPEN"
         else:
             proc_action = "UPDATE"
         proc_episode_id = ep.id
-        proc_active = bool(getattr(ep, "active", True))
+        proc_active = getattr(ep, "end_ts", None) is None
 
     db.commit()
 
