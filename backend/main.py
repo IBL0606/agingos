@@ -21,6 +21,7 @@ from routes.anomalies import router as anomalies_router
 
 from fastapi import Query
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
@@ -246,11 +247,17 @@ def receive_event(event: Event):
             payload=event.payload,
         )
         db.add(db_event)
-        db.commit()
+        try:
+            db.commit()
+            return {"received": True, "deduped": False}
+        except IntegrityError as e:
+            db.rollback()
+            constraint = getattr(getattr(e.orig, "diag", None), "constraint_name", None)
+            if constraint == "events_event_id_unique":
+                return {"received": True, "deduped": True}
+            raise HTTPException(status_code=500, detail=f"db integrity error: {constraint or str(e)}")
     finally:
         db.close()
-
-    return {"received": True}
 
 
 @app.get("/ai/proposals")
