@@ -10,7 +10,7 @@ from models.event import Event
 from models.db_event import EventDB
 
 from services.scheduler import scheduler, setup_scheduler
-from services.auth import require_api_key, validate_auth_config_on_startup
+from services.auth import require_api_key, require_scope, AuthScope, validate_auth_config_on_startup
 from services.proposals_miner import mine_proposals
 from services.proposals_expiry import expire_testing_proposals
 
@@ -30,7 +30,7 @@ from util.time import require_utc_aware
 
 app = FastAPI(
     title="AgingOS Backend",
-    dependencies=[Depends(require_api_key)],
+    dependencies=[Depends(require_scope)],
 )
 
 app.include_router(rules_router)
@@ -408,6 +408,7 @@ def _upsert_monitor_mode(db, *, monitor_key: str, room_id: str, mode: str) -> No
 def list_proposals(
     last: str | None = None,
     limit: int = Query(default=200, ge=1, le=500),
+    scope: AuthScope = Depends(require_scope),
 ):
     """
     Persistent proposals from DB (NOT ai-bot proxy).
@@ -441,12 +442,12 @@ def list_proposals(
                     ) a
                   ), '[]'::jsonb) AS actions
                 FROM proposals p
-                WHERE p.updated_at > :last_ts
+                WHERE p.org_id = :org_id AND p.subject_id = :subject_id AND p.updated_at > :last_ts
                 ORDER BY p.updated_at ASC
                 LIMIT :limit
                 """
             )
-            rows = db.execute(q, {"last_ts": last, "limit": limit}).mappings().all()
+            rows = db.execute(q, {"org_id": scope.org_id, "subject_id": scope.subject_id, "last_ts": last, "limit": limit}).mappings().all()
         else:
             q = text(
                 """
@@ -472,11 +473,12 @@ def list_proposals(
                     ) a
                   ), '[]'::jsonb) AS actions
                 FROM proposals p
+                WHERE p.org_id = :org_id AND p.subject_id = :subject_id
                 ORDER BY p.updated_at DESC
                 LIMIT :limit
                 """
             )
-            rows = db.execute(q, {"limit": limit}).mappings().all()
+            rows = db.execute(q, {"org_id": scope.org_id, "subject_id": scope.subject_id, "limit": limit}).mappings().all()
 
         return [dict(r) for r in rows]
     finally:
@@ -501,6 +503,8 @@ def _proposal_transition(
     db,
     *,
     proposal_id: int,
+    org_id: str,
+    subject_id: str,
     action: str,  # TEST | ACTIVATE | REJECT
     actor: str | None,
     source: str,
@@ -509,9 +513,9 @@ def _proposal_transition(
     row = (
         db.execute(
             text(
-                "SELECT proposal_id, state, action_target, room_id FROM proposals WHERE proposal_id = :id FOR UPDATE"
+                "SELECT proposal_id, state, action_target, room_id FROM proposals WHERE proposal_id = :id AND org_id = :org_id AND subject_id = :subject_id FOR UPDATE"
             ),
-            {"id": proposal_id},
+            {"id": proposal_id, "org_id": org_id, "subject_id": subject_id},
         )
         .mappings()
         .one_or_none()
@@ -637,13 +641,15 @@ def _proposal_transition(
 
 
 @app.post("/proposals/{proposal_id}/test")
-def test_proposal(proposal_id: int, body: dict = Body(default={})):
+def test_proposal(proposal_id: int, body: dict = Body(default={}), scope: AuthScope = Depends(require_scope)):
     db = SessionLocal()
     try:
         with db.begin():
             return _proposal_transition(
                 db,
                 proposal_id=proposal_id,
+                org_id=scope.org_id,
+                subject_id=scope.subject_id,
                 action="TEST",
                 actor=body.get("actor"),
                 source=body.get("source", "ui"),
@@ -654,13 +660,15 @@ def test_proposal(proposal_id: int, body: dict = Body(default={})):
 
 
 @app.post("/proposals/{proposal_id}/activate")
-def activate_proposal(proposal_id: int, body: dict = Body(default={})):
+def activate_proposal(proposal_id: int, body: dict = Body(default={}), scope: AuthScope = Depends(require_scope)):
     db = SessionLocal()
     try:
         with db.begin():
             return _proposal_transition(
                 db,
                 proposal_id=proposal_id,
+                org_id=scope.org_id,
+                subject_id=scope.subject_id,
                 action="ACTIVATE",
                 actor=body.get("actor"),
                 source=body.get("source", "ui"),
@@ -671,13 +679,15 @@ def activate_proposal(proposal_id: int, body: dict = Body(default={})):
 
 
 @app.post("/proposals/{proposal_id}/reject")
-def reject_proposal(proposal_id: int, body: dict = Body(default={})):
+def reject_proposal(proposal_id: int, body: dict = Body(default={}), scope: AuthScope = Depends(require_scope)):
     db = SessionLocal()
     try:
         with db.begin():
             return _proposal_transition(
                 db,
                 proposal_id=proposal_id,
+                org_id=scope.org_id,
+                subject_id=scope.subject_id,
                 action="REJECT",
                 actor=body.get("actor"),
                 source=body.get("source", "ui"),
