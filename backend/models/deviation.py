@@ -40,6 +40,10 @@ class Deviation(Base):
         String(200), nullable=False, default="default"
     )
 
+
+    org_id: Mapped[str] = mapped_column(String(200), nullable=False, default="default")
+    home_id: Mapped[str] = mapped_column(String(200), nullable=False, default="default")
+    subject_id: Mapped[str] = mapped_column(String(200), nullable=False, default="default")
     context: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     evidence: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
 

@@ -237,7 +237,7 @@ def ai_anomalies(
 
 
 @app.post("/event")
-def receive_event(event: Event):
+def receive_event(event: Event, scope: AuthScope = Depends(require_scope)):
     db = SessionLocal()
     try:
         db_event = EventDB(
@@ -245,6 +245,9 @@ def receive_event(event: Event):
             timestamp=event.timestamp,
             category=event.category,
             payload=event.payload,
+            org_id=scope.org_id,
+            home_id=scope.home_id,
+            subject_id=scope.subject_id,
         )
         db.add(db_event)
         try:

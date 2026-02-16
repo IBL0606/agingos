@@ -17,3 +17,6 @@ class EventDB(Base):
     timestamp = Column(DateTime(timezone=True), nullable=False)
     category = Column(String, nullable=False)
     payload = Column(JSON, nullable=False)
+    org_id = Column(String, nullable=False)
+    home_id = Column(String, nullable=False)
+    subject_id = Column(String, nullable=False)

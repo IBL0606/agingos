@@ -195,11 +195,18 @@ def _upsert_open_deviation(
     subject_key: str,
     now: datetime,
     deviation_v1: dict,
+    *,
+    org_id: str = "default",
+    home_id: str = "default",
+    subject_id: str = "default",
 ) -> None:
     existing = (
         db.query(Deviation)
         .filter(Deviation.rule_id == rule_row.id)
         .filter(Deviation.subject_key == subject_key)
+        .filter(Deviation.org_id == org_id)
+        .filter(Deviation.home_id == home_id)
+        .filter(Deviation.subject_id == subject_id)
         .filter(Deviation.status.in_([DeviationStatus.OPEN, DeviationStatus.ACK]))
         .one_or_none()
     )
@@ -243,7 +250,10 @@ def _upsert_open_deviation(
         started_at=now,
         last_seen_at=now,
         subject_key=subject_key,
-        context=context,
+        org_id=org_id,
+        home_id=home_id,
+        subject_id=subject_id,
+context=context,
         evidence=evidence,
     )
     db.add(dev)
@@ -254,6 +264,9 @@ def _close_stale_deviations(
     *,
     subject_key: str,
     now: datetime,
+    org_id: str = "default",
+    home_id: str = "default",
+    subject_id: str = "default",
 ) -> int:
     """
     Close deviations that have not been seen within expire_after_minutes.
@@ -269,13 +282,17 @@ def _close_stale_deviations(
     candidates = (
         db.query(Deviation)
         .filter(Deviation.subject_key == subject_key)
+        .filter(Deviation.org_id == org_id)
+        .filter(Deviation.home_id == home_id)
+        .filter(Deviation.subject_id == subject_id)
         .filter(Deviation.status.in_([DeviationStatus.OPEN, DeviationStatus.ACK]))
         .all()
     )
 
     for dev in candidates:
         # rules.yaml keys are the rule "key" like "R-002". In DB that is Rule.name.
-        rule_key = getattr(dev, "rule_id", None) or getattr(dev, "rule_key", None)
+        rule_row = db.query(Rule).filter(Rule.id == dev.rule_id).one_or_none()
+        rule_key = rule_row.name if rule_row else None
         if not rule_key:
             continue
 
@@ -317,6 +334,10 @@ def run_rule_engine_job():
         cfg = load_rule_config()
         interval_minutes = cfg.scheduler_interval_minutes()
         subject_key = cfg.scheduler_default_subject_key()
+        org_id = "default"
+        home_id = "default"
+        subject_id = "default"
+
 
         now = utcnow()
         until = now
@@ -398,7 +419,10 @@ def run_rule_engine_job():
                             subject_key=subject_key,
                             now=now,
                             deviation_v1=dct,
-                        )
+                            org_id=org_id,
+                            home_id=home_id,
+                            subject_id=subject_id,
+)
                         upserted_for_rule += 1
 
                 deviations_upserted += upserted_for_rule
@@ -439,7 +463,7 @@ def run_rule_engine_job():
                 )
                 continue
 
-        closed = _close_stale_deviations(db, subject_key=subject_key, now=now)
+        closed = _close_stale_deviations(db, subject_key=subject_key, now=now, org_id=org_id, home_id=home_id, subject_id=subject_id)
 
         db.commit()
 
