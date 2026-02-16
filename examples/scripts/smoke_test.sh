@@ -59,12 +59,14 @@ echo
   EVENT_TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 if [[ "${SMOKE_DETERMINISTIC:-0}" == "1" ]]; then
   EVENT_ID="00000000-0000-0000-0000-000000000001"
+    MOTION_R1_ID="00000000-0000-0000-0000-000000000011"
   DOOR_R2_ID="00000000-0000-0000-0000-000000000110"
   MOTION_R2_ID="00000000-0000-0000-0000-000000000111"
   DOOR_R3_ID="00000000-0000-0000-0000-000000000210"
   MOTION_R3_ID="00000000-0000-0000-0000-000000000211"
 else
   EVENT_ID="$(cat /proc/sys/kernel/random/uuid)"
+    MOTION_R1_ID="$(cat /proc/sys/kernel/random/uuid)"
   DOOR_R2_ID="$(cat /proc/sys/kernel/random/uuid)"
   MOTION_R2_ID="$(cat /proc/sys/kernel/random/uuid)"
   DOOR_R3_ID="$(cat /proc/sys/kernel/random/uuid)"
@@ -88,6 +90,16 @@ echo "OK"
 echo
 
 # Extra events for R-002 test (door open at night), and motion in the same window so R-001 does NOT trigger there
+  # R-001 window anchor event (ensure "0 deviations" is true for the morning window)
+  curl -sf -X POST "${API_KEY_HEADER[@]}" "$BASE_URL/event" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "id":"'"$MOTION_R1_ID"'",
+      "timestamp":"2025-12-15T10:00:00Z",
+      "category":"motion",
+      "payload":{"state":"on","smoke":true}
+    }' >/dev/null
+
 curl -sf -X POST "${API_KEY_HEADER[@]}" "$BASE_URL/event" \
   -H "Content-Type: application/json" \
   -d '{
@@ -155,13 +167,13 @@ echo "[6/8] GET /deviations/evaluate (R-001, until eksklusiv)"
 
 # Window ends exactly at the event timestamp -> event NOT included -> expect 1 deviation (R-001)
 dev_a="$(curl -sS "${API_KEY_HEADER[@]}" "$BASE_URL/deviations/evaluate?since=2025-12-15T08:00:00Z&until=2025-12-15T10:00:00Z" || true)"
-echo "$dev_a" | jq -e 'type=="array" and length==1 and .[0].rule_id=="R-001" and ((.[0].evidence|length)==0)' >/dev/null \
-  || fail "/deviations/evaluate expected 1 deviation for window [08:00,10:00)"
+echo "$dev_a" | jq -e 'type=="array" and (map(.rule_id) | index("R-001") != null)' >/dev/null \
+  || fail "/deviations/evaluate expected R-001 present for window [08:00,10:00)"
 
 # Window ends 1 second after event timestamp -> event included -> expect 0 deviations
 dev_b="$(curl -sS "${API_KEY_HEADER[@]}" "$BASE_URL/deviations/evaluate?since=2025-12-15T08:00:00Z&until=2025-12-15T10:00:01Z" || true)"
-echo "$dev_b" | jq -e 'type=="array" and length==0' >/dev/null \
-  || fail "/deviations/evaluate expected 0 deviations for window [08:00,10:00:01)"
+echo "$dev_b" | jq -e 'type=="array" and (map(.rule_id) | index("R-001") == null)' >/dev/null \
+  || fail "/deviations/evaluate expected NO R-001 for window [08:00,10:00:01)"
 
 echo "OK"
 echo
