@@ -23,12 +23,18 @@ def upgrade() -> None:
 
     op.create_table(
         "app_instance",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False,
-                  server_default=sa.text("gen_random_uuid()")),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=True),
+            primary_key=True,
+            nullable=False,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
     )
 
     # Ensure exactly one row exists so backend can resolve user_id
     op.execute("INSERT INTO app_instance DEFAULT VALUES;")
+
 
 def downgrade() -> None:
     op.drop_table("app_instance")
