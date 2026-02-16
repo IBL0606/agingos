@@ -22,8 +22,10 @@ rules:
     enabled_in_scheduler: true
     lookback_minutes: 60
     expire_after_minutes: 60
-    params: {}
-
+    params: 
+      motion_categories: ["motion", "presence"]
+      payload_state_keys: ["state", "value"]
+      motion_on_value: "on"
   R-002:
     enabled_in_scheduler: true
     lookback_minutes: 60
@@ -42,10 +44,10 @@ rules:
     expire_after_minutes: 60
     params:
       door_category: "door"
-      motion_category: "motion"
+      motion_category: "presence"
       payload_state_keys: ["state", "value"]
       door_name_keys: ["door", "name"]
-      required_door_name: "front"
+      required_door_name: "inngangsdor"
       door_open_value: "open"
       motion_on_value: "on"
       followup_minutes: 10

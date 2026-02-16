@@ -5,87 +5,248 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>AgingOS Console (MVP)</title>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 20px; max-width: 980px; }
+  /* THEME_TOKENS_V1 (source: proposals.html) */
+  /* STATUSBAR_POLISH_V1 (customer-facing) */
+  .statusbar{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    align-items:center;
+    margin: 8px 0 10px;
+  }
+  .statuschip{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:6px 10px;
+    border-radius:999px;
+    border:1px solid var(--border);
+    background: rgba(255,255,255,0.04);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+    font-size:13px;
+    line-height:18px;
+    white-space:nowrap;
+  }
+  .statuschip > span:nth-child(2){ font-weight:600; }
+  .statuschip .pill{
+    padding:1px 8px;
+    font-size:11px;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.06);
+    text-transform:uppercase;
+    letter-spacing:0.02em;
+  }
+  .smallbtn{
+    background: var(--primary);
+    color: white;
+    border: 0;
+    padding: 7px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 13px;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.22);
+  }
+  .smallbtn:hover{ filter: brightness(1.05); }
+  .smallbtn.secondary{ background: var(--secondary); }
+  .smallbtn:disabled{ opacity:0.5; cursor:not-allowed; }
+  :root{
+    --bg:#0b0f14;
+    --fg:#e6edf3;
+    --muted:#9fb0c0;
+    --link:#7ee787;
+    --card:#0f1620;
+    --border:#1f2a37;
+    --border2:#30363d;
+    --shadow:0 8px 20px rgba(0,0,0,0.25);
+    --primary:#1f6feb;
+    --secondary:#30363d;
+    --ok:#238636;
+    --deg:#d29922;
+    --err:#da3633;
+  }
+  body{ font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; margin:16px; max-width:1400px; background:var(--bg); color:var(--fg); }
+  a{ color:var(--link); }
+  .muted{ color:var(--muted); }
+  .card{ background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px; box-shadow:var(--shadow); }
+  .pill{ display:inline-block; padding:2px 8px; border-radius:999px; border:1px solid var(--border2); background: rgba(255,255,255,0.06); font-size:12px; }
+  button{ background:var(--primary); color:white; border:0; padding:8px 10px; border-radius:10px; cursor:pointer; }
+  button.secondary{ background:var(--secondary); }
+  button.ok{ background:var(--ok); }
+  button.danger{ background:var(--err); }
+  button:disabled{ opacity:0.5; cursor:not-allowed; }
+  input,select{ background:var(--bg); color:var(--fg); border:1px solid var(--border2); border-radius:10px; padding:6px 8px; }
+  table{ width:100%; border-collapse: collapse; }
+  th,td{ padding:8px; border-bottom:1px solid var(--border); vertical-align: top; }
+  th{ text-align:left; color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:0.02em; }
+  code{ background:var(--bg); border:1px solid var(--border); padding:1px 6px; border-radius:8px; }
+
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 20px; max-width:1400px; }
     .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
-    .card { border: 1px solid #ddd; border-radius: 10px; padding: 14px; flex: 1; min-width: 320px; }
-    .muted { color: #666; font-size: 14px; }
-    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #f2f2f2; font-size: 12px; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px; box-shadow:var(--shadow); flex: 1; min-width: 320px; }
+    .muted { color: var(--muted); font-size: 14px; }
+    .pill { display:inline-block; padding:2px 8px; border-radius:999px; background: rgba(255,255,255,0.06); border:1px solid var(--border2); font-size:12px; }
     label { display: inline-block; width: 110px; }
     input { padding: 6px 8px; width: 320px; }
     button { padding: 7px 10px; cursor: pointer; }
     ul { margin: 8px 0 0 18px; }
-    pre { background: #fafafa; border: 1px solid #eee; padding: 10px; border-radius: 8px; overflow:auto; }
+    pre { background: var(--bg); border: 1px solid var(--border); padding: 10px; border-radius: 10px; overflow:auto; }
     h2 { margin-top: 0; }
     a { text-decoration: none; }
-    .finding { border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px; }
+    .finding { border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px; }
     .finding:first-child { border-top: none; padding-top: 0; margin-top: 0; }
     .finding-title { font-weight: 600; }
     .actions { margin-top: 8px; }
-  </style>
+  
+      /* Step 8 (Nav/IA/UX): consistent topbar/nav */
+      .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin:0 0 12px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--card);}
+      .topbar-title{font-weight:700;}
+      .nav{margin-top:4px;display:flex;gap:10px;flex-wrap:wrap;font-size:14px;}
+      .navlink{color:inherit;}
+      .navlink.active{font-weight:700;text-decoration:underline;}
+      .topbar-right{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);}
+      @media (max-width: 700px){.topbar{flex-direction:column;align-items:stretch}.topbar-right{justify-content:flex-start}}
+
+
+      /* INDEX_IA_V1: clearer IA without removing info */
+      .notice { margin: 8px 0 12px; padding: 10px 12px; border:1px solid rgba(210,153,34,0.55); background: rgba(210,153,34,0.10); border-radius:12px; font-size:13px; display:none; color: var(--fg); }
+      .section-title { margin: 16px 0 8px; font-size: 16px; }
+      .quicklinks { margin: 6px 0 12px; font-size: 14px; }
+        /* INDEX_STATUS_COLORS_V2 (customer-facing; theme = proposals.html) */
+        .dot{width:10px;height:10px;border-radius:999px;background:rgba(255,255,255,0.18);display:inline-block;}
+        .dot.ok{background:var(--ok);}
+        .dot.deg{background:var(--deg);}
+        .dot.err{background:var(--err);}
+
+        .sysbanner{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:var(--card);box-shadow:var(--shadow);margin:10px 0 12px;}
+        .sysbanner.ok{border-color:rgba(35,134,54,0.55);}
+        .sysbanner.deg{border-color:rgba(210,153,34,0.55);}
+        .sysbanner.err{border-color:rgba(218,54,51,0.55);}
+        .sysbanner .title{font-weight:800;font-size:16px;letter-spacing:0.01em;}
+        .sysbanner .meta{color:var(--muted);font-size:12px;}
+
+        .details summary { cursor:pointer; }
+  /* INDEX_DASHGRID_V1: 3-col dashboard on wide screens */
+  .dashgrid{display:grid;grid-template-columns:1fr;gap:16px;align-items:start;}
+  .dashgrid .card{min-width:0;}
+  .dashgrid > .card{flex:initial;width:auto;}
+  .dashgrid .spanall{grid-column:1/-1;}
+  @media (min-width: 900px){ .dashgrid{grid-template-columns:repeat(2,minmax(0,1fr));} }
+  @media (min-width: 1200px){ .dashgrid{grid-template-columns:repeat(3,minmax(0,1fr));} }
+</style>
 
 <style>
   .rules-grid { display:flex; flex-direction:column; gap:8px; }
-  .rule-row { padding:8px 10px; border:1px solid #eee; border-radius:8px; background:#fafafa; }
+  .rule-row { padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:var(--card); }
   .rule-top { display:flex; gap:10px; flex-wrap:wrap; align-items:baseline; }
   .rule-name code { font-size:12px; }
   .rule-kv { font-size:13px; }
   .rule-meta { margin-top:4px; }
-  .rule-meta small { color:#666; }
+  .rule-meta small { color:var(--muted); }
 </style>
 
 </head>
 <body>
-<div style="margin:12px 0;"><a href="./proposals.html">Proposals (dev)</a></div>
+<div class="topbar">
+    <div>
+      <div class="topbar-title">AgingOS Console</div>
+      <div class="nav">
+        <a class="navlink active" href="./index.html">Status</a>
+        <a class="navlink" href="./events.html">Events</a>
+        <a class="navlink" href="./anomalies.html">Anomalier</a>
+        <a class="navlink" href="./proposals.html">Proposals</a>
+        <a class="navlink" href="./report.html">Rapport</a>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span class="pill" id="apiMini">API: —</span>
+    </div>
+  </div>
+    <!-- INDEX_IA_OVERFOLD_V1 -->
+    <details class="details" style="margin:8px 0 10px;">
+      <summary class="muted">Om denne konsollen</summary>
+      <div class="muted" style="margin-top:6px;">AgingOS Console viser status og hendelser for AgingOS. Tekniske detaljer er tilgjengelig under “Vis detaljer”.</div>
+    </details>
+<div class="notice" id="globalNotice">—</div>
+    <h2 class="section-title">Status</h2>
 
-  <h1>AgingOS Console (MVP)</h1>
-  <p class="muted">Statisk HTML/JS. Henter data fra AgingOS API.</p>
+
+
+  <div class="sysbanner" id="sysBanner">
+    <div>
+      <div class="title" id="sysBannerTitle">SYSTEM: ukjent</div>
+      <div class="meta" id="sysBannerMeta">—</div>
+    </div>
+    <div class="pill" id="sysBannerPill">—</div>
+  </div>
 
 <div class="statusbar" id="statusbar">
-  <span class="statuschip"><span class="dot" id="dotBackend"></span><span>Backend</span><span class="pill" id="stBackend">ukjent</span></span>
+  
+    <span class="statuschip"><span class="dot" id="dotSystem"></span><span>SYSTEM</span><span class="pill" id="stSystem">ukjent</span></span>
+<span class="statuschip"><span class="dot" id="dotBackend"></span><span>Backend</span><span class="pill" id="stBackend">ukjent</span></span>
   <span class="statuschip"><span class="dot" id="dotAI"></span><span>AI</span><span class="pill" id="stAI">ukjent</span></span>
   <span class="statuschip"><span class="dot" id="dotScheduler"></span><span>Scheduler</span><span class="pill" id="stScheduler">ukjent</span></span>
   <span class="statuschip"><span class="dot" id="dotAnom"></span><span>Anomali-runner</span><span class="pill" id="stAnom">ukjent</span></span>
+      <span class="statuschip"><span class="dot" id="dotBaseline"></span><span>Baseline</span><span class="pill" id="stBaseline">ukjent</span></span>
+
   <button class="smallbtn" id="refreshStatusBtn" type="button">Oppdater status</button>
 </div>
-  <p><a href="/events.html">Gå til Events</a></p>
+  
+    <div class="row" style="align-items:center; justify-content:space-between; margin:10px 0 10px;">
+      <div class="right" style="justify-content:flex-start;">
+        <a class="pill" href="/events.html">Events</a>
+        <a class="pill" href="/anomalies.html">Anomalier</a>
+        <a class="pill" href="/report.html">Rapport</a>
+      </div>
+      <div class="right">
+        <a class="pill" href="/report.html" title="Åpner rapport/driftpakke">Generer driftpakke →</a>
+      </div>
+    </div>
+  <!-- INDEX_CONTROLS_DETAILS_V1 -->
+  <details class="details" style="margin: 10px 0 6px;">
+    <summary class="muted">Innstillinger / Tilkobling (admin)</summary>
+    <div style="margin-top:10px;">
+    <div class="card">
+        <div><span class="pill">Tilkobling</span></div>
+        <p>
+          <label>API Base:</label>
+          <input id="apiBase" value="/api" />
+        </p>
+        <p>
+          <label>X-API-Key:</label>
+          <input id="apiKey" placeholder="sett X-API-Key" />
+          <button id="saveBtn">Lagre</button>
+          <button id="refreshBtn">Oppdater</button>
+            <label style="margin-left:12px;width:auto"><input type="checkbox" id="proposalsTest" /> Proposals test</label>
+        </p>
+        <div class="muted">Nøkkelen lagres lokalt i nettleseren (localStorage).</div>
+          <div class="muted" id="authLine">Auth: —</div>
+      </div>
+    </div>
+    <div class="muted small" style="margin-top:8px;">
+      Dette påvirker kun denne nettleseren (localStorage).
+    </div>
+  </details>
+<h2 class="section-title">Resultater</h2>
 
-  <div class="card">
-    <div><span class="pill">Tilkobling</span></div>
-    <p>
-      <label>API Base:</label>
-      <input id="apiBase" value="/api" />
-    </p>
-    <p>
-      <label>X-API-Key:</label>
-      <input id="apiKey" placeholder="sett X-API-Key" />
-      <button id="saveBtn">Lagre</button>
-      <button id="refreshBtn">Oppdater</button>
-        <label style="margin-left:12px;width:auto"><input type="checkbox" id="proposalsTest" /> Proposals test</label>
-    </p>
-    <div class="muted">Nøkkelen lagres lokalt i nettleseren (localStorage).</div>
-  </div>
-
-  <div class="row">
-
-<div class="card">
-  <h2>Systemstatus</h2>
-  <div class="muted">Viser om backend, scheduler og anomalies-runner faktisk kjører.</div>
-  <div style="margin-top:10px">
-    <button id="refreshStatusBtn">Oppdater status</button>
-    <button id="runAnomLatestBtn" style="margin-left:8px">Kjør anomalier (siste bucket)</button>
-  </div>
-  <pre id="sysStatus" style="margin-top:10px">Trykk "Oppdater status".</pre>
-</div>
-
-  <div class="card">
+  <div class="dashgrid">
+    <div class="card spanall">
     <h2>Systemstatus</h2>
+      <!-- INDEX_SYS_SOURCES_V1 -->
+      <details class="details" style="margin:6px 0 10px;">
+        <summary class="muted">Datakilder (teknisk)</summary>
+        <div class="muted small" style="margin-top:6px;">
+          Backend: <code>/api/health</code> · Analyse: <code>/api/ai/status</code> · Baseline: <code>/api/baseline/status</code>
+        </div>
+      </details>
     <div class="grid2">
       <div>
         <div class="kv">
-          <div class="k">Backend /health</div><div class="v" id="sysHealth">—</div>
-          <div class="k">AI /ai/status</div><div class="v" id="sysAI">—</div>
-          <div class="k">Scheduler jobs</div><div class="v" id="sysJobs">—</div>
+          <div class="k">Backend</div><div class="v" id="sysHealth">—</div>
+          <div class="k">Analyse (AI)</div><div class="v" id="sysAI">—</div>
+          <div class="k">Scheduler</div><div class="v" id="sysJobs">—</div>
           <div class="k">Anomali-runner</div><div class="v" id="sysAnom">—</div>
+            <div class="k">Baseline</div><div class="v" id="sysBaseline">—</div>
         </div>
         <div class="actions" style="margin-top:10px">
           <button class="smallbtn" id="runAnomLatestBtn" type="button">Kjør anomalier (siste bucket)</button>
@@ -95,11 +256,108 @@
       <div>
         <details class="details">
           <summary>Vis detaljer (JSON)</summary>
-          <pre id="sysDetails">Trykk "Oppdater".</pre>
+          <pre id="sysStatus">Trykk "Oppdater status".</pre>
         </details>
       </div>
     </div>
-  </div>
+
+    </div>
+    </div>
+
+
+    <div class="card" id="coverageCard">
+      <h2>Coverage (ingest per rom)</h2>
+      <!-- INDEX_COVERAGE_HELP_V1 -->
+        <div class="muted">Dekning per rom basert på siste events (siste 24t).</div>
+        <details class="details" style="margin-top:6px;">
+          <summary class="muted">Hjelp (teknisk)</summary>
+          <div class="muted small" style="margin-top:6px;">
+            Datakilde: <code>/api/events</code>. “Rooms expected” settes lokalt i nettleseren (localStorage) fordi backend ikke eksponerer forventede rom.
+          </div>
+        </details>
+
+      <div style="margin-top:10px" class="grid2">
+        <div>
+          <div class="kv">
+            <div class="k">Rooms seen</div><div class="v" id="covRoomsSeen">—</div>
+            <div class="k">Rooms expected</div><div class="v" id="covRoomsExpected">—</div>
+            <div class="k">Missing expected</div><div class="v" id="covRoomsMissing">—</div>
+            <div class="k">Unknown room events</div><div class="v" id="covUnknownCount">—</div>
+          </div>
+
+          <div style="margin-top:10px">
+            <label>Rooms expected (comma-sep):</label>
+            <input id="expectedRooms" placeholder="f.eks: soverom,baderom,stue" style="width:100%" />
+            <div style="margin-top:6px">
+              <button class="smallbtn" id="saveExpectedRoomsBtn" type="button">Lagre expected</button>
+            </div>
+            <div class="muted">Lagrer i localStorage: <code>agingos_expected_rooms</code></div>
+          </div>
+
+          <div class="muted" id="covMsg" style="margin-top:10px">—</div>
+        </div>
+
+        <div>
+          <details class="details">
+            <summary>Per rom (last seen + counts)</summary>
+            <div style="overflow:auto;max-height:360px">
+              <table class="table" id="covTable">
+                <thead>
+                  <tr><th>Rom</th><th>Last seen</th><th>5m</th><th>60m</th><th>24h</th></tr>
+                </thead>
+                <tbody id="covTbody"></tbody>
+              </table>
+            </div>
+          </details>
+        </div>
+      </div>
+    </div>
+    <div class="card" id="baselineCard">
+      <h2>Baseline</h2>
+      <!-- INDEX_BASELINE_HELP_V1 -->
+        <div class="muted">Baseline viser om systemet har nok historikk til å vurdere “normal” aktivitet.</div>
+        <details class="details" style="margin-top:6px;">
+          <summary class="muted">Hjelp (teknisk)</summary>
+          <div class="muted small" style="margin-top:6px;">
+            Datakilder: <code>/api/baseline/status</code> (global) og <code>/api/baseline</code> (per rom). Viser kun felter som faktisk returneres av API.
+          </div>
+        </details>
+
+      <div style="margin-top:10px" class="grid2">
+        <div>
+          <div class="kv">
+            <div class="k">Global baseline</div><div class="v" id="baseGlobalStatus">—</div>
+            <div class="k">Model window</div><div class="v" id="baseWindow">—</div>
+            <div class="k">Days with data</div><div class="v" id="baseDaysWithData">—</div>
+            <div class="k">Min days required</div><div class="v" id="baseMinDays">—</div>
+            <div class="k">Room bucket rows (status)</div><div class="v" id="baseRbRowsStatus">—</div>
+            <div class="k">Room bucket rows (fetched)</div><div class="v" id="baseRbRowsFetched">—</div>
+            <div class="k">Room bucket supported (status)</div><div class="v" id="baseRbSuppStatus">—</div>
+            <div class="k">Room bucket supported (fetched)</div><div class="v" id="baseRbSuppFetched">—</div>
+            <div class="k">Coverage (room_bucket)</div><div class="v" id="baseCoverageRoomBucket">—</div>
+            <div class="k">Coverage (transition)</div><div class="v" id="baseCoverageTransition">—</div>
+            <div class="k">Rooms with baseline data</div><div class="v" id="baseRoomsWith">—</div>
+            <div class="k">Missing baseline for expected</div><div class="v" id="baseMissingExpected">—</div>
+          </div>
+          <div class="muted" id="baseMsg" style="margin-top:10px">—</div>
+        </div>
+        <div>
+          <details class="details">
+            <summary>Per rom (summary)</summary>
+            <div style="overflow:auto;max-height:360px">
+              <table class="table" id="baseTable">
+                <thead>
+                  <tr><th>Rom</th><th>Rows</th><th>Min bucket</th><th>Max bucket</th></tr>
+                </thead>
+                <tbody id="baseTbody"></tbody>
+              </table>
+            </div>
+          </details>
+        </div>
+      </div>
+    </div>
+
+
 
   <div class="card">
     <h2>AI-status</h2>
@@ -108,7 +366,7 @@
 
     <div class="card">
       <h2>Insights</h2>
-      <div id="insightsNote" style="display:none;margin:6px 0;padding:6px 8px;background:#fff6e5;border:1px solid #ffe3ad;border-radius:6px;font-size:12px"></div>
+      <div id="insightsNote" style="display:none;margin:6px 0;padding:6px 8px;background:rgba(210,153,34,0.10);border:1px solid rgba(210,153,34,0.55);border-radius:10px;font-size:12px;color:var(--fg)"></div>
       <div id="insightsList" class="muted">Trykk "Oppdater".</div>
     </div>
 
@@ -124,26 +382,132 @@
     </div>
   </div>
 
-      <div id="anomaliesNote" style="display:none;margin:6px 0;padding:6px 8px;background:#fff6e5;border:1px solid #ffe3ad;border-radius:6px;font-size:12px"></div>
+      <div id="anomaliesNote" style="display:none;margin:6px 0;padding:6px 8px;background:rgba(210,153,34,0.10);border:1px solid rgba(210,153,34,0.55);border-radius:10px;font-size:12px;color:var(--fg)"></div>
       <div id="anomaliesList" class="muted">Trykk "Oppdater".</div>
 
     </div>
 
     <div class="card">
       <h2>Forslag (Sprint 3)</h2>
-      <div id="proposalsNote" style="display:none;margin:6px 0;padding:6px 8px;background:#fff6e5;border:1px solid #ffe3ad;border-radius:6px;font-size:12px"></div>
+      <div id="proposalsNote" style="display:none;margin:6px 0;padding:6px 8px;background:rgba(210,153,34,0.10);border:1px solid rgba(210,153,34,0.55);border-radius:10px;font-size:12px;color:var(--fg)"></div>
       <div id="proposalsList" class="muted">Trykk "Oppdater".</div>
         <div id="proposalsDebug" class="muted" style="margin-top:6px;font-size:12px"></div>
     </div>
   </div>
 
   <script>
+  // TOPBAR_API_MINI v1
+
+  // INDEX_STATUS_COLORS_V1
+  function _lvlFromText(t){
+    const x = String(t||"").toUpperCase();
+    if (x.includes("ERROR")) return "err";
+    if (x.includes("DEGRADED") || x.includes("WARN") || x.includes("ADVAR")) return "deg";
+    if (x.includes("OK")) return "ok";
+    return "";
+  }
+  function setChip(which, level, text){
+    const dot = document.getElementById("dot"+which);
+    const pill = document.getElementById("st"+which);
+    if (dot){
+      dot.classList.remove("ok","deg","err");
+      if (level) dot.classList.add(level);
+    }
+    if (pill && text!=null) pill.textContent = text;
+  }
+  function _indexApplyColors(){
+    // Read whatever the existing status logic already wrote into the pills
+    const mapping = ["System","Backend","AI","Scheduler","Anom","Baseline"];
+    for (const w of mapping){
+      const pill = document.getElementById("st"+w);
+      if (!pill) continue;
+      const txt = pill.textContent || "";
+      const lvl = _lvlFromText(txt);
+      if (lvl) {
+        const dot = document.getElementById("dot"+w);
+        if (dot){
+          dot.classList.remove("ok","deg","err");
+          dot.classList.add(lvl);
+        }
+      }
+    }
+
+    // Big banner mirrors SYSTEM state
+    const st = document.getElementById("stSystem");
+    const lvl = _lvlFromText(st ? st.textContent : "");
+    const b = document.getElementById("sysBanner");
+    const t = document.getElementById("sysBannerTitle");
+    const p = document.getElementById("sysBannerPill");
+    if (b){
+      b.classList.remove("ok","deg","err");
+      if (lvl) b.classList.add(lvl);
+    }
+    const sysTxt = st ? (st.textContent || "ukjent") : "ukjent";
+    if (t) t.textContent = "SYSTEM: " + sysTxt;
+    if (p) p.textContent = sysTxt;
+  }
+
+  // INDEX_IA_V1
+  function _indexUpdateNotice() {
+    const el = document.getElementById("globalNotice");
+    if (!el) return;
+    const base = _topbarGetApiBase();
+    const key  = _topbarGetApiKey();
+    if (!key) {
+      el.style.display = "block";
+      el.textContent = "Mangler X-API-Key. Sett nøkkel under “Kontroller” og trykk “Oppdater status”. (API: " + base + ")";
+      return;
+    }
+    el.style.display = "none";
+    el.textContent = "";
+  }
+
+  function _topbarGetApiBase() {
+    let v = "";
+    try { const el = document.getElementById("apiBase"); if (el && el.value) v = el.value; } catch(e) {}
+    if (!v) { try { v = localStorage.getItem("agingos_api_base") || localStorage.getItem("apiBase") || "/api"; } catch(e) { v = "/api"; } }
+    v = String(v || "/api").trim();
+    if (v.length > 1 && v.endsWith("/")) v = v.slice(0, -1);
+    return v;
+  }
+  function _topbarGetApiKey() {
+    let v = "";
+    try { const el = document.getElementById("apiKey"); if (el && el.value) v = el.value; } catch(e) {}
+    if (!v) { try { v = localStorage.getItem("agingos_api_key") || localStorage.getItem("apiKey") || ""; } catch(e) {} }
+    return String(v || "").trim();
+  }
+  function _topbarUpdateApiMini() {
+    const el = document.getElementById("apiMini");
+    if (!el) return;
+    const base = _topbarGetApiBase();
+    const key  = _topbarGetApiKey();
+    el.textContent = "API: " + base + " | key: " + (key ? "SET" : "NOT SET");
+  }
+  (function(){
+    try { _topbarUpdateApiMini(); } catch(e) {}
+    try { _indexUpdateNotice(); } catch(e) {}
+    ["apiBase","apiKey"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener("input", () => { try { _topbarUpdateApiMini(); } catch(e) {} });
+      el.addEventListener("change", () => { try { _topbarUpdateApiMini(); } catch(e) {} });
+    });
+    window.addEventListener("storage", (ev) => {
+      const k = ev && ev.key ? String(ev.key) : "";
+      if (!k) return;
+      if (k.startsWith("agingos_api_") || k === "apiBase" || k === "apiKey") {
+        try { _topbarUpdateApiMini(); } catch(e) {}
+      }
+    });
+    setTimeout(() => { try { _topbarUpdateApiMini(); } catch(e) {} }, 0);
+  })();
+
     const $ = (id) => document.getElementById(id);
 
     function loadSettings() {
         const proposalsTestEl = $("proposalsTest");
-      const apiBase = localStorage.getItem("agingos_api_base") || $("apiBase").value;
-      const apiKey = localStorage.getItem("agingos_api_key") || "";
+      const apiBase = localStorage.getItem("agingos_api_base") || localStorage.getItem("apiBase") || $("apiBase").value;
+      const apiKey = localStorage.getItem("agingos_api_key") || localStorage.getItem("apiKey") || "";
       $("apiBase").value = apiBase;
       $("apiKey").value = apiKey;
     }
@@ -152,6 +516,9 @@
         const proposalsTestEl = $("proposalsTest");
       localStorage.setItem("agingos_api_base", $("apiBase").value.trim());
       localStorage.setItem("agingos_api_key", $("apiKey").value.trim());
+      // kompat: behold gamle keys også (kan fjernes senere)
+      localStorage.setItem("apiBase", $("apiBase").value.trim());
+      localStorage.setItem("apiKey", $("apiKey").value.trim());
     }
 
     function getQS(name) {
@@ -634,25 +1001,526 @@
     }
 
     $("saveBtn").addEventListener("click", () => { saveSettings(); refresh(); });
-    $("refreshBtn").addEventListener("click", () => { syncAnomalyRoomToQS(); refresh(); });
+    $("refreshBtn").addEventListener("click", () => { syncAnomalyRoomToQS(); 
+$("saveExpectedRoomsBtn") && $("saveExpectedRoomsBtn").addEventListener("click", () => { try { saveExpectedRooms(); refreshSystemStatus(); } catch (_) {} });
+refresh(); try { refreshSystemStatus(); } catch (_) {} });
 
     loadSettings();
   
-    // --- Systemstatus (vNext minimal) ---
-    async function refreshSystemStatus() {
+    
+function parseExpectedRooms(txt) {
+  return (txt || "")
+    .split(",")
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+function getExpectedRooms() {
+  const fromLS = localStorage.getItem("agingos_expected_rooms") || "";
+  const el = $("expectedRooms");
+  if (el && !el.value) el.value = fromLS;
+  return parseExpectedRooms((el && el.value) ? el.value : fromLS);
+}
+function saveExpectedRooms() {
+  const el = $("expectedRooms");
+  const txt = (el && el.value) ? el.value : "";
+  localStorage.setItem("agingos_expected_rooms", txt);
+  return getExpectedRooms();
+}
+
+// --- Systemstatus (vNext minimal) ---
+async function refreshSystemStatus() {
+  const out = {};
+  const now = new Date();
+
+  // helpers (local to this function for robustness)
+  function setText(id, txt) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = (txt === undefined || txt === null) ? "" : String(txt);
+  }
+  function dot(dotId, level) {
+    const el = document.getElementById(dotId);
+    if (!el) return;
+    const c = (level === "OK") ? "#16a34a" : (level === "DEGRADED") ? "#f59e0b" : "#dc2626";
+    el.style.background = c;
+    el.style.borderColor = c;
+  }
+  function chip(dotId, pillId, level, label) {
+    dot(dotId, level);
+    setText(pillId, label || level.toLowerCase());
+  }
+
+  // auth snapshot (explicit + honest)
+  const key = (document.getElementById("apiKey") && document.getElementById("apiKey").value) || (localStorage.getItem("agingos_api_key") || "");
+  const keySet = !!(key && key.trim().length);
+  setText("authLine", `api_base=${(document.getElementById("apiBase") && document.getElementById("apiBase").value) || "/api"} auth_mode=api_key api_key_set=${keySet}`);
+
+  const degraded = [];
+  const errors = [];
+
+  let backendLevel = "DEGRADED";
+  let aiLevel = "DEGRADED";
+  let schedLevel = "DEGRADED";
+  let anomLevel = "DEGRADED";
+  let baseLevel = "DEGRADED";
+
+  if (!keySet) errors.push("API-key mangler (sett X-API-Key i Tilkobling).");
+
+  // Backend /health
+  try {
+    out.health = await apiGet("/health");
+    backendLevel = "OK";
+    setText("sysHealth", "OK");
+  } catch (e) {
+    out.health_error = String(e && e.message ? e.message : e);
+    backendLevel = "ERROR";
+    setText("sysHealth", "FEIL: " + out.health_error);
+    errors.push("Backend /health feiler");
+  }
+
+  // AI (/ai/status) - offline/disabled => DEGRADED (ikke ERROR)
+  try {
+    out.ai_status = await apiGet("/ai/status");
+    const enabled = !!(out.ai_status && out.ai_status.enabled);
+    const reachable = !!(out.ai_status && out.ai_status.reachable);
+    aiLevel = (enabled && reachable) ? "OK" : "DEGRADED";
+    const txt = enabled ? (reachable ? "OK" : "ENABLED, MEN IKKE REACHABLE") : "DISABLED";
+    setText("sysAI", txt);
+    setText("ao-ai", txt);
+    if (aiLevel !== "OK") degraded.push("AI: " + txt);
+  } catch (e) {
+    out.ai_status_error = String(e && e.message ? e.message : e);
+    aiLevel = "DEGRADED";
+    setText("sysAI", "FEIL: " + out.ai_status_error);
+    setText("ao-ai", "FEIL");
+    degraded.push("AI-status feiler (DEGRADED)");
+  }
+
+  // Scheduler jobs
+  try {
+    out.scheduler_jobs = await apiGet("/anomalies/scheduler_jobs");
+    const n = Array.isArray(out.scheduler_jobs) ? out.scheduler_jobs.length : 0;
+    const nr = (Array.isArray(out.scheduler_jobs) && out.scheduler_jobs[0] && out.scheduler_jobs[0].next_run_time) ? out.scheduler_jobs[0].next_run_time : null;
+    schedLevel = "OK";
+    setText("sysJobs", `${n} job(s)` + (nr ? ` next=${nr}` : ""));
+  } catch (e) {
+    out.scheduler_jobs_error = String(e && e.message ? e.message : e);
+    schedLevel = "DEGRADED";
+    setText("sysJobs", "FEIL: " + out.scheduler_jobs_error);
+    degraded.push("Scheduler jobs feiler");
+  }
+
+  // Runner status
+  try {
+    out.runner_status = await apiGet("/anomalies/runner_status");
+    const rs = out.runner_status || {};
+    const lastRun = rs.last_run_at || null;
+    const lastErrAt = rs.last_error_at || null;
+    const lastErrMsg = rs.last_error_msg || null;
+    const counts = rs.last_counts || null;
+
+    // ERROR only if runner reports a recent error timestamp/message
+    if (lastErrAt || lastErrMsg) {
+      anomLevel = "DEGRADED";
+      degraded.push("Anomali-runner har error nylig");
+    } else {
+      anomLevel = "OK";
+    }
+
+    // stale threshold (MVP): 600s
+    const staleS = 600;
+    if (lastRun) {
+      const t = Date.parse(lastRun);
+      if (!Number.isNaN(t)) {
+        const ageS = Math.round((now.getTime() - t) / 1000);
+        if (ageS > staleS) {
+          anomLevel = "DEGRADED";
+          degraded.push(`Anomali-runner stale (> ${staleS}s)`);
+        }
+      }
+    } else {
+      anomLevel = "DEGRADED";
+      degraded.push("Anomali-runner: last_run_at mangler");
+    }
+
+    const msgParts = [];
+    if (lastRun) msgParts.push("last_run=" + lastRun);
+    if (lastErrAt) msgParts.push("last_error_at=" + lastErrAt);
+    if (lastErrMsg) msgParts.push("last_error_msg=" + lastErrMsg);
+    if (counts) msgParts.push("counts=" + JSON.stringify(counts));
+    setText("sysAnom", msgParts.length ? msgParts.join(" ; ") : "OK");
+  } catch (e) {
+    out.runner_status_error = String(e && e.message ? e.message : e);
+    anomLevel = "DEGRADED";
+    setText("sysAnom", "FEIL: " + out.runner_status_error);
+    degraded.push("Anomali-runner status feiler");
+  }
+    // Baseline status (global + per-rom ærlig)
+    try {
+      out.baseline_status = await apiGet("/baseline/status");
+      const bs = out.baseline_status || {};
+      const ready = !!bs.baseline_ready;
+
+      // --- Baseline card (global fields) ---
+      function setBase(id, v) { try { const el = document.getElementById(id); if (el) el.textContent = (v === undefined || v === null || v === "") ? "—" : String(v); } catch (_) {} }
+
+      setBase("baseGlobalStatus", ready ? "READY" : "NOT READY");
+      setBase("baseWindow", (bs.model_start && bs.model_end) ? (bs.model_start + " → " + bs.model_end) : "—");
+      setBase("baseDaysWithData", (bs.days_with_data !== undefined) ? bs.days_with_data : "—");
+      setBase("baseMinDays", (bs.min_days_required !== undefined) ? bs.min_days_required : "—");
+      setBase("baseRbRowsStatus", (bs.room_bucket_rows !== undefined) ? bs.room_bucket_rows : "—");
+      setBase("baseRbSuppStatus", (bs.room_bucket_supported !== undefined) ? bs.room_bucket_supported : "—");
+      setBase("baseCoverageRoomBucket", (bs.coverage && bs.coverage.room_bucket !== undefined) ? bs.coverage.room_bucket : "—");
+      setBase("baseCoverageTransition", (bs.coverage && bs.coverage.transition !== undefined) ? bs.coverage.transition : "—");
+
+      baseLevel = ready ? "OK" : "DEGRADED";
+      const txt = ready
+        ? `READY (days_with_data=${bs.days_with_data}, window=${bs.days_in_window})`
+        : `NOT READY (days_with_data=${bs.days_with_data}, min=${bs.min_days_required})`;
+      setText("sysBaseline", txt);
+
+      if (!ready) degraded.push("Baseline ikke READY");
+
+      // --- Per-rom baseline summary (from /baseline) ---
+      let baselineRooms = [];
+      let missingBaseline = [];
+      let rbRowsFetched = 0;
+      let rbSuppFetched = 0;
+
       try {
-        const out = {};
-        out.health = await apiGet("/health");
-        try { out.scheduler_jobs = await apiGet("/anomalies/scheduler_jobs"); } catch (e) { out.scheduler_jobs_error = String(e); }
-        try { out.runner_status = await apiGet("/anomalies/runner_status"); } catch (e) { out.runner_status_error = String(e); }
-        try { out.ai_status = await apiGet("/ai/status"); } catch (e) { out.ai_status_error = String(e); }
-        $("sysStatus").textContent = JSON.stringify(out, null, 2);
-      } catch (e) {
-        $("sysStatus").textContent = "Feil: " + (e.message || String(e));
+        
+out.baseline = await apiGet("/baseline?rooms=1");
+
+// BASELINE_ROOMS_RENDER_V1 (robust: bruker kun felter som faktisk finnes i /baseline?rooms=1)
+try {
+  const rooms = (out.baseline && Array.isArray(out.baseline.rooms)) ? out.baseline.rooms : [];
+  const tbody = document.getElementById("baseTbody") || document.getElementById("baseRoomsTbody") || document.getElementById("baseTbody");
+  if (tbody) {
+    tbody.innerHTML = "";
+    // Sorter stabilt på romnavn
+    rooms.sort((a,b) => String(a.room_id||"").localeCompare(String(b.room_id||"")));
+    for (const r of rooms) {
+      const tr = document.createElement("tr");
+      const rid = (r && r.room_id) ? String(r.room_id) : "-";
+      const nrows = (r && (r.n_rows ?? r.rows)) ?? 0;
+      const minb = (r && (r.min_bucket ?? r.minBucket)) ?? "-";
+      const maxb = (r && (r.max_bucket ?? r.maxBucket)) ?? "-";
+      tr.innerHTML = `<td>${rid}</td><td>${nrows}</td><td>${minb}</td><td>${maxb}</td>`;
+      tbody.appendChild(tr);
+    }
+  }
+} catch (e) {
+  // swallow: UI skal ikke knekke hvis baseline-respons endrer seg
+}
+
+// BASELINE_ROOMS_RENDER_V1_END
+
+        const b = out.baseline || {};
+        const rows = Array.isArray(b.baseline_room_bucket) ? b.baseline_room_bucket : [];
+        rbRowsFetched = rows.length;
+
+        const byRoom = {}; // room -> agg
+        for (const r of rows) {
+          const room = (r && r.room_id) ? String(r.room_id) : "__UNKNOWN__";
+          if (!byRoom[room]) byRoom[room] = { room, rows:0, supported:0, actMedian:0, doorMedian:0, supportDaysMax:0 };
+          const a = byRoom[room];
+          a.rows += 1;
+
+          const a_n = Number(r.activity_support_n || 0);
+          const d_n = Number(r.door_support_n || 0);
+          if ((a_n > 0) || (d_n > 0)) { a.supported += 1; rbSuppFetched += 1; }
+
+          if (r.activity_median !== null && r.activity_median !== undefined) a.actMedian += 1;
+          if (r.door_median !== null && r.door_median !== undefined) a.doorMedian += 1;
+
+          const sdA = Number(r.activity_support_days || 0);
+          const sdD = Number(r.door_support_days || 0);
+          const sd = Math.max(Number.isFinite(sdA) ? sdA : 0, Number.isFinite(sdD) ? sdD : 0);
+          if (sd > a.supportDaysMax) a.supportDaysMax = sd;
+        }
+
+        baselineRooms = Object.keys(byRoom).filter(r => r !== "__UNKNOWN__").sort();
+
+          // Fill table (robust): renderer direkte fra /baseline?rooms=1 (out.baseline.rooms)
+          const tbody = document.getElementById("baseTbody");
+          if (tbody) {
+            tbody.innerHTML = "";
+            const roomsArr = (out.baseline && Array.isArray(out.baseline.rooms)) ? out.baseline.rooms : [];
+            const list = roomsArr
+              .filter(r => r && r.room_id != null)
+              .map(r => ({
+                room: String(r.room_id),
+                n_rows: (r.n_rows != null) ? Number(r.n_rows) : 0,
+                min_bucket: (r.min_bucket != null) ? r.min_bucket : "",
+                max_bucket: (r.max_bucket != null) ? r.max_bucket : "",
+              }))
+              .sort((a,b) => (a.room > b.room ? 1 : -1));
+
+            for (const r of list) {
+              const tr = document.createElement("tr");
+              // Render cells safely (no escHtml dependency)
+              tr.innerHTML = "<td></td><td></td><td></td><td></td>";
+              tr.children[0].textContent = r.room;
+              tr.children[1].textContent = String(r.n_rows);
+              tr.children[2].textContent = (r.min_bucket === "" ? "" : String(r.min_bucket));
+              tr.children[3].textContent = (r.max_bucket === "" ? "" : String(r.max_bucket));
+              tbody.appendChild(tr);
+            }
+          }
+
+        /* BASELINE_ROOMS_V2 */
+        // Robust: /baseline?rooms=1 returnerer {status, rooms:[{room_id,n_rows,...}]} (ikke baseline_room_bucket)
+        try {
+          const roomsArr = (out.baseline && Array.isArray(out.baseline.rooms)) ? out.baseline.rooms : null;
+          if (roomsArr) {
+            // Rooms with baseline data
+            baselineRooms = roomsArr
+              .map(r => (r && r.room_id != null) ? String(r.room_id) : "")
+              .filter(Boolean);
+
+            // "Fetched" for room buckets: sum n_rows fra rooms-lista
+            rbRowsFetched = roomsArr.reduce((acc, r) => acc + (r && Number.isFinite(+r.n_rows) ? (+r.n_rows) : 0), 0);
+
+            // Supported rows finnes ikke i rooms-only respons (vi lar den stå ukjent i UI)
+              // Supported kan ikke utledes fra rooms-lista; bruk /baseline/status hvis tilgjengelig
+              rbSuppFetched = (out.baseline_status && (out.baseline_status.room_bucket_supported != null))
+                ? Number(out.baseline_status.room_bucket_supported)
+                : "?";
+          }
+        } catch (_) {}
+
+// Compare to expected rooms (coverage settings)
+        const expected = getExpectedRooms();
+        missingBaseline = expected.filter(x => !baselineRooms.includes(String(x)));
+
+        setBase("baseRoomsWith", baselineRooms.length ? baselineRooms.join(", ") : "(ingen)");
+        setBase("baseMissingExpected", expected.length ? (missingBaseline.length ? missingBaseline.join(", ") : "(ingen)") : "(unknown — sett expected)");
+        setBase("baseRbRowsFetched", rbRowsFetched);
+        setBase("baseRbSuppFetched", rbSuppFetched);
+
+        const baseNotes = [];
+        // If expected rooms are set and baseline missing for some -> DEGRADED
+        if (expected.length && missingBaseline.length) {
+          baseLevel = "DEGRADED";
+          baseNotes.push("Baseline mangler for expected: " + missingBaseline.join(", "));
+        }
+
+        // If baseline coverage is low (reported) -> DEGRADED (MVP threshold)
+        const covRb = (bs.coverage && typeof bs.coverage.room_bucket === "number") ? bs.coverage.room_bucket : null;
+        if (covRb !== null && covRb < 0.2) {
+          baseLevel = "DEGRADED";
+          baseNotes.push(`Lav baseline coverage (room_bucket=${covRb} < 0.2)`);
+        }
+
+        const msg = baseNotes.length ? ("DEGRADED: " + baseNotes.join(" ; ")) : "OK";
+        setBase("baseMsg", msg);
+        if (baseNotes.length) degraded.push("Baseline: " + baseNotes.join(" ; "));
+      } catch (e2) {
+        out.baseline_error = String(e2 && e2.message ? e2.message : e2);
+        
+          // DEBUG_BASELINE_FAIL_V1
+          try { console.log("[baseline fail]", out.baseline_error); } catch (_) {}
+setBase("baseRbRowsFetched", "?");
+        setBase("baseRbSuppFetched", (out.baseline_status && (out.baseline_status.room_bucket_supported != null)) ? String(out.baseline_status.room_bucket_supported) : "?");
+setBase("baseRoomsWith", "—");
+        setBase("baseMissingExpected", "—");
+        setBase("baseMsg", "DEGRADED: kunne ikke hente /baseline (" + out.baseline_error + ")");
+        degraded.push("Baseline /baseline feiler");
+        // Keep baseLevel at least DEGRADED
+        if (baseLevel == "OK") baseLevel = "DEGRADED";
+      }
+    } catch (e) {
+      out.baseline_status_error = String(e && e.message ? e.message : e);
+      baseLevel = "DEGRADED";
+      setText("sysBaseline", "FEIL: " + out.baseline_status_error);
+
+      // Baseline-card global fields become unknown
+      try {
+        const ids = ["baseGlobalStatus","baseWindow","baseDaysWithData","baseMinDays","baseRbRowsStatus","baseRbRowsFetched","baseRbSuppStatus","baseRbSuppFetched","baseCoverageRoomBucket","baseCoverageTransition","baseRoomsWith","baseMissingExpected","baseMsg"];
+        for (const id of ids) { const el = document.getElementById(id); if (el) el.textContent = "—"; }
+      } catch (_) {}
+
+      degraded.push("Baseline status feiler");
+    }
+
+  // Events ingest + coverage per rom
+  try {
+      // Coverage must be computed from a 24h window, not a truncated latest-50 sample
+      const sinceIso = new Date(now.getTime() - 24*60*60*1000).toISOString();
+      const untilIso = new Date(now.getTime()).toISOString();
+      out.events = await apiGet(`/events?since=${encodeURIComponent(sinceIso)}&until=${encodeURIComponent(untilIso)}&limit=1000`);
+
+    const events = Array.isArray(out.events) ? out.events : [];
+    const last = events.length ? events[0] : null;
+    setText("ao-last-ts", last && last.timestamp ? last.timestamp : "(ingen)");
+
+    const sinceMs = Date.parse(sinceIso);
+    const untilMs = Date.parse(untilIso);
+
+    // Bruk samme "nå" som queryen brukte
+    const nowMs = Number.isFinite(untilMs) ? untilMs : Date.now();
+
+    const t5  = nowMs - 5*60*1000;
+    const t60 = nowMs - 60*60*1000;
+    // 24t-vinduet skal være nøyaktig det vi spurte API om
+    const t24 = Number.isFinite(sinceMs) ? sinceMs : (nowMs - 24*60*60*1000);
+let c5 = 0, c60 = 0;
+    const lines = [];
+
+    const byRoom = {}; // room -> {lastTs, c5,c60,c24}
+    let unknownCount = 0;
+
+    for (let i=0; i<events.length; i++) {
+      const e = events[i] || {};
+      const ts = Date.parse(e.timestamp);
+      const payload = e.payload || {};
+      const room = (payload.room || payload.area) ? (payload.room || payload.area) : "__UNKNOWN__";
+      if (room === "__UNKNOWN__") unknownCount++;
+      if (!byRoom[room]) byRoom[room] = { room: room, lastTs: null, c5:0, c60:0, c24:0 };
+
+      if (!Number.isNaN(ts)) {
+        if (ts >= t5) { c5++; byRoom[room].c5++; }
+        if (ts >= t60) { c60++; byRoom[room].c60++; }
+        if (ts >= t24 && ts <= nowMs) { byRoom[room].c24++; }
+        if (!byRoom[room].lastTs || ts > Date.parse(byRoom[room].lastTs)) byRoom[room].lastTs = e.timestamp;
+      }
+
+      if (i < 10) {
+        const rtxt = (room === "__UNKNOWN__") ? "-" : room;
+        lines.push(`${e.timestamp || "-"}  ${e.category || "-"}  room=${rtxt}  id=${e.id || "-"}`);
       }
     }
 
-    if ($("refreshStatusBtn")) $("refreshStatusBtn").onclick = () => refreshSystemStatus();
+    setText("ao-c5", String(c5));
+    setText("ao-c60", String(c60));
+    setText("ao-feed", lines.join("\n"));
+
+    // Coverage UI fields (uses expected rooms helpers)
+    const roomsSeen = Object.keys(byRoom).filter(r => r !== "__UNKNOWN__").sort();
+    const expected = getExpectedRooms();
+    const missing = expected.filter(r => !roomsSeen.includes(r));
+
+    setText("covRoomsSeen", roomsSeen.length ? roomsSeen.join(", ") : "(ingen)");
+    setText("covRoomsExpected", expected.length ? expected.join(", ") : "(unknown — sett manuelt)");
+    setText("covRoomsMissing", missing.length ? missing.join(", ") : "(ingen)");
+    setText("covUnknownCount", String(unknownCount));
+
+    const tbody = document.getElementById("covTbody");
+    if (tbody) {
+      tbody.innerHTML = "";
+      const rows = Object.values(byRoom).sort((a,b) => (a.room > b.room ? 1 : -1));
+      for (const r of rows) {
+        const tr = document.createElement("tr");
+        const name = (r.room === "__UNKNOWN__") ? "(ukjent rom)" : r.room;
+        tr.innerHTML = `<td>${name}</td><td>${r.lastTs || "-"}</td><td>${r.c5}</td><td>${r.c60}</td><td>${r.c24}</td>`;
+        tbody.appendChild(tr);
+      }
+    }
+
+    // Coverage thresholds (MVP)
+    let covDegraded = false;
+    const notes = [];
+    if (!expected.length) { covDegraded = true; notes.push("Rooms expected er ikke satt"); }
+    if (missing.length) { covDegraded = true; notes.push("Mangler expected: " + missing.join(", ")); }
+
+    const min24 = 5;
+    const staleH = 6;      // soft warn
+    const staleHardH = 72; // hard degraded (likely offline)
+
+    for (const r of expected) {
+      const rr = byRoom[r];
+      const c24 = rr ? rr.c24 : 0;
+      if (c24 < min24) { covDegraded = true; notes.push(`${r}: lav events 24h (${c24} < ${min24})`); }
+      if (rr && rr.lastTs) {
+        const ageS = Math.round((nowMs - Date.parse(rr.lastTs))/1000);
+        if (!Number.isNaN(ageS) && ageS > staleHardH*3600) { covDegraded = true; notes.push(`${r}: stale last_seen (> ${staleHardH}h)`); }
+        else if (!Number.isNaN(ageS) && ageS > staleH*3600) { notes.push(`${r}: stale last_seen (> ${staleH}h)`); }
+      } else {
+        covDegraded = true;
+        notes.push(`${r}: ingen data`);
+      }
+    }
+
+    if (covDegraded) {
+      degraded.push("Coverage: " + notes.join(" ; "));
+      setText("covMsg", "DEGRADED: " + notes.join(" ; "));
+    } else {
+      setText("covMsg", "OK");
+    }
+  } catch (e) {
+    out.events_error = String(e && e.message ? e.message : e);
+    setText("ao-last-ts", "?");
+    setText("ao-c5", "?");
+    setText("ao-c60", "?");
+    setText("ao-feed", "Kunne ikke hente /api/events (sjekk API-key / proxy).");
+    degraded.push("Events/ingest feiler");
+    setText("covMsg", "FEIL: Events/ingest feiler");
+  }
+
+  // SYSTEM status text + overall chip
+  if (!keySet) {
+    setText("sysMsg", "ERROR: API-key mangler (sett X-API-Key i Tilkobling).");
+  } else if (backendLevel === "ERROR") {
+    setText("sysMsg", "ERROR: Backend feiler (se /health).");
+  } else {
+    const state = errors.length ? "ERROR" : (degraded.length ? "DEGRADED" : "OK");
+    const msg = (errors.length ? ("ERRORS: " + errors.join(" ; ")) : "") +
+                (degraded.length ? ((errors.length ? " | " : "") + "DEGRADED: " + degraded.join(" ; ")) : "") ||
+                "OK";
+    setText("sysMsg", state + ": " + msg);
+  }
+
+  // Chips
+  chip("dotBackend", "stBackend", backendLevel, backendLevel);
+  chip("dotAI", "stAI", aiLevel, aiLevel);
+  chip("dotScheduler", "stScheduler", schedLevel, schedLevel);
+  chip("dotAnom", "stAnom", anomLevel, anomLevel);
+  chip("dotBaseline", "stBaseline", baseLevel, baseLevel);
+
+  let systemLevel = "OK";
+  if (!keySet || backendLevel === "ERROR" || errors.length) systemLevel = "ERROR";
+  else if (degraded.length || [aiLevel, schedLevel, anomLevel, baseLevel].some(x => x === "DEGRADED")) systemLevel = "DEGRADED";
+  chip("dotSystem", "stSystem", systemLevel, systemLevel);
+
+    // INDEX_BANNER_META_V1
+    try {
+      var _now2 = new Date();
+      var ts = _now2.toLocaleString("nb-NO", { timeZone: "Europe/Oslo", year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", second:"2-digit" });
+      var meta = "Sist oppdatert: " + ts;
+
+      // Short reason (do not remove full sysMsg; this is a summary only)
+      var reasons = [];
+      try {
+        if (errors && errors.length) reasons = reasons.concat(errors.slice(0,2));
+      } catch(e) {}
+      try {
+        if (degraded && degraded.length) reasons = reasons.concat(degraded.slice(0,2));
+      } catch(e) {}
+
+      if (systemLevel && String(systemLevel).toUpperCase() !== "OK" && reasons.length) {
+        meta += " · Årsak: " + reasons.join(" | ");
+      }
+
+      var metaEl = document.getElementById("sysBannerMeta");
+      if (metaEl) metaEl.textContent = meta;
+
+      // Make banner title match the computed systemLevel (already mirrored from stSystem, but keep deterministic)
+      var titleEl = document.getElementById("sysBannerTitle");
+      if (titleEl) titleEl.textContent = "SYSTEM: " + systemLevel;
+      var pillEl = document.getElementById("sysBannerPill");
+      if (pillEl) pillEl.textContent = systemLevel;
+    } catch(e) {}
+
+
+  // Observability backend mirror
+  setText("ao-backend", backendLevel === "OK" ? "OK" : (backendLevel === "ERROR" ? "FEIL" : "DEGRADED"));
+
+  // JSON details (sysStatus)  // DEBUG_DEGRADED_V1
+  try { console.log("[degraded]", degraded); } catch (_) {}
+
+  try { document.getElementById("sysStatus").textContent = JSON.stringify(out, null, 2); } catch (_) {}
+}
+
+if ($("refreshStatusBtn")) $("refreshStatusBtn").onclick = () => refreshSystemStatus();
 
     if ($("runAnomLatestBtn")) $("runAnomLatestBtn").onclick = async () => {
       try {
@@ -665,8 +1533,28 @@
       try { await refreshSystemStatus(); } catch (_) {}
     };
 
+window.addEventListener("load", () => { try { refreshSystemStatus(); } catch (_) {} });
+
+
+
+  (function(){
+    try { _indexApplyColors(); } catch(e) {}
+    // Watch status pills for changes so colors follow existing logic without touching it.
+    const ids = ["stSystem","stBackend","stAI","stScheduler","stAnom","stBaseline"];
+    const obs = new MutationObserver(() => { try { _indexApplyColors(); } catch(e) {} });
+    ids.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) obs.observe(el, { characterData:true, childList:true, subtree:true });
+    });
+    // Also re-apply after refresh button clicks
+    const btn = document.getElementById("refreshStatusBtn");
+    if (btn) btn.addEventListener("click", () => { setTimeout(() => { try { _indexApplyColors(); } catch(e) {} }, 0); });
+  })();
+
 </script>
-<section id="agingos-observability" style="margin:16px;padding:12px;border:1px solid #ddd;border-radius:8px;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif">
+  <details class="details" style="margin-top:14px" id="obsDetails"><summary><b>Observability (detaljer)</b> <span class="muted">(valgfritt)</span></summary>
+<!-- INDEX_OBS_DETAILS_V1 -->
+<section id="agingos-observability" style="margin:16px;padding:12px;border:1px solid var(--border);background:var(--card);box-shadow:var(--shadow);border-radius:12px;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif">
   <h2 style="margin:0 0 8px 0;font-size:16px">AgingOS observability</h2>
   <div id="ao-status" style="display:flex;gap:12px;flex-wrap:wrap;font-size:13px">
     <div><b>Backend</b>: <span id="ao-backend">?</span></div>
@@ -677,151 +1565,10 @@
   </div>
   <div style="margin-top:10px">
     <div style="font-size:13px;margin-bottom:6px"><b>Live feed</b> (siste 10)</div>
-    <pre id="ao-feed" style="margin:0;padding:10px;background:#fafafa;border:1px solid #eee;border-radius:6px;max-height:260px;overflow:auto;font-size:12px;line-height:1.35"></pre>
+    <pre id="ao-feed" style="margin:0;padding:10px;background:var(--card);border:1px solid var(--border);border-radius:6px;max-height:260px;overflow:auto;font-size:12px;line-height:1.35"></pre>
   </div>
 </section>
-
-<script>
-// AO_OBS_FIX_V1: Robust observability (ES5/promise; no async/await, no optional chaining)
-(function(){
-  function $(id){ return document.getElementById(id); }
-  function setText(id, txt){
-    var el = $(id);
-    if (el) el.textContent = (txt === undefined || txt === null) ? "" : String(txt);
-  }
-  function fmt(s){ return s ? String(s) : "-"; }
-
-  function fetchJson(url, key){
-    var headers = key ? { "X-API-Key": key } : {};
-    return fetch(url, { headers: headers }).then(function(r){
-      if (!r.ok) throw new Error(url + " -> " + r.status);
-      return r.json();
-    });
-  }
-
-  function sinceIso(mins){
-    return new Date(Date.now() - mins*60*1000).toISOString();
-  }
-
-  function countSince(events, iso){
-    var t0 = Date.parse(iso);
-    var n = 0;
-    for (var i=0; i<(events||[]).length; i++){
-      var ts = Date.parse(events[i] && events[i].timestamp);
-      if (!Number.isNaN(ts) && ts >= t0) n++;
-    }
-    return n;
-  }
-
-  function tick(){
-    var keyEl = document.getElementById("apiKey");
-    var key = (keyEl && keyEl.value) ? keyEl.value : (localStorage.getItem("agingos_api_key") || "");
-
-    fetchJson("/api/health", key).then(function(){
-      setText("ao-backend", "OK");
-    }).catch(function(){
-      setText("ao-backend", "FEIL");
-    });
-
-    fetchJson("/api/ai/status", key).then(function(st){
-      var ok = st && st.enabled && st.reachable;
-      var txt = ok ? "OK" : (st && st.enabled ? "ENABLED, MEN IKKE REACHABLE" : "DISABLED");
-      setText("ao-ai", txt);
-    }).catch(function(){
-      setText("ao-ai", "FEIL");
-    });
-
-    fetchJson("/api/events?limit=50", key).then(function(events){
-      var last = (events && events.length) ? events[0] : null;
-      setText("ao-last-ts", last ? fmt(last.timestamp) : "(ingen)");
-      setText("ao-c5", String(countSince(events, sinceIso(5))));
-      setText("ao-c60", String(countSince(events, sinceIso(60))));
-
-      var lines = [];
-      for (var i=0; i<Math.min(10, (events||[]).length); i++){
-        var e = events[i] || {};
-        var payload = e.payload || {};
-        var room = (payload.room || payload.area) ? (payload.room || payload.area) : "-";
-        lines.push(fmt(e.timestamp) + "  " + fmt(e.category) + "  room=" + room + "  id=" + fmt(e.id));
-      }
-      setText("ao-feed", lines.join("\n"));
-    }).catch(function(){
-      setText("ao-last-ts", "?");
-      setText("ao-c5", "?");
-      setText("ao-c60", "?");
-      setText("ao-feed", "Kunne ikke hente /api/events (sjekk API-key / proxy).");
-    });
-  }
-
-  window.addEventListener("load", function(){
-    try { tick(); } catch(_) {}
-    setInterval(function(){ try { tick(); } catch(_) {} }, 5000);
-  });
-})();
-</script>
-
-<script>
-(() => {
-  const $ = (id) => document.getElementById(id);
-  const fmt = (s) => (s ? String(s) : "-");
-  const sinceIso = (mins) => new Date(Date.now() - mins*60*1000).toISOString();
-
-  async function fetchJson(url){
-    const key = (document.getElementById("apiKey") && document.getElementById("apiKey").value) || localStorage.getItem("agingos_api_key") || "";
-    const headers = key ? { "X-API-Key": key } : {};
-    const r = await fetch(url, { headers });
-    if (!r.ok) throw new Error(url + " -> " + r.status);
-    return await r.json();
-  }
-
-  function countSince(events, iso){
-    const t0 = Date.parse(iso);
-    let n = 0;
-    for (const e of events){
-      const ts = Date.parse(e.timestamp);
-      if (!Number.isNaN(ts) && ts >= t0) n++;
-    }
-    return n;
-  }
-
-  async function tick(){
-    try {
-      await fetchJson("/api/health");
-      $("ao-backend").textContent = "OK";
-    } catch (e) {
-      $("ao-backend").textContent = "FEIL";
-    }
-
-    try {
-      const st = await fetchJson("/api/ai/status");
-      $("ao-ai").textContent = (st.enabled && st.reachable) ? "OK" : (st.enabled ? "ENABLED, MEN IKKE REACHABLE" : "DISABLED");
-    } catch (e) {
-      $("ao-ai").textContent = "FEIL";
-    }
-
-    try {
-      const events = await fetchJson("/api/events?limit=50");
-      const last = (events && events.length) ? events[0] : null;
-      $("ao-last-ts").textContent = last ? fmt(last.timestamp) : "(ingen)";
-      $("ao-c5").textContent = String(countSince(events, sinceIso(5)));
-      $("ao-c60").textContent = String(countSince(events, sinceIso(60)));
-      const lines = (events || []).slice(0, 10).map(e => {
-        const room = e.payload && (e.payload.room || e.payload.area) ? (e.payload.room || e.payload.area) : "-";
-        return `${e.timestamp}  ${e.category}  room=${room}  id=${e.id}`;
-      });
-      $("ao-feed").textContent = lines.join("\n");
-    } catch (e) {
-      $("ao-last-ts").textContent = "?";
-      $("ao-c5").textContent = "?";
-      $("ao-c60").textContent = "?";
-      $("ao-feed").textContent = "Kunne ikke hente /api/events (sjekk API-key / proxy).";
-    }
-  }
-
-  tick();
-  setInterval(tick, 5000);
-})();
-
+</details><script>
   // --- Rules UI (GET /rules) ---
   (function () {
     function $(id) { return document.getElementById(id); }
@@ -919,10 +1666,10 @@
 
       try {
         var qsKey = new URLSearchParams(window.location.search).get("api_key");
-        var key = (qsKey && qsKey.trim()) ? qsKey.trim() : "dev-key-2";
+        var savedKey = (document.getElementById("apiKey") && document.getElementById("apiKey").value) || (localStorage.getItem("agingos_api_key") || "");
+        var key = (qsKey && qsKey.trim()) ? qsKey.trim() : (savedKey && savedKey.trim() ? savedKey.trim() : "");
 
         var resp = await fetch("/rules", { headers: { "X-API-Key": key } });
-        if (resp.status === 401 || resp.status === 403) resp = await fetch("/rules");
         if (!resp.ok) throw new Error("HTTP " + resp.status + " " + resp.statusText);
 
         var rules = await resp.json();

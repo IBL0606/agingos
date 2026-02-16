@@ -5,29 +5,225 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>AgingOS Console – Events</title>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 20px; max-width: 1100px; }
+  /* THEME_TOKENS_V1 (source: proposals.html) */
+  :root{
+    --bg:#0b0f14;
+    --fg:#e6edf3;
+    --muted:#9fb0c0;
+    --link:#7ee787;
+    --card:#0f1620;
+    --border:#1f2a37;
+    --border2:#30363d;
+    --shadow:0 8px 20px rgba(0,0,0,0.25);
+    --primary:#1f6feb;
+    --secondary:#30363d;
+    --ok:#238636;
+    --deg:#d29922;
+    --err:#da3633;
+  }
+
+  body{
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    margin: 16px;
+    max-width: 1400px;
+    background: var(--bg);
+    color: var(--fg);
+  }
+  /* Center wide layouts */
+  @media (min-width: 900px){
+    body{ margin-left:auto; margin-right:auto; }
+  }
+
+  a{ color: var(--link); }
+  .row{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+  @media (max-width: 980px){ .grid2{ grid-template-columns: 1fr; } }
+
+  .card{
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: var(--shadow);
+  }
+  .muted{ color: var(--muted); font-size: 14px; }
+
+  .pill{
+    display:inline-block;
+    padding:2px 8px;
+    border-radius:999px;
+    border:1px solid var(--border2);
+    background: rgba(255,255,255,0.06);
+    font-size:12px;
+  }
+
+  button{
+    background: var(--primary);
+    color: white;
+    border: 0;
+    padding: 8px 10px;
+    border-radius: 12px;
+    cursor: pointer;
+  }
+  button.secondary{ background: var(--secondary); }
+  button:disabled{ opacity:0.5; cursor:not-allowed; }
+
+  input, select{
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    padding: 6px 8px;
+  }
+
+  table{ width:100%; border-collapse: collapse; }
+  th, td{ padding:8px; border-bottom: 1px solid var(--border); vertical-align: top; text-align:left; }
+  th{ color: var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:0.02em; background: transparent; }
+
+  pre{
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 10px;
+    border-radius: 12px;
+    overflow:auto;
+  }
+
+  .notice{
+    margin: 8px 0 12px;
+    padding: 10px 12px;
+    border:1px solid rgba(210,153,34,0.55);
+    background: rgba(210,153,34,0.10);
+    border-radius: 12px;
+    font-size: 13px;
+    display:none;
+    color: var(--fg);
+  }
+
+  /* Make the Step-8 topbar match proposals theme */
+  .topbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:12px;
+    margin:0 0 12px;
+    padding:10px 12px;
+    border:1px solid var(--border);
+    border-radius:12px;
+    background: var(--card);
+    box-shadow: var(--shadow);
+  }
+  .topbar-title{ font-weight:700; color: var(--fg); }
+  .nav{ margin-top:4px; display:flex; gap:10px; flex-wrap:wrap; font-size:13px; }
+  .navlink{ color: var(--link); text-decoration:none; }
+  .navlink.active{ font-weight:700; text-decoration:underline; }
+  .topbar-right{ display:flex; align-items:center; gap:8px; font-size:12px; color: var(--muted); flex-wrap:wrap; justify-content:flex-end; }
+  @media (max-width: 900px){ .topbar{flex-direction:column;align-items:stretch} .topbar-right{justify-content:flex-start} }
+
+  /* Common chips (anomalies/report) */
+  .statuschip{
+    display:inline-flex;
+    gap:6px;
+    align-items:center;
+    padding:6px 10px;
+    border:1px solid var(--border);
+    border-radius:999px;
+    background: rgba(255,255,255,0.04);
+    font-size:13px;
+  }
+
+  /* Report warnbox */
+  .warnbox{
+    margin-top:10px;
+    padding:8px 10px;
+    border:1px solid rgba(210,153,34,0.55);
+    background: rgba(210,153,34,0.10);
+    border-radius: 12px;
+    font-size:12px;
+  }
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 16px; max-width: 1400px; background: var(--bg); color: var(--fg); }
     .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-    .card { border: 1px solid #ddd; border-radius: 10px; padding: 14px; }
-    .muted { color: #666; font-size: 14px; }
+    .card { border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+    .muted { color: var(--muted); font-size: 14px; }
     label { margin-right: 6px; }
     select, input { padding: 6px 8px; }
     button { padding: 7px 10px; cursor: pointer; }
     table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-    th, td { text-align: left; border-bottom: 1px solid #eee; padding: 8px; vertical-align: top; }
-    th { background: #fafafa; }
+    th, td { text-align: left; border-bottom: 1px solid var(--border); padding: 8px; vertical-align: top; }
+    th { background: transparent; }
     code { font-size: 12px; }
     .topbar { display:flex; justify-content: space-between; align-items:center; margin-bottom: 12px; }
     a { text-decoration: none; }
     .btnrow { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-  </style>
+  
+      /* Step 8 (Nav/IA/UX): consistent topbar/nav (override) */
+      .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin:0 0 12px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--card);}
+      .topbar-title{font-weight:700;}
+      .nav{margin-top:4px;display:flex;gap:10px;flex-wrap:wrap;font-size:14px;}
+      .navlink{color:var(--link);text-decoration:none;}
+      .navlink.active{font-weight:700;text-decoration:underline;}
+      .topbar-right{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);}
+      @media (max-width: 700px){.topbar{flex-direction:column;align-items:stretch}.topbar-right{justify-content:flex-start}}
+
+
+      /* EVENTS_NOTICE_V1: clear empty/auth state */
+      .notice { margin: 8px 0 12px; padding: 10px 12px; border:1px solid rgba(210,153,34,0.55); background:rgba(210,153,34,0.10); border-radius:10px; font-size:13px; display:none; }
+
+  /* LEGACY_CSS_TOKENIZED_V1 */
+
+    /* EVENTS_LAYOUT2_V1: customer IA (2-col) */
+    .layout2{ display:grid; grid-template-columns: 1fr; gap:12px; align-items:start; }
+    @media (min-width: 1100px){
+      .layout2{ grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+      .rightcol{ position: sticky; top: 12px; }
+    }
+    .leftcol, .rightcol{ min-width:0; }
+
+
+    /* EVENTS_TABLE_OVERFLOW_V1: prevent rightcol "overlap" by constraining table/payload */
+    .leftcol{ overflow:hidden; }
+    .tablewrap{ overflow:auto; max-width:100%; border-radius:12px; }
+    #tbl{ width:100%; }
+    /* Payload column (6th) should not force layout; keep readable */
+    #tbl td:nth-child(6) code{
+      display:block;
+      max-height: 140px;
+      overflow:auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:6px 8px;
+      background: rgba(255,255,255,0.03);
+    }
+
+</style>
 </head>
 <body>
   <div class="topbar">
-    <h1>Events</h1>
-    <div class="muted"><a href="/">← Tilbake</a></div>
-  </div>
+      <div>
+        <div class="topbar-title">Events</div>
+        
+    <div class="notice" id="globalNotice">—</div>
+<div class="nav">
+          <a class="navlink" href="./index.html">Status</a>
+          <a class="navlink active" href="./events.html">Events</a>
+          <a class="navlink" href="./anomalies.html">Anomalier</a>
+          <a class="navlink" href="./proposals.html">Proposals</a>
+          <a class="navlink" href="./report.html">Rapport</a>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <span class="pill" id="apiMini">API: —</span>
+      </div>
+    </div>
 
-  <div class="card">
+</div>
+
+  
+    <!-- EVENTS_LAYOUT2_V1 -->
+    <div class="layout2">
+      <div class="leftcol">
+<div class="card">
     <div class="row">
       <div>
         <label>Periode:</label>
@@ -44,6 +240,14 @@
         <input id="category" placeholder="(valgfritt, f.eks. motion)" />
       </div>
 
+
+        <div>
+          <label>Rom:</label>
+          <select id="roomSel">
+            <option value="">(alle)</option>
+          </select>
+        </div>
+
       <div>
         <label>Limit:</label>
         <select id="limit">
@@ -53,6 +257,16 @@
           <option selected>1000</option>
         </select>
       </div>
+
+
+        <div>
+          <label>Dupe-vindu (sek):</label>
+          <input id="dupeWindow" type="number" min="1" max="30" step="1" style="width:80px;" value="3" />
+          <label style="margin-left:8px;">
+            <input type="checkbox" id="dupOnly" />
+            vis kun duplikater
+          </label>
+        </div>
 
       <div class="btnrow">
         <button id="loadBtn">Hent</button>
@@ -68,19 +282,89 @@
 
   <div id="status" class="muted" style="margin-top:10px;"></div>
 
+  
+
+    <div class="tablewrap">
   <table id="tbl" style="display:none;">
     <thead>
       <tr>
-        <th>Tid</th>
-        <th>Kategori</th>
-        <th>ID</th>
-        <th>Payload</th>
-      </tr>
+
+          <th>Tid</th>
+          <th>Rom</th>
+          <th>Kategori</th>
+          <th>Dupe</th>
+          <th>ID</th>
+          <th>Payload</th>
+        </tr>
     </thead>
     <tbody id="tbody"></tbody>
   </table>
+</div>
+
+      </div>
+      <div class="rightcol">
+<div id="roomSummary" class="card" style="display:none; margin-top:10px;">
+      <div class="row" style="justify-content: space-between;">
+        <div><strong>Rooms seen</strong> (i valgt periode)</div>
+        <div class="muted" id="roomSummaryMeta"></div>
+      </div>
+      <table style="margin-top:10px;">
+        <thead>
+          <tr>
+            <th>Rom</th>
+            <th>Antall</th>
+            <th>Last seen</th>
+            <th>Andel dupe</th>
+          </tr>
+        </thead>
+        <tbody id="roomSummaryBody"></tbody>
+      </table>
+      <div class="muted" style="margin-top:6px;">
+        “Ukjent rom” betyr at payload mangler både <code>room</code> og <code>area</code>.
+      </div>
+    </div>
+
+
+      </div>
+    </div>
 
   <script>
+      // TOPBAR_API_MINI v1
+
+      // EVENTS_NOTICE_V1
+      function _eventsUpdateNotice() {
+        const el = document.getElementById("globalNotice");
+        if (!el) return;
+        const key = String(getApiKey() || "").trim();
+        if (!key) {
+          el.style.display = "block";
+          el.textContent = "Mangler X-API-Key. Sett nøkkel på Status-siden (index.html) og last siden på nytt.";
+          return;
+        }
+        el.style.display = "none";
+        el.textContent = "";
+      }
+
+      function _topbarUpdateApiMini() {
+        const el = document.getElementById("apiMini");
+        if (!el) return;
+        const base = getApiBase();
+        const key  = String(getApiKey() || "").trim();
+        el.textContent = "API: " + base + " | key: " + (key ? "SET" : "NOT SET");
+      }
+      (function(){
+        try { _topbarUpdateApiMini(); } catch(e) {}
+        try { _eventsUpdateNotice(); } catch(e) {}
+        window.addEventListener("storage", (ev) => {
+          const k = ev && ev.key ? String(ev.key) : "";
+          if (!k) return;
+          if (k.startsWith("agingos_api_") || k === "apiBase" || k === "apiKey") {
+            try { _topbarUpdateApiMini(); } catch(e) {}
+          }
+        });
+        setTimeout(() => { try { _topbarUpdateApiMini(); } catch(e) {} }, 0);
+      })();
+
     function getQS() {
       const p = new URLSearchParams(window.location.search);
       return {
@@ -104,18 +388,57 @@
       rows: [],
       categories: [],
       exhausted: false,
+        roomDupes: {},
+        roomLastSeen: {},
+        roomCounts: {},
+        _isDupeById: {},
+        _dupeLastTsByHash: {},
+        _dupeMetaById: {},
+        dupeStats: { total:0, dupes:0 },
+        dupOnly: false,
+        dupeWindowSec: 3,
     };
 
-    function apiKey() {
-      return localStorage.getItem("agingos_api_key") || "";
+    function getApiBase() {
+      let v =
+        localStorage.getItem("agingos_api_base") ||
+        localStorage.getItem("apiBase") ||
+        "/api";
+      v = String(v || "/api").trim();
+      if (v.length > 1 && v.endsWith("/")) v = v.slice(0, -1);
+      return v;
+    }
+
+    function getApiKey() {
+      return (
+        localStorage.getItem("agingos_api_key") ||
+        localStorage.getItem("apiKey") ||
+        ""
+      );
+    }
+
+    function apiInfoText() {
+      const base = getApiBase();
+      const key = String(getApiKey() || "").trim();
+      return "API base: " + base + " | API key: " + (key ? "satt" : "IKKE satt");
+    }
+
+    function renderApiMini(){
+      const el = document.getElementById("apiMini");
+      if (!el) return;
+      el.textContent = "API: " + base + " | key: " + (key ? "SET" : "—");
     }
 
     async function apiGet(path) {
       const headers = {};
-      const key = apiKey().trim();
+      const key = String(getApiKey() || "").trim();
       if (key) headers["X-API-Key"] = key;
 
-      const res = await fetch("/api" + path, { headers });
+      const base = getApiBase();
+      const pth = String(path || "");
+      const url = base + (pth.startsWith("/") ? pth : ("/" + pth));
+
+      const res = await fetch(url, { headers });
       const text = await res.text();
       if (!res.ok) throw new Error(res.status + " " + text);
       return JSON.parse(text);
@@ -135,24 +458,7 @@
       return { since: isoUTC(since), until: isoUTC(now) };
     }
 
-    function renderAppend(events) {
-      if (state.room) {
-        events = events.filter(ev =>
-          String(((ev.payload || {}).room || "")).trim().toLowerCase() === String(state.room).trim().toLowerCase()
-        );
-      }
-      if (state.categories.length > 0) {
-        events = events.filter(ev => state.categories.includes(String(ev.category || "").toLowerCase()));
-      }
-      if (events.length === 0) return;
-      const tbody = $("tbody");
 
-      for (const ev of events) {
-        const tr = document.createElement("tr");
-        const tdT = document.createElement("td");
-        const tdC = document.createElement("td");
-        const tdI = document.createElement("td");
-        const tdP = document.createElement("td");
 
       function fmtUtc(iso) {
         if (!iso) return "";
@@ -160,19 +466,241 @@
         return t.length >= 16 ? t.slice(0,16) : t;
       }
 
-        tdT.textContent = fmtUtc(ev.timestamp || "");
-        tdC.textContent = ev.category || "";
-        tdI.innerHTML = `<code>${(ev.id || "").slice(0, 16)}…</code>`;
-        tdP.innerHTML = `<code>${JSON.stringify(ev.payload || {}, null, 0)}</code>`;
+      function getRoomLabel(ev) {
+        const p = (ev && ev.payload) ? ev.payload : {};
+        const r = String((p && (p.room || p.area)) || "").trim();
+        return r ? r : "ukjent rom";
+      }
+
+      // Deterministisk stringify: sorterer keys rekursivt
+      function stableStringify(x) {
+        if (x === null || x === undefined) return "null";
+        const t = typeof x;
+        if (t !== "object") return JSON.stringify(x);
+        if (Array.isArray(x)) return "[" + x.map(stableStringify).join(",") + "]";
+        const keys = Object.keys(x).sort();
+        const parts = [];
+        for (const k of keys) {
+          parts.push(JSON.stringify(k) + ":" + stableStringify(x[k]));
+        }
+        return "{" + parts.join(",") + "}";
+      }
+
+      // Lett deterministisk hash (FNV-1a 32-bit) -> hex
+      function hash32Hex(str) {
+        let h = 0x811c9dc5;
+        for (let i = 0; i < str.length; i++) {
+          h ^= str.charCodeAt(i);
+          h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+        }
+        return ("00000000" + h.toString(16)).slice(-8);
+      }
+
+      function loadEventsUiPrefs() {
+        const k = "agingos_events_dupe_window_sec";
+        const v = localStorage.getItem(k);
+        const sec = v ? parseInt(v, 10) : parseInt($("dupeWindow").value || "3", 10);
+        state.dupeWindowSec = Number.isFinite(sec) && sec > 0 ? sec : 3;
+        $("dupeWindow").value = String(state.dupeWindowSec);
+
+        const k2 = "agingos_events_dup_only";
+        const v2 = localStorage.getItem(k2);
+        state.dupOnly = (v2 === "1");
+        $("dupOnly").checked = state.dupOnly;
+      }
+
+      function resetDedupeState() {
+        state.dupeStats = { total:0, dupes:0 };
+        state._dupeLastTsByHash = {};
+        state._isDupeById = {};
+          state._dupeMetaById = {};
+        state.roomCounts = {};
+        state.roomLastSeen = {};
+        state.roomDupes = {};
+      }
+
+      function upsertRoomOptionsFromRows(rows) {
+        const sel = $("roomSel");
+        if (!sel) return;
+        const cur = String(sel.value || "");
+        const setRooms = new Set();
+        for (const ev of (rows || [])) setRooms.add(getRoomLabel(ev));
+        const rooms = Array.from(setRooms);
+        rooms.sort((a,b) => {
+          if (a === "ukjent rom" && b !== "ukjent rom") return -1;
+          if (b === "ukjent rom" && a !== "ukjent rom") return 1;
+          return a.localeCompare(b);
+        });
+
+        sel.innerHTML = "";
+        const optAll = document.createElement("option");
+        optAll.value = "";
+        optAll.textContent = "(alle)";
+        sel.appendChild(optAll);
+        for (const r of rooms) {
+          const o = document.createElement("option");
+          o.value = r;
+          o.textContent = r;
+          sel.appendChild(o);
+        }
+        if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+      }
+
+      function renderRoomSummary() {
+        const wrap = $("roomSummary");
+        const body = $("roomSummaryBody");
+        const meta = $("roomSummaryMeta");
+        if (!wrap || !body || !meta) return;
+
+        const rows = state.rows || [];
+        if (rows.length === 0) { wrap.style.display = "none"; return; }
+
+        const entries = [];
+        for (const room of Object.keys(state.roomCounts || {})) {
+          const count = state.roomCounts[room] || 0;
+          const lastSeen = state.roomLastSeen[room] || "";
+          const dupes = state.roomDupes[room] || 0;
+          entries.push({ room, count, lastSeen, dupes });
+        }
+        entries.sort((a,b) => (b.count - a.count) || a.room.localeCompare(b.room));
+
+        body.innerHTML = "";
+        for (const it of entries) {
+          const tr = document.createElement("tr");
+          const tdR = document.createElement("td");
+          const tdC = document.createElement("td");
+          const tdL = document.createElement("td");
+          const tdD = document.createElement("td");
+          tdR.textContent = it.room;
+          tdC.textContent = String(it.count);
+          tdL.textContent = fmtUtc(it.lastSeen);
+          const pct = it.count > 0 ? Math.round((it.dupes / it.count) * 100) : 0;
+          tdD.textContent = `${pct}% (${it.dupes})`;
+          tr.appendChild(tdR); tr.appendChild(tdC); tr.appendChild(tdL); tr.appendChild(tdD);
+          body.appendChild(tr);
+        }
+
+        meta.textContent = `Dupe-vindu: ${state.dupeWindowSec}s | Totalt lastet: ${rows.length} | Dupe(view): ${state.dupeStats.dupes}/${state.dupeStats.total}`;
+        wrap.style.display = "block";
+      }
+
+      function wireEventsUiPrefs() {
+        $("dupeWindow").addEventListener("change", () => {
+          const sec = parseInt($("dupeWindow").value || "3", 10);
+          state.dupeWindowSec = Number.isFinite(sec) && sec > 0 ? sec : 3;
+          localStorage.setItem("agingos_events_dupe_window_sec", String(state.dupeWindowSec));
+          try { renderApiMini(); } catch (_) {}
+      loadFresh();
+        });
+
+        $("dupOnly").addEventListener("change", () => {
+          state.dupOnly = !!$("dupOnly").checked;
+          localStorage.setItem("agingos_events_dup_only", state.dupOnly ? "1" : "0");
+          loadFresh();
+        });
+
+        $("roomSel").addEventListener("change", () => {
+          state.room = String($("roomSel").value || "").trim();
+          resetTable();
+          resetDedupeState();
+          renderAppend(state.rows || []);
+          renderRoomSummary();
+        });
+      }
+    
+    function renderAppend(events) {
+      const windowSec = Number(state.dupeWindowSec || 3);
+
+      const roomFilter = String(state.room || "").trim();
+      if (roomFilter) {
+        events = events.filter(ev => getRoomLabel(ev) === roomFilter);
+      }
+
+      if (state.categories && state.categories.length > 0) {
+        events = events.filter(ev => state.categories.includes(String(ev.category || "").toLowerCase()));
+      }
+
+      if (events.length === 0) return;
+      const tbody = $("tbody");
+
+      for (const ev of events) {
+        const room = getRoomLabel(ev);
+        const cat = String(ev.category || "");
+        const payload = (ev && ev.payload) ? ev.payload : {};
+
+        const sig = room + "|" + cat + "|" + stableStringify(payload);
+        const h = hash32Hex(sig);
+
+        const ts = String(ev.timestamp || "");
+        const id = String(ev.id || "");
+        let isDupe = false;
+
+
+          let prevTs = null;
+        if (ts) {
+            prevTs = state._dupeLastTsByHash[h] || null;
+            let dtSec = null;
+          if (prevTs) {
+            try {
+              const dt = (Date.parse(prevTs) - Date.parse(ts)) / 1000.0;
+                if (Number.isFinite(dt)) dtSec = dt;
+              if (Number.isFinite(dt) && dt >= 0 && dt <= windowSec) isDupe = true;
+            } catch (_) {}
+          }
+          state._dupeLastTsByHash[h] = ts;
+        }
+
+        state._isDupeById[id] = isDupe;
+
+          // store dupe meta for explainability
+          state._dupeMetaById[id] = { hash: h, prevTs: prevTs || null, ts: ts || null, dtSec: (typeof dtSec === "number" ? dtSec : null) };
+
+        if (state.dupOnly && !isDupe) continue;
+
+        state.dupeStats.total += 1;
+        if (isDupe) state.dupeStats.dupes += 1;
+
+        // room aggregations (for summary)
+        state.roomCounts[room] = (state.roomCounts[room] || 0) + 1;
+        if (!state.roomLastSeen[room] || (ts && ts > state.roomLastSeen[room])) state.roomLastSeen[room] = ts;
+        if (isDupe) state.roomDupes[room] = (state.roomDupes[room] || 0) + 1;
+
+        const tr = document.createElement("tr");
+        const tdT = document.createElement("td");
+        const tdR = document.createElement("td");
+        const tdC = document.createElement("td");
+        const tdD = document.createElement("td");
+        const tdI = document.createElement("td");
+        const tdP = document.createElement("td");
+
+        tdT.textContent = fmtUtc(ts);
+        tdR.textContent = room;
+        tdC.textContent = cat;
+
+        if (isDupe) {
+          const meta = state._dupeMetaById[id] || { hash: h, prevTs: null, ts: ts, dtSec: null };
+            const dts = (typeof meta.dtSec === "number") ? Math.round(meta.dtSec) : null;
+            const tip = `hash=${meta.hash}\nprev=${meta.prevTs || "?"}\nnow=${meta.ts || "?"}\nΔs=${(dts===null?"?":dts)}`;
+            tdD.innerHTML = `<code title="${tip}">DUPE</code> <span class="muted">(${meta.hash})${(dts===null?"":(" Δ"+dts+"s"))}</span>`;
+        } else {
+          tdD.innerHTML = `<span class="muted">—</span>`;
+        }
+
+        tdI.innerHTML = `<code>${id.slice(0, 16)}…</code>`;
+        tdP.innerHTML = `<code>${JSON.stringify(payload || {}, null, 0)}</code>`;
 
         tr.appendChild(tdT);
+        tr.appendChild(tdR);
         tr.appendChild(tdC);
+        tr.appendChild(tdD);
         tr.appendChild(tdI);
         tr.appendChild(tdP);
         tbody.appendChild(tr);
       }
+
       $("tbl").style.display = "table";
     }
+
 
     function resetTable() {
       $("tbody").innerHTML = "";
@@ -184,7 +712,7 @@
     }
 
     async function fetchPage(isMore) {
-      $("status").textContent = isMore ? "Laster mer..." : "Laster...";
+      $("status").textContent = (isMore ? "Laster mer..." : "Laster...") + " — " + apiInfoText();
       const qs = new URLSearchParams();
       qs.set("since", state.since);
       qs.set("until", state.until);
@@ -199,7 +727,10 @@
     async function loadFresh() {
       resetTable();
 
-      const qs = getQS();
+      
+      loadEventsUiPrefs();
+      resetDedupeState();
+const qs = getQS();
 
       // Auto-fetch when deep-linking (auto=1 + since/until) - run once per tab
       try {
@@ -228,8 +759,8 @@
       state.before = null;
       state.rows = [];
       state.exhausted = false;
-      state.room = (qs.room || "").trim();
-      state.categories = state.category
+      state.room = String((qs.room || $("roomSel").value || "")).trim();
+state.categories = state.category
         ? state.category.split(",").map(s => s.trim().toLowerCase()).filter(Boolean)
         : [];
 
@@ -238,14 +769,17 @@
         state.rows = page;
         renderAppend(page);
 
-        // update cursor: last item is oldest in this page (descending order)
+        
+          upsertRoomOptionsFromRows(state.rows);
+          renderRoomSummary();
+// update cursor: last item is oldest in this page (descending order)
         if (page.length > 0) state.before = page[page.length - 1].timestamp;
         if (page.length < state.limit) state.exhausted = true;
 
-        $("status").textContent = `Fant ${state.rows.length} events (viser siste). Periode: ${state.since} → ${state.until}` +
+        $("status").textContent = apiInfoText() + " — " + `Fant ${state.rows.length} events (viser siste). Periode: ${state.since} → ${state.until}` +
           (state.exhausted ? " (ingen flere)" : " (trykk 'Hent flere' for eldre)");
       } catch (e) {
-        $("status").textContent = "Feil: " + e.message + " (Husk å sette X-API-Key på forsiden.)";
+          $("status").textContent = apiInfoText() + " — Feil: " + (e.message || String(e));
       }
 
       updateButtons();
@@ -265,13 +799,16 @@
         state.rows = state.rows.concat(page);
         renderAppend(page);
 
-        state.before = page[page.length - 1].timestamp;
+        
+          upsertRoomOptionsFromRows(state.rows);
+          renderRoomSummary();
+state.before = page[page.length - 1].timestamp;
         if (page.length < state.limit) state.exhausted = true;
 
-        $("status").textContent = `Fant ${state.rows.length} events. Periode: ${state.since} → ${state.until}` +
+        $("status").textContent = apiInfoText() + " — " + `Fant ${state.rows.length} events. Periode: ${state.since} → ${state.until}` +
           (state.exhausted ? " (ingen flere)" : " (trykk 'Hent flere' for eldre)");
       } catch (e) {
-        $("status").textContent = "Feil: " + e.message;
+        $("status").textContent = apiInfoText() + " — Feil: " + e.message;
       }
 
       updateButtons();
@@ -279,7 +816,7 @@
 
     function clearAll() {
       resetTable();
-      state = { since:null, until:null, category:"", limit:1000, before:null, rows:[], exhausted:false };
+      state = { since:null, until:null, category:"", room:"", limit:1000, before:null, rows:[], categories:[], exhausted:false, dupeWindowSec:3, dupOnly:false, dupeStats:{ total:0, dupes:0 }, _dupeLastTsByHash:{}, _isDupeById:{}, roomCounts:{}, roomLastSeen:{}, roomDupes:{} };
       $("status").textContent = "";
       updateButtons();
     }
@@ -288,8 +825,10 @@
     $("moreBtn").addEventListener("click", loadMore);
     $("clearBtn").addEventListener("click", clearAll);
 
+    loadEventsUiPrefs();
+    wireEventsUiPrefs();
     loadFresh();
     updateButtons();
-  </script>
+</script>
 </body>
 </html>

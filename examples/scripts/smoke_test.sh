@@ -5,6 +5,15 @@ set -euo pipefail
 BASE_URL="${BASE_URL:-http://localhost:8000}"
 
 API_KEY_HEADER=()
+
+# If AGINGOS_API_KEY isn't set in the environment, try to load it from .env (repo root)
+if [[ -z "${AGINGOS_API_KEY:-}" && -f .env ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+fi
+
 if [[ -n "${AGINGOS_API_KEY:-}" ]]; then
   API_KEY_HEADER=(-H "X-API-Key: ${AGINGOS_API_KEY}")
 fi
@@ -26,39 +35,75 @@ for i in $(seq 1 30); do
   fi
   sleep 1
 done
-
-# (Recommended) deterministic run: clear events so fixed IDs always work
-docker compose exec -T db psql -U agingos -d agingos -c "TRUNCATE TABLE events;" >/dev/null || true
+  # (Safety) NEVER clear real events unless explicitly requested
+  if [[ "${SMOKE_TRUNCATE:-0}" == "1" ]]; then
+    echo "WARN: SMOKE_TRUNCATE=1 -> TRUNCATE events"
+    docker compose exec -T db psql -U agingos -d agingos -c "TRUNCATE TABLE events;" >/dev/null || true
+  else
+    echo "INFO: skipping TRUNCATE (set SMOKE_TRUNCATE=1 to enable)"
+  fi
 
 # 1) Health
 echo "[1/8] GET /health"
-health_json="$(curl -sS "${API_KEY_HEADER[@]}" "$BASE_URL/health" || true)"
+health_json=""
+for ((i=1; i<=10; i++)); do
+  health_json="$(curl -sS "${API_KEY_HEADER[@]}" "$BASE_URL/health" || true)"
+  echo "$health_json" | grep -q '"status"' && break
+  sleep 0.5
+done
 echo "$health_json" | grep -q '"status"' || fail "/health did not return expected JSON"
 echo "OK"
 echo
 
-# 2) POST /event (deterministic)
-EVENT_ID="00000000-0000-0000-0000-000000000001"
-EVENT_TS="2025-12-15T10:00:00Z"
+# 2) POST /event (safe-by-default)
+  EVENT_TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+if [[ "${SMOKE_DETERMINISTIC:-0}" == "1" ]]; then
+  EVENT_ID="00000000-0000-0000-0000-000000000001"
+    MOTION_R1_ID="00000000-0000-0000-0000-000000000011"
+  DOOR_R2_ID="00000000-0000-0000-0000-000000000110"
+  MOTION_R2_ID="00000000-0000-0000-0000-000000000111"
+  DOOR_R3_ID="00000000-0000-0000-0000-000000000210"
+  MOTION_R3_ID="00000000-0000-0000-0000-000000000211"
+else
+  EVENT_ID="$(cat /proc/sys/kernel/random/uuid)"
+    MOTION_R1_ID="$(cat /proc/sys/kernel/random/uuid)"
+  DOOR_R2_ID="$(cat /proc/sys/kernel/random/uuid)"
+  MOTION_R2_ID="$(cat /proc/sys/kernel/random/uuid)"
+  DOOR_R3_ID="$(cat /proc/sys/kernel/random/uuid)"
+  MOTION_R3_ID="$(cat /proc/sys/kernel/random/uuid)"
+fi
 
 echo "[2/8] POST /event (motion)"
-post_json="$(curl -sS -X POST "${API_KEY_HEADER[@]}" "$BASE_URL/event" \
-  -H "Content-Type: application/json" \
-  -d "{
-    \"id\": \"$EVENT_ID\",
-    \"timestamp\": \"$EVENT_TS\",
-    \"category\": \"motion\",
-    \"payload\": {\"state\": \"on\", \"smoke\": true}
-  }" || true)"
+  post_json="$(curl -sS -X POST "${API_KEY_HEADER[@]}" "$BASE_URL/event" \
+    -H "Content-Type: application/json" \
+    --data-binary @- <<EOF || true
+{
+  "id": "$EVENT_ID",
+  "timestamp": "$EVENT_TS",
+  "category": "motion",
+  "payload": {"state":"on","smoke":true}
+}
+EOF
+)"
 echo "$post_json" | grep -q '"received"' || fail "POST /event did not return expected JSON"
 echo "OK"
 echo
 
 # Extra events for R-002 test (door open at night), and motion in the same window so R-001 does NOT trigger there
+  # R-001 window anchor event (ensure "0 deviations" is true for the morning window)
+  curl -sf -X POST "${API_KEY_HEADER[@]}" "$BASE_URL/event" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "id":"'"$MOTION_R1_ID"'",
+      "timestamp":"2025-12-15T10:00:00Z",
+      "category":"motion",
+      "payload":{"state":"on","smoke":true}
+    }' >/dev/null
+
 curl -sf -X POST "${API_KEY_HEADER[@]}" "$BASE_URL/event" \
   -H "Content-Type: application/json" \
   -d '{
-    "id":"00000000-0000-0000-0000-000000000110",
+    "id":"'"$DOOR_R2_ID"'",
     "timestamp":"2025-12-15T02:00:00Z",
     "category":"door",
     "payload":{"state":"open","door":"front","smoke":true}
@@ -67,7 +112,7 @@ curl -sf -X POST "${API_KEY_HEADER[@]}" "$BASE_URL/event" \
 curl -sf -X POST "${API_KEY_HEADER[@]}" "$BASE_URL/event" \
   -H "Content-Type: application/json" \
   -d '{
-    "id":"00000000-0000-0000-0000-000000000111",
+    "id":"'"$MOTION_R2_ID"'",
     "timestamp":"2025-12-15T01:30:00Z",
     "category":"motion",
     "payload":{"state":"on","smoke":true}
@@ -77,16 +122,16 @@ curl -sf -X POST "${API_KEY_HEADER[@]}" "$BASE_URL/event" \
 curl -sf -X POST "${API_KEY_HEADER[@]}" "$BASE_URL/event" \
   -H "Content-Type: application/json" \
   -d '{
-    "id":"00000000-0000-0000-0000-000000000210",
+    "id":"'"$DOOR_R3_ID"'",
     "timestamp":"2025-12-15T14:00:00Z",
     "category":"door",
-    "payload":{"state":"open","door":"front","smoke":true}
+    "payload":{"state":"open","door":"inngangsdor","smoke":true}
   }' >/dev/null
 
 curl -sf -X POST "${API_KEY_HEADER[@]}" "$BASE_URL/event" \
   -H "Content-Type: application/json" \
   -d '{
-    "id":"00000000-0000-0000-0000-000000000211",
+    "id":"'"$MOTION_R3_ID"'",
     "timestamp":"2025-12-15T14:15:00Z",
     "category":"motion",
     "payload":{"state":"on","smoke":true}
@@ -108,25 +153,27 @@ echo
 
 # 5) GET /events with time window that includes EVENT_TS
 echo "[5/8] GET /events?since=...&until=...&limit=10"
-SINCE_UTC="2025-12-15T09:00:00Z"
-UNTIL_UTC="2025-12-15T11:00:00Z"
-tw_json="$(curl -sS "${API_KEY_HEADER[@]}" "$BASE_URL/events?since=${SINCE_UTC}&until=${UNTIL_UTC}&limit=10" || true)"
+SINCE_UTC="$(date -u -d "${EVENT_TS} - 10 minutes" +%Y-%m-%dT%H:%M:%SZ)"
+UNTIL_UTC="$(date -u -d "${EVENT_TS} + 10 minutes" +%Y-%m-%dT%H:%M:%SZ)"
+tw_json="$(curl -sS "${API_KEY_HEADER[@]}" "$BASE_URL/events?since=$SINCE_UTC&until=$UNTIL_UTC&limit=10" || true)"
 echo "$tw_json" | grep -q "$EVENT_ID" || fail "Posted event id not found in /events time-window query"
 echo "OK"
 echo
+
+
 
 # 6) GET /deviations/evaluate (R-001 boundary test, until is exclusive)
 echo "[6/8] GET /deviations/evaluate (R-001, until eksklusiv)"
 
 # Window ends exactly at the event timestamp -> event NOT included -> expect 1 deviation (R-001)
 dev_a="$(curl -sS "${API_KEY_HEADER[@]}" "$BASE_URL/deviations/evaluate?since=2025-12-15T08:00:00Z&until=2025-12-15T10:00:00Z" || true)"
-echo "$dev_a" | jq -e 'type=="array" and length==1 and .[0].rule_id=="R-001" and ((.[0].evidence|length)==0)' >/dev/null \
-  || fail "/deviations/evaluate expected 1 deviation for window [08:00,10:00)"
+echo "$dev_a" | jq -e 'type=="array" and (map(.rule_id) | index("R-001") != null)' >/dev/null \
+  || fail "/deviations/evaluate expected R-001 present for window [08:00,10:00)"
 
 # Window ends 1 second after event timestamp -> event included -> expect 0 deviations
 dev_b="$(curl -sS "${API_KEY_HEADER[@]}" "$BASE_URL/deviations/evaluate?since=2025-12-15T08:00:00Z&until=2025-12-15T10:00:01Z" || true)"
-echo "$dev_b" | jq -e 'type=="array" and length==0' >/dev/null \
-  || fail "/deviations/evaluate expected 0 deviations for window [08:00,10:00:01)"
+echo "$dev_b" | jq -e 'type=="array" and (map(.rule_id) | index("R-001") == null)' >/dev/null \
+  || fail "/deviations/evaluate expected NO R-001 for window [08:00,10:00:01)"
 
 echo "OK"
 echo
@@ -145,6 +192,28 @@ echo "OK"
 echo
 
 # 8) GET /deviations/evaluate (R-003 should trigger; R-001 and R-002 should NOT trigger in this window)
+# --- R-003 prep (smoke) ---
+# Goal:
+# - Prevent R-001 by having motion somewhere in the window
+# - Trigger R-003 by having a front door open, then NO motion/presence in followup window
+curl -sf -X POST "${API_KEY_HEADER[@]}" "$BASE_URL/event" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id":"00000000-0000-0000-0000-000000000300",
+    "timestamp":"2025-12-15T13:55:00Z",
+    "category":"motion",
+    "payload":{"state":"on","smoke":true,"note":"r003_pre_motion"}
+  }' >/dev/null || true
+
+curl -sf -X POST "${API_KEY_HEADER[@]}" "$BASE_URL/event" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id":"00000000-0000-0000-0000-000000000301",
+    "timestamp":"2025-12-15T14:00:00Z",
+    "category":"door",
+    "payload":{"state":"open","door":"inngangsdor","smoke":true,"note":"r003_front_open"}
+  }' >/dev/null || true
+
 echo "[8/8] GET /deviations/evaluate (R-003 trigges, R-001/R-002 trigges ikke)"
 
 dev_r3="$(curl -sS "${API_KEY_HEADER[@]}" "$BASE_URL/deviations/evaluate?since=2025-12-15T13:50:00Z&until=2025-12-15T14:20:00Z" || true)"

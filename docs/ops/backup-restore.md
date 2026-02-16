@@ -1,3 +1,98 @@
+
+## Backup/Restore Procedure for AgingOS
+
+### Backup
+
+1. **Formål**: Sikre at databasen kan gjenopprettes til en tidligere tilstand.
+2. **Kommando**:
+```bash
+make backup-db
+```
+
+**Forventet resultat**:
+- En ny fil lagres i `./backups/`-mappen med navnet `agingos_<UTC-timestamp>.sql`.
+- For eksempel: `agingos_20260208T090620Z.sql`.
+
+**Valgfritt**: Sjekk de siste backup-filene:
+```bash
+ls -lh backups | tail -n 5
+```
+
+### Restore
+
+1. **Formål**: Gjenopprette databasen fra en tidligere backup og tilbakestille systemet til ønsket tilstand.
+2. **Kommando**:
+```bash
+make restore-db FILE=backups/agingos_<timestamp>.sql
+```
+
+**Forventet resultat**:
+- Restore vil resettere databasen og gjenopprette den fra backup-filen. Det inkluderer å fjerne eksisterende data og gjenopprette tabeller og data fra filen.
+
+**Verifikasjon etter restore**:
+
+1) **DB Counts** (for å sammenligne med før-restore tilstand):
+```bash
+docker compose exec -T db psql -U agingos -d agingos -c "
+select
+  (select count(*) from events) as events,
+  (select count(*) from episodes) as episodes,
+  (select count(*) from deviations) as deviations,
+  (select count(*) from proposals) as proposals,
+  (select count(*) from monitor_modes) as monitor_modes;"
+```
+Forventede resultater:
+```
+events    | 11332
+episodes  | 400
+deviations| 44
+proposals | 8
+monitor_modes | 3
+```
+
+2) **API Health**:
+```bash
+BASE=http://127.0.0.1:8080
+KEY=dev-key-2
+curl -fsS -H "X-API-Key: " "/api/health" && echo
+curl -fsS -H "X-API-Key: " "/api/ai/status" && echo
+curl -fsS -H "X-API-Key: " "/api/proposals/miner_status" && echo
+```
+**Forventet resultat**:
+- API status **OK**
+- AI status **enabled** og **reachable**
+- Proposals status viser ingen feil, og siste kjøring er vellykket.
+
+### Feilsøking / Failure Modes
+
+1. **Feil ved `docker compose exec ...`**:
+- Sjekk at alle relevante containere kjører:
+```bash
+docker compose ps
+```
+- Se logger for eventuelle feil:
+```bash
+docker compose logs -f
+```
+
+2. **Restore feiler**:
+- Hvis restore feiler, kan det skyldes en korrupt backup-fil. Forsikre deg om at `make backup-db` ble fullført uten feil før restore.
+- Hvis restore pågår, men feiler underveis, kan du prøve å bruke en annen backup-fil.
+
+3. **Restore overskriver data**:
+- Merk at restore-skriptet **resetter databasen** og overskriver alle eksisterende data. Det er viktig å ha en ny backup tilgjengelig før restore hvis du er usikker på filens integritet.
+
+### Oppdaterte Backup/Restore Bevis
+
+**Backup-filen**: `backups/agingos_20260208T090620Z.sql`
+- Filstørrelse: 3,3MB
+- Backup ble laget med `make backup-db` og lagret i `./backups/`.
+
+**DB counts** før og etter restore er konsistente (se resultatene fra verifikasjon ovenfor).
+
+**API-status** etter restore:
+- API returnerte **OK**
+- Alle endepunkter svarte som forventet
 # DB backup/restore (lokal)
 
 ## Formål

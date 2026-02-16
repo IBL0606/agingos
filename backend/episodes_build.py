@@ -218,7 +218,8 @@ def build_episodes(events: List[RawEvent]) -> List[EpisodeDraft]:
         if not ep:
             return
         if ep.saw_presence_on:
-            ep.timeout_s = 180
+            # PRESENCE_HOLD_V1: hold presence-based episodes much longer to avoid false "empty" during long stays
+            ep.timeout_s = 5 * 60 * 60  # 5 hours
         else:
             ep.timeout_s = 90
         gap = (now_ts - ep.last_activity_ts).total_seconds()
@@ -616,6 +617,22 @@ def score_episode(ep: EpisodeDraft) -> tuple[str, float, float, float, list[dict
 # -----------------------------------------------------------------------------
 
 
+def delete_overlap(conn, since: datetime, until: datetime) -> int:
+    """Delete existing episodes overlapping [since, until) to make rebuild idempotent."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            DELETE FROM episodes
+            WHERE start_ts < %s
+              AND COALESCE(end_ts, start_ts) > %s
+            """,
+            (until, since),
+        )
+        n = cur.rowcount or 0
+    conn.commit()
+    return int(n)
+
+
 def insert_episodes(conn, eps: List[EpisodeDraft], dry_run: bool = True) -> int:
     """
     Insert episodes with classification=unknown (rules later).
@@ -711,6 +728,11 @@ def main() -> int:
         "--last", default="24h", help="Window to read events from (e.g. 24h, 7d)"
     )
     ap.add_argument("--dry-run", action="store_true", help="Do not write to DB")
+    ap.add_argument(
+        "--delete-overlap",
+        action="store_true",
+        help="Delete existing episodes overlapping the window before insert (idempotent rebuild)",
+    )
     args = ap.parse_args()
 
     seconds = parse_duration_seconds(args.last)
@@ -733,6 +755,11 @@ def main() -> int:
                 print(
                     f"- room={ep.room} start={ep.start_ts.isoformat()} end={ep.end_ts.isoformat() if ep.end_ts else None} dur_s={dur} total={ep.total} motion={ep.motion} p_on={ep.presence_on} p_off={ep.presence_off} close={ep.close_reason} q={ep.quality}"
                 )
+
+        if (not args.dry_run) and args.delete_overlap:
+            deleted = delete_overlap(conn, since, until)
+
+            print(f"deleted_overlap={deleted}")
 
         written = insert_episodes(conn, eps, dry_run=args.dry_run)
         if args.dry_run:

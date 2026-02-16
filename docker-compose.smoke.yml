@@ -1,0 +1,14 @@
+services:
+  db:
+    ports: !reset []
+
+  ai-bot:
+    ports: !reset []
+
+  backend:
+    ports: !override
+      - "18000:8000"
+
+  console:
+    ports: !override
+      - "18080:80"

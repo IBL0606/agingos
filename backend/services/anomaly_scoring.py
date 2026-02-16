@@ -215,8 +215,8 @@ def score_room_bucket(
     )
     bucket_end = bucket_start + timedelta(minutes=15)
 
-    dow = int(bucket_start.weekday())  # Monday=0 .. Sunday=6
-    is_weekend = dow >= 5
+    dow = (int(bucket_start.weekday()) + 1) % 7  # pg_dow: 0=Sunday .. 6=Saturday
+    is_weekend = dow in (0, 6)  # pg weekend: Sunday(0) or Saturday(6)
     bucket_idx = _bucket_idx_15m(bucket_start)
 
     uid = _get_instance_user_id(db)
@@ -315,7 +315,6 @@ def score_room_bucket(
         .mappings()
         .first()
     )
-
     if not b:
         reasons.append(
             {
@@ -330,6 +329,54 @@ def score_room_bucket(
                 },
             }
         )
+        # QUIET_BASELINE_FALLBACK_V1 (missing baseline_room_bucket)
+        # 0 observed => treat as quiet/green (explainable).
+        # observed > 0 => assign small deterministic points to make it actionable even without baseline support.
+        if float(activity_obs or 0.0) <= 0.05 and float(door_obs or 0.0) <= 0.0:
+            reasons.append(
+                {
+                    "reason_code": "QUIET_BASELINE_ASSUMED_QUIET",
+                    "component": "meta",
+                    "points": 0.0,
+                    "evidence": {
+                        "activity_obs": activity_obs,
+                        "door_obs": door_obs,
+                        "note": "Missing baseline_room_bucket; treated as quiet",
+                    },
+                }
+            )
+        else:
+            qa = _clamp(
+                math.log1p(max(0.0, float(activity_obs or 0.0))) / 2.0, 0.0, 3.0
+            )
+            if qa > 0:
+                score_intensity = max(score_intensity, qa)
+                reasons.append(
+                    {
+                        "reason_code": "QUIET_BASELINE_ACTIVITY",
+                        "component": "intensity",
+                        "points": round(qa, 4),
+                        "evidence": {
+                            "activity_obs": activity_obs,
+                            "note": "Missing baseline_room_bucket; quiet-assumption fallback",
+                        },
+                    }
+                )
+            qd = _clamp(float(door_obs or 0.0) * 1.0, 0.0, 3.0)
+            if qd > 0:
+                score_event = max(score_event, qd)
+                reasons.append(
+                    {
+                        "reason_code": "EVENT_DOOR_BURST",
+                        "component": "event",
+                        "points": round(qd, 4),
+                        "evidence": {
+                            "door_obs": door_obs,
+                            "note": "Missing baseline_room_bucket; quiet-assumption fallback",
+                        },
+                    }
+                )
+
     else:
         # Intensity component (activity)
         mu = b["activity_median"]
@@ -346,6 +393,36 @@ def score_room_bucket(
                     "evidence": {"support_n": n, "mu": mu, "sigma": sig},
                 }
             )
+            # QUIET_BASELINE_FALLBACK_V1 (activity unsupported)
+            if float(activity_obs or 0.0) <= 0.05:
+                reasons.append(
+                    {
+                        "reason_code": "QUIET_BASELINE_ACTIVITY_QUIET",
+                        "component": "intensity",
+                        "points": 0.0,
+                        "evidence": {
+                            "activity_obs": activity_obs,
+                            "note": "Unsupported activity baseline; treated as quiet",
+                        },
+                    }
+                )
+            else:
+                qa = _clamp(
+                    math.log1p(max(0.0, float(activity_obs or 0.0))) / 2.0, 0.0, 3.0
+                )
+                if qa > 0:
+                    score_intensity = max(score_intensity, qa)
+                    reasons.append(
+                        {
+                            "reason_code": "QUIET_BASELINE_ACTIVITY",
+                            "component": "intensity",
+                            "points": round(qa, 4),
+                            "evidence": {
+                                "activity_obs": activity_obs,
+                                "note": "Unsupported activity baseline; quiet-assumption fallback",
+                            },
+                        }
+                    )
         else:
             mu = float(mu)
             sig = float(sig)
@@ -384,6 +461,34 @@ def score_room_bucket(
                     "evidence": {"support_n": dn, "mu": dmu, "sigma": dsig},
                 }
             )
+            # QUIET_BASELINE_FALLBACK_V1 (door unsupported)
+            if float(door_obs or 0.0) <= 0.0:
+                reasons.append(
+                    {
+                        "reason_code": "QUIET_BASELINE_DOOR_QUIET",
+                        "component": "event",
+                        "points": 0.0,
+                        "evidence": {
+                            "door_obs": door_obs,
+                            "note": "Unsupported door baseline; treated as quiet",
+                        },
+                    }
+                )
+            else:
+                qd = _clamp(float(door_obs or 0.0) * 1.0, 0.0, 3.0)
+                if qd > 0:
+                    score_event = max(score_event, qd)
+                    reasons.append(
+                        {
+                            "reason_code": "EVENT_DOOR_BURST",
+                            "component": "event",
+                            "points": round(qd, 4),
+                            "evidence": {
+                                "door_obs": door_obs,
+                                "note": "Unsupported door baseline; quiet-assumption fallback",
+                            },
+                        }
+                    )
         else:
             dmu = float(dmu)
             dsig = float(dsig)
@@ -448,7 +553,11 @@ def score_room_bucket(
                     "reason_code": "TRANSITION_BASELINE_MISSING",
                     "component": "sequence",
                     "points": 0.0,
-                    "evidence": {"from_room": prev, "to_room": room},
+                    "evidence": {
+                        "from_room": prev,
+                        "to_room": room,
+                        "note": "Pilot: transition baseline often missing; 0 points",
+                    },
                 }
             )
         else:

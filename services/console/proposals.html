@@ -36,10 +36,37 @@
 .badge-test{border-color:rgba(255,170,0,0.55);}
   .badge-on{border-color:rgba(35,134,54,0.55);}
   .badge-off{border-color:rgba(218,54,51,0.55);}
+
+  /* Step 8 (Nav/IA/UX): consistent topbar/nav (dark) */
+  .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin:0 0 12px;padding:10px 12px;border:1px solid #1f2a37;border-radius:12px;background:#0f1620;}
+  .topbar-title{font-weight:700;font-size:14px;color:#e6edf3;}
+  .nav{margin-top:4px;display:flex;gap:10px;flex-wrap:wrap;font-size:13px;}
+  .navlink{color:#7ee787;text-decoration:none;}
+  .navlink.active{font-weight:700;text-decoration:underline;}
+  .topbar-right{display:flex;align-items:center;gap:8px;font-size:12px;color:#9fb0c0;flex-wrap:wrap;justify-content:flex-end}
+  #apiMini{font-size:12px;}
+  @media (max-width: 900px){.topbar{flex-direction:column;align-items:stretch}.topbar-right{justify-content:flex-start}}
+
 </style>
 </head>
 <body>
-  <div class="row" style="align-items:center; justify-content:space-between;">
+  <div class="topbar">
+      <div>
+        <div class="topbar-title">AgingOS Console</div>
+        <div class="nav">
+          <a class="navlink" href="./index.html">Status</a>
+          <a class="navlink" href="./events.html">Events</a>
+          <a class="navlink" href="./anomalies.html">Anomalier</a>
+          <a class="navlink active" href="./proposals.html">Proposals</a>
+          <a class="navlink" href="./report.html">Rapport</a>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <span class="pill" id="apiMini">API: —</span>
+      </div>
+    </div>
+
+<div class="row" style="align-items:center; justify-content:space-between;">
     <div>
       <h1 style="margin:0; font-size:18px;">AgingOS Dev – Proposals</h1>
       <div class="muted small">Verifikasjon: miner/expiry → DB → API → lifecycle actions → monitor_modes</div>
@@ -107,8 +134,10 @@
             <th>subject</th>
             <th>room</th>
             <th>action_target</th>
-            <th>evidence</th>
-            <th class="right">actions</th>
+            
+            <th>forklaring</th><th>evidence</th>
+            
+            <th>anbefalt</th><th class="right">actions</th>
           </tr>
         </thead>
         <tbody id="proposalsBody"></tbody>
@@ -117,6 +146,56 @@
   </div>
 
   <script>
+  // TOPBAR_API_MINI v1
+  function _topbarGetApiBase() {
+    try {
+      const el = document.getElementById("baseUrl");
+      if (el && el.value) {
+        let v = String(el.value || "").trim();
+        if (!v) v = "/api";
+        if (v.length > 1 && v.endsWith("/")) v = v.slice(0,-1);
+        return v;
+      }
+    } catch(e) {}
+    try {
+      let v = String(localStorage.getItem("agingos_api_base") || localStorage.getItem("apiBase") || "/api").trim();
+      if (v.length > 1 && v.endsWith("/")) v = v.slice(0,-1);
+      return v;
+    } catch(e) { return "/api"; }
+  }
+  function _topbarGetApiKey() {
+    try {
+      const el = document.getElementById("apiKey");
+      if (el && el.value) return String(el.value || "").trim();
+    } catch(e) {}
+    try { return String(localStorage.getItem("agingos_api_key") || localStorage.getItem("apiKey") || "").trim(); }
+    catch(e) { return ""; }
+  }
+  function _topbarUpdateApiMini() {
+    const el = document.getElementById("apiMini");
+    if (!el) return;
+    const base = _topbarGetApiBase();
+    const key  = _topbarGetApiKey();
+    el.textContent = "API: " + base + " | key: " + (key ? "SET" : "NOT SET");
+  }
+  (function(){
+    try { _topbarUpdateApiMini(); } catch(e) {}
+    ["baseUrl","apiKey"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener("input", () => { try { _topbarUpdateApiMini(); } catch(e) {} });
+      el.addEventListener("change", () => { try { _topbarUpdateApiMini(); } catch(e) {} });
+    });
+    window.addEventListener("storage", (ev) => {
+      const k = ev && ev.key ? String(ev.key) : "";
+      if (!k) return;
+      if (k.startsWith("agingos_api_") || k === "apiBase" || k === "apiKey") {
+        try { _topbarUpdateApiMini(); } catch(e) {}
+      }
+    });
+    setTimeout(() => { try { _topbarUpdateApiMini(); } catch(e) {} }, 0);
+  })();
+
 function escapeHtml(x){
   return String(x ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
 }
@@ -152,8 +231,8 @@ function _asRows(data){
     // Persist settings like the main console
     (function initFromLocalStorage(){
       try {
-        const b = localStorage.getItem("apiBase");
-        const k = localStorage.getItem("apiKey");
+        const b = localStorage.getItem("agingos_api_base") || localStorage.getItem("apiBase");
+        const k = localStorage.getItem("agingos_api_key") || localStorage.getItem("apiKey");
         if (b) $("baseUrl").value = b;
         if (k) $("apiKey").value = k;
       } catch {}
@@ -161,6 +240,10 @@ function _asRows(data){
 
     function persistSettings(){
       try {
+        localStorage.setItem("agingos_api_base", $("baseUrl").value.trim() || "/api");
+        localStorage.setItem("agingos_api_key", $("apiKey").value.trim() || "");
+
+        // kompat: behold gamle keys også (kan fjernes senere)
         localStorage.setItem("apiBase", $("baseUrl").value.trim() || "/api");
         localStorage.setItem("apiKey", $("apiKey").value.trim() || "");
       } catch {}
@@ -208,7 +291,83 @@ function _asRows(data){
       return parts.join(", ");
     }
 
-    async function refreshMinerStatus() {
+    function summarizeWhy(why) {
+      try {
+        if (!why) return "";
+        if (Array.isArray(why)) return why.map(w => (w && w.text) ? String(w.text) : "").filter(Boolean).join(" ");
+        if (typeof why === "object" && why.text) return String(why.text);
+        return "";
+      } catch (e) { return ""; }
+    }
+
+    
+      function summarizeActionHint(p) {
+        try {
+          const tgt = String(p?.action_target ?? "");
+          const ap = (p && typeof p.action_payload === "object" && p.action_payload) ? p.action_payload : {};
+          const note = ap.note ? String(ap.note) : "";
+          if (tgt.startsWith("monitor:")) {
+            const rule = tgt.split(":")[1] || "";
+            const suppress = ap.suppress_alerts_in_test === true;
+            const base = `Forslag: Sett ${rule} til TEST for å prøve overvåkning uten å aktivere varsler.`;
+            const extra = suppress ? " Varsler dempes i TEST." : "";
+            const tail = note ? (" " + note) : "";
+            return base + extra + tail;
+          }
+          return note || tgt;
+        } catch (e) { return ""; }
+      }
+
+      function proposalTitle(p){
+        const t = String(p?.proposal_type ?? "");
+        if (t === "DOOR_ANOMALY_BURST_3_OF_14") return "Uvanlig mye døraktivitet";
+        if (t === "NIGHT_ACTIVITY_EARLY_SIGNAL_1_OF_7") return "Aktivitet på natt";
+        if (t === "BOOTSTRAP_MONITORING_TEST") return "Testforslag (pilot)";
+        return t || "Forslag";
+      }
+
+      function proposalNextStep(p){
+        const tgt = String(p?.action_target ?? "");
+        const ap = (p && typeof p.action_payload === "object" && p.action_payload) ? p.action_payload : {};
+        const note = ap.note ? String(ap.note) : "";
+        if (tgt.startsWith("monitor:")) {
+          const rule = tgt.split(":")[1] || "";
+          if (p?.state === "TESTING") {
+            const until = p?.test_until ? (" til " + fmtTs(p.test_until)) : "";
+            return `TEST er aktiv${until}. La dette stå noen dager og se om du får relevante observasjoner.`;
+          }
+          if (rule === "R-002") {
+            return "Anbefalt: Trykk TEST først. Dette slår på overvåkning uten at du trenger å forplikte deg til varsler.";
+          }
+          if (rule === "R-001") {
+            return "Anbefalt: Trykk TEST først for å se om natt-aktiviteten er reell og relevant før du aktiverer varsler.";
+          }
+          return "Anbefalt: Trykk TEST først for å verifisere at overvåkningen gir mening.";
+        }
+        return note || tgt;
+      }
+
+      function proposalExplanation(p){
+        const w = summarizeWhy(p?.why);
+        if (w) return w;
+
+        const t = String(p?.proposal_type ?? "");
+        const ev = (p && typeof p.evidence === "object" && p.evidence) ? p.evidence : {};
+        if (t === "DOOR_ANOMALY_BURST_3_OF_14") {
+          const n = ev.door_anomaly_count ?? "";
+          const days = ev.window_days ?? "";
+          return `Systemet har registrert uvanlig mange dør-hendelser (${n}) de siste ${days} dagene.`;
+        }
+        if (t === "NIGHT_ACTIVITY_EARLY_SIGNAL_1_OF_7") {
+          const n = ev.nights_over_threshold ?? "";
+          const wdw = ev.nights_window ?? "";
+          const nh = ev.night_hours_local ? `${ev.night_hours_local.start}–${ev.night_hours_local.end}` : "";
+          return `Systemet ser aktivitet i nattperioden ${nh} på ${n} av de siste ${wdw} nettene.`;
+        }
+        return "";
+      }
+
+async function refreshMinerStatus() {
       const el = $("minerStatus");
       el.textContent = "loading…";
       try {
@@ -241,7 +400,7 @@ function _asRows(data){
         list = await api("/proposals");
       } catch (e) {
         const tr = document.createElement("tr");
-        tr.innerHTML = `<td colspan="8" class="mono">ERROR loading /proposals: ${e.message}</td>`;
+        tr.innerHTML = `<td colspan="10" class="mono">ERROR loading /proposals: ${e.message}</td>`;
         body.appendChild(tr);
         return;
       }
@@ -252,14 +411,20 @@ function _asRows(data){
       for (const p of list) {
         const tr = document.createElement("tr");
         const ev = summarizeEvidence(p.evidence);
+        const titleText = proposalTitle(p);
+        const explText = proposalExplanation(p);
+        const nextText = proposalNextStep(p);
+        const codeText = String(p.proposal_type||"");
         tr.innerHTML = `
           <td class="mono">${p.proposal_id}</td>
-          <td class="mono">${p.proposal_type || ""}</td>
+          <td><div><b>${escapeHtml(titleText)}</b></div><div class="mono small muted">${escapeHtml(codeText)}</div></td>
           <td><span class="pill ${p.state}">${p.state}</span></td>
           <td class="mono small">${p.subject_id || ""}</td>
           <td class="mono">${p.room_id ?? ""}</td>
           <td class="mono">${p.action_target || ""}</td>
+          <td class="small">${escapeHtml(explText)}</td>
           <td class="small mono">${ev}</td>
+          <td class="small">${escapeHtml(nextText)}</td>
           <td class="right">
             <button class="secondary" data-act="test" ${p.state==="REJECTED"?"disabled":""}>Test</button>
             <button class="ok" data-act="activate" ${p.state==="REJECTED"?"disabled":""}>Activate</button>
