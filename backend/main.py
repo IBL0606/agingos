@@ -44,6 +44,190 @@ def health():
     return {"status": "ok"}
 
 
+
+@app.get("/health/detail")
+def health_detail(scope: "AuthScope" = Depends(require_scope)):
+    """
+    Full pipeline health (P0-5).
+    - Always scoped: returns explicit resolved scope to avoid false confidence.
+    - Additive: does not change /health.
+    """
+    from datetime import datetime, timezone
+    from sqlalchemy import text
+    from db import SessionLocal
+    from services.scheduler import scheduler, ANOMALIES_RUNNER_STATUS
+
+    now = datetime.now(timezone.utc)
+
+    out = {
+        "schema_version": "v1",
+        "now_utc": now.isoformat(),
+        "scope": {
+            "org_id": scope.org_id,
+            "home_id": scope.home_id,
+            "subject_id": scope.subject_id,
+            "role": scope.role,
+            "user_id": scope.user_id,
+        },
+        "components": {},
+        "overall_status": "OK",
+        "reasons": [],
+    }
+
+    def degrade(level: str, reason: str):
+        # level: DEGRADED or ERROR
+        if level == "ERROR":
+            out["overall_status"] = "ERROR"
+        elif out["overall_status"] != "ERROR":
+            out["overall_status"] = "DEGRADED"
+        out["reasons"].append(reason)
+
+    # ---- ingest lag (events) ----
+    db = SessionLocal()
+    try:
+        row = db.execute(
+            text("""
+                SELECT MAX("timestamp") AS max_ts, COUNT(*)::int AS n
+                FROM events
+                WHERE org_id = :org AND home_id = :home AND subject_id = :sub
+            """),
+            {"org": scope.org_id, "home": scope.home_id, "sub": scope.subject_id},
+        ).mappings().one()
+
+        max_ts = row["max_ts"]
+        n = int(row["n"] or 0)
+        lag_s = None
+        if max_ts is not None:
+            # max_ts is timestamptz from DB driver => aware datetime
+            lag_s = max(0.0, (now - max_ts).total_seconds())
+
+        out["components"]["ingest"] = {
+            "status": "OK",
+            "events_n": n,
+            "max_event_ts": (max_ts.isoformat() if max_ts is not None else None),
+            "lag_seconds": lag_s,
+        }
+
+        # Threshold is explicit and returned; can be tuned later without changing semantics.
+        INGEST_LAG_DEGRADED_S = int(os.getenv("AGINGOS_HEALTH_INGEST_LAG_DEGRADED_S", "900"))  # 15 min
+        INGEST_LAG_ERROR_S = int(os.getenv("AGINGOS_HEALTH_INGEST_LAG_ERROR_S", "7200"))      # 2 hours
+        out["components"]["ingest"]["thresholds"] = {
+            "degraded_seconds": INGEST_LAG_DEGRADED_S,
+            "error_seconds": INGEST_LAG_ERROR_S,
+        }
+
+        if n == 0:
+            out["components"]["ingest"]["status"] = "ERROR"
+            degrade("ERROR", "no events found for this scope")
+        elif lag_s is not None and lag_s >= INGEST_LAG_ERROR_S:
+            out["components"]["ingest"]["status"] = "ERROR"
+            degrade("ERROR", f"ingest lag >= {INGEST_LAG_ERROR_S}s")
+        elif lag_s is not None and lag_s >= INGEST_LAG_DEGRADED_S:
+            out["components"]["ingest"]["status"] = "DEGRADED"
+            degrade("DEGRADED", f"ingest lag >= {INGEST_LAG_DEGRADED_S}s")
+
+        # ---- baseline stale (baseline_model_status) ----
+        b = db.execute(
+            text("""
+                SELECT model_start, model_end, baseline_ready, computed_at,
+                       days_in_window, days_with_data,
+                       room_bucket_rows, room_bucket_supported,
+                       transition_rows, transition_supported
+                FROM baseline_model_status
+                WHERE org_id = :org AND home_id = :home AND subject_id = :sub
+                ORDER BY model_end DESC
+                LIMIT 1
+            """),
+            {"org": scope.org_id, "home": scope.home_id, "sub": scope.subject_id},
+        ).mappings().one_or_none()
+
+        # Expected end day (Oslo "yesterday") computed in DB to avoid timezone guessing in app.
+        exp = db.execute(text("""
+            SELECT ((now() AT TIME ZONE 'Europe/Oslo')::date - 1) AS expected_end_day
+        """)).mappings().one()
+        expected_end = exp["expected_end_day"]
+
+        out["components"]["baseline"] = {
+            "status": "OK",
+            "expected_model_end": (expected_end.isoformat() if expected_end is not None else None),
+            "latest": None,
+        }
+
+        BASELINE_MAX_AGE_HOURS = int(os.getenv("AGINGOS_HEALTH_BASELINE_MAX_AGE_HOURS", "36"))
+        out["components"]["baseline"]["thresholds"] = {"max_age_hours": BASELINE_MAX_AGE_HOURS}
+
+        if not b:
+            out["components"]["baseline"]["status"] = "ERROR"
+            degrade("ERROR", "no baseline_model_status rows for this scope")
+        else:
+            latest = dict(b)
+            # Normalize datetimes/dates to isoformat for JSON
+            for k in ("model_start", "model_end"):
+                if latest.get(k) is not None:
+                    latest[k] = latest[k].isoformat()
+            if latest.get("computed_at") is not None:
+                latest["computed_at"] = latest["computed_at"].isoformat()
+
+            out["components"]["baseline"]["latest"] = latest
+
+            # Evaluate staleness/readiness
+            model_end = b["model_end"]
+            computed_at = b["computed_at"]
+            baseline_ready = bool(b["baseline_ready"])
+
+            age_hours = None
+            if computed_at is not None:
+                age_hours = max(0.0, (now - computed_at).total_seconds() / 3600.0)
+            out["components"]["baseline"]["age_hours"] = age_hours
+
+            if not baseline_ready:
+                out["components"]["baseline"]["status"] = "DEGRADED"
+                degrade("DEGRADED", "baseline_ready=false")
+            if expected_end is not None and model_end is not None and model_end < expected_end:
+                out["components"]["baseline"]["status"] = "DEGRADED"
+                degrade("DEGRADED", "baseline model_end is behind expected_end_day")
+            if age_hours is not None and age_hours > BASELINE_MAX_AGE_HOURS:
+                out["components"]["baseline"]["status"] = "DEGRADED"
+                degrade("DEGRADED", f"baseline computed_at older than {BASELINE_MAX_AGE_HOURS}h")
+
+    finally:
+        db.close()
+
+    # ---- scheduler status ----
+    jobs = scheduler.get_jobs()
+    out["components"]["scheduler"] = {
+        "status": "OK",
+        "running": bool(getattr(scheduler, "running", False)),
+        "jobs": [
+            {
+                "id": j.id,
+                "next_run_time": (j.next_run_time.isoformat() if j.next_run_time else None),
+                "trigger": str(j.trigger),
+            }
+            for j in jobs
+        ],
+    }
+    if not out["components"]["scheduler"]["running"]:
+        out["components"]["scheduler"]["status"] = "ERROR"
+        degrade("ERROR", "scheduler not running")
+    elif len(jobs) == 0:
+        out["components"]["scheduler"]["status"] = "DEGRADED"
+        degrade("DEGRADED", "scheduler has zero jobs configured")
+
+    # ---- anomalies runner status (process-local) ----
+    rs = dict(ANOMALIES_RUNNER_STATUS)
+    out["components"]["anomalies_runner"] = {
+        "status": "OK",
+        "runner_status": rs,
+    }
+    if rs.get("last_error_at"):
+        out["components"]["anomalies_runner"]["status"] = "DEGRADED"
+        degrade("DEGRADED", "anomalies runner has last_error_at set")
+    elif not rs.get("last_ok_at") and not rs.get("last_run_at"):
+        out["components"]["anomalies_runner"]["status"] = "DEGRADED"
+        degrade("DEGRADED", "anomalies runner has never run in this process")
+
+    return out
 @app.post("/pattern_miner/run_once")
 def pattern_miner_run_once(request: Request):
     # manual trigger for testing (auth already enforced globally)
@@ -236,6 +420,95 @@ def ai_anomalies(
         }
 
 
+
+
+@app.get("/debug/scope")
+def debug_scope(scope: "AuthScope" = Depends(require_scope)):
+    """Debug: return resolved scope for current API key."""
+    try:
+        return scope.model_dump()
+    except Exception:
+        # pydantic v1 fallback
+        return getattr(scope, "dict", lambda: {"org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id, "role": getattr(scope, "role", None), "user_id": getattr(scope, "user_id", None)})()
+
+# --- Episodes SVC (incremental + idempotent) ----------------------------------
+from datetime import datetime
+from typing import Optional
+from pydantic import BaseModel
+
+class EpisodesSvcBuildIn(BaseModel):
+    since: Optional[str] = None      # ISO 8601 (UTC/offset), optional window replay
+    until: Optional[str] = None
+    advance_watermark: bool = False  # only relevant when since/until provided
+    batch: int = 5000
+    builder_name: str = "episodes_svc_v1"
+
+def _parse_iso_ts(s: Optional[str]) -> Optional[datetime]:
+    if not s:
+        return None
+    return datetime.fromisoformat(s.replace("Z", "+00:00"))
+
+@app.post("/episodes_svc/build_once")
+def episodes_svc_build_once(body: EpisodesSvcBuildIn, scope: "AuthScope" = Depends(require_scope)):
+    """
+    Build presence-room episodes into episodes_svc.
+    - Incremental by default (uses episode_builder_state watermark).
+    - Idempotent writes (unique key on episodes_svc).
+    - Optional window replay with since/until; watermark advances only if advance_watermark=true.
+    """
+    from services.episodes_svc_builder import build_presence_room_v1
+
+    # DB DSN: same convention as elsewhere in backend
+    # Prefer DATABASE_URL if set; fallback to local docker-compose defaults.
+    import os
+    dsn = os.getenv("DATABASE_URL")
+    if not dsn:
+        host = os.getenv("PGHOST", "db")
+        port = os.getenv("PGPORT", "5432")
+        user = os.getenv("PGUSER", "agingos")
+        pwd  = os.getenv("PGPASSWORD", "agingos")
+        db   = os.getenv("PGDATABASE", "agingos")
+        dsn = f"postgresql://{user}:{pwd}@{host}:{port}/{db}"
+
+    since = _parse_iso_ts(body.since)
+    until = _parse_iso_ts(body.until)
+
+    res = build_presence_room_v1(
+        db_dsn=dsn,
+        org_id=scope.org_id,
+        home_id=scope.home_id,
+        subject_id=scope.subject_id,
+        builder_name=body.builder_name,
+        since=since,
+        until=until,
+        advance_watermark=bool(body.advance_watermark),
+        batch=int(body.batch),
+    )
+
+    return {
+        "builder": body.builder_name,
+        "scope": {"org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id},
+        "since": body.since,
+        "until": body.until,
+        "advance_watermark": bool(body.advance_watermark),
+        "batch": int(body.batch),
+        "events_read": res.events_read,
+        "episodes_upserted": res.episodes_upserted,
+        "skipped": {
+            "no_room": res.skipped_no_room,
+            "no_state": res.skipped_no_state,
+            "unknown_state": res.skipped_unknown_state,
+        },
+        "watermark_before": {
+            "last_event_ts": res.watermark_before_ts.isoformat() if res.watermark_before_ts else None,
+            "last_event_row_id": res.watermark_before_id,
+        },
+        "watermark_after": {
+            "last_event_ts": res.watermark_after_ts.isoformat() if res.watermark_after_ts else None,
+            "last_event_row_id": res.watermark_after_id,
+        },
+    }
+
 @app.post("/event")
 def receive_event(event: Event, scope: AuthScope = Depends(require_scope)):
     db = SessionLocal()
@@ -393,17 +666,17 @@ def _monitor_key_from_action_target(action_target: str) -> str:
     return FRIENDLY_TO_RULE.get(key, key)
 
 
-def _upsert_monitor_mode(db, *, monitor_key: str, room_id: str, mode: str) -> None:
+def _upsert_monitor_mode(db, *, scope: "AuthScope", monitor_key: str, room_id: str, mode: str) -> None:
     db.execute(
         text(
             """
-            INSERT INTO monitor_modes (monitor_key, room_id, mode, updated_at)
-            VALUES (:k, :r, :m, now())
-            ON CONFLICT (monitor_key, room_id)
-            DO UPDATE SET mode = EXCLUDED.mode, updated_at = now()
+            INSERT INTO monitor_modes (org_id, home_id, subject_id, monitor_key, room_id, mode, updated_at)
+              VALUES (:org_id, :home_id, :subject_id, :k, :r, :m, now())
+              ON CONFLICT (org_id, home_id, subject_id, monitor_key, room_id)
+              DO UPDATE SET mode = EXCLUDED.mode, updated_at = now()
             """
         ),
-        {"k": monitor_key, "r": room_id, "m": mode},
+        {"org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id, "k": monitor_key, "r": room_id, "m": mode},
     )
 
 
@@ -424,7 +697,7 @@ def list_proposals(
             q = text(
                 """
                 SELECT
-                  p.proposal_id, p.org_id, p.subject_id, p.room_id,
+                  p.proposal_id, p.org_id, p.home_id, p.subject_id, p.room_id,
                   p.proposal_type, p.dedupe_key, p.state, p.priority,
                   p.evidence, p.why,
                   p.action_target, p.action_payload,
@@ -445,17 +718,17 @@ def list_proposals(
                     ) a
                   ), '[]'::jsonb) AS actions
                 FROM proposals p
-                WHERE p.org_id = :org_id AND p.subject_id = :subject_id AND p.updated_at > :last_ts
+                WHERE p.org_id = :org_id AND p.home_id = :home_id AND p.subject_id = :subject_id AND p.updated_at > :last_ts
                 ORDER BY p.updated_at ASC
                 LIMIT :limit
                 """
             )
-            rows = db.execute(q, {"org_id": scope.org_id, "subject_id": scope.subject_id, "last_ts": last, "limit": limit}).mappings().all()
+            rows = db.execute(q, {"org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id, "last_ts": last, "limit": limit}).mappings().all()
         else:
             q = text(
                 """
                 SELECT
-                  p.proposal_id, p.org_id, p.subject_id, p.room_id,
+                  p.proposal_id, p.org_id, p.home_id, p.subject_id, p.room_id,
                   p.proposal_type, p.dedupe_key, p.state, p.priority,
                   p.evidence, p.why,
                   p.action_target, p.action_payload,
@@ -476,12 +749,12 @@ def list_proposals(
                     ) a
                   ), '[]'::jsonb) AS actions
                 FROM proposals p
-                WHERE p.org_id = :org_id AND p.subject_id = :subject_id
+                WHERE p.org_id = :org_id AND p.home_id = :home_id AND p.subject_id = :subject_id
                 ORDER BY p.updated_at DESC
                 LIMIT :limit
                 """
             )
-            rows = db.execute(q, {"org_id": scope.org_id, "subject_id": scope.subject_id, "limit": limit}).mappings().all()
+            rows = db.execute(q, {"org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id, "limit": limit}).mappings().all()
 
         return [dict(r) for r in rows]
     finally:
@@ -507,6 +780,7 @@ def _proposal_transition(
     *,
     proposal_id: int,
     org_id: str,
+    home_id: str,
     subject_id: str,
     action: str,  # TEST | ACTIVATE | REJECT
     actor: str | None,
@@ -516,9 +790,9 @@ def _proposal_transition(
     row = (
         db.execute(
             text(
-                "SELECT proposal_id, state, action_target, room_id FROM proposals WHERE proposal_id = :id AND org_id = :org_id AND subject_id = :subject_id FOR UPDATE"
+                "SELECT proposal_id, state, action_target, room_id FROM proposals WHERE proposal_id = :id AND org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id FOR UPDATE"
             ),
-            {"id": proposal_id, "org_id": org_id, "subject_id": subject_id},
+            {"id": proposal_id, "org_id": org_id, "home_id": home_id, "subject_id": subject_id},
         )
         .mappings()
         .one_or_none()
@@ -652,6 +926,7 @@ def test_proposal(proposal_id: int, body: dict = Body(default={}), scope: AuthSc
                 db,
                 proposal_id=proposal_id,
                 org_id=scope.org_id,
+                home_id=scope.home_id,
                 subject_id=scope.subject_id,
                 action="TEST",
                 actor=body.get("actor"),
@@ -671,6 +946,7 @@ def activate_proposal(proposal_id: int, body: dict = Body(default={}), scope: Au
                 db,
                 proposal_id=proposal_id,
                 org_id=scope.org_id,
+                home_id=scope.home_id,
                 subject_id=scope.subject_id,
                 action="ACTIVATE",
                 actor=body.get("actor"),
@@ -690,6 +966,7 @@ def reject_proposal(proposal_id: int, body: dict = Body(default={}), scope: Auth
                 db,
                 proposal_id=proposal_id,
                 org_id=scope.org_id,
+                home_id=scope.home_id,
                 subject_id=scope.subject_id,
                 action="REJECT",
                 actor=body.get("actor"),
@@ -740,6 +1017,7 @@ def list_episodes(
     classification: Optional[str] = Query(default=None),
     room_id: Optional[str] = Query(default=None),
     quality: Optional[str] = Query(default=None),
+    scope: "AuthScope" = Depends(require_scope),
 ):
     """
     Dev endpoint: return stored episodes for the last window.
@@ -763,7 +1041,10 @@ def list_episodes(
         # Fetch episodes with pagination + filters (stable ordering)
         # Stable sort: start_ts DESC, id DESC
         params = {"since": since, "until": until, "limit": limit}
-        where = ["start_ts >= :since", "start_ts < :until"]
+        params["org_id"] = scope.org_id
+        params["home_id"] = scope.home_id
+        params["subject_id"] = scope.subject_id
+        where = ["org_id = :org_id", "home_id = :home_id", "subject_id = :subject_id", "start_ts >= :since", "start_ts < :until"]
 
         # Filters
         if classification:
@@ -1011,7 +1292,7 @@ class EpisodeUndoIn(BaseModel):
 
 
 @app.post("/episodes/{episode_id}/label")
-def set_episode_label(episode_id: str, body: EpisodeLabelIn):
+def set_episode_label(episode_id: str, body: EpisodeLabelIn, scope: "AuthScope" = Depends(require_scope)):
     """
     Persist a user label for an episode (audit trail in episode_labels).
     """
@@ -1030,7 +1311,16 @@ def set_episode_label(episode_id: str, body: EpisodeLabelIn):
     try:
         # Ensure episode exists
         ep = db.execute(
-            text("SELECT id FROM episodes WHERE id = :id"), {"id": episode_id}
+            text(
+                "SELECT id FROM episodes "
+                "WHERE id = :id AND org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id"
+            ),
+            {
+                "id": episode_id,
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+            },
         ).fetchone()
         if not ep:
             raise HTTPException(status_code=404, detail="episode not found")
@@ -1061,7 +1351,7 @@ def set_episode_label(episode_id: str, body: EpisodeLabelIn):
 
 
 @app.post("/episodes/{episode_id}/label/undo")
-def undo_episode_label(episode_id: str, body: EpisodeUndoIn):
+def undo_episode_label(episode_id: str, body: EpisodeUndoIn, scope: "AuthScope" = Depends(require_scope)):
     """
     Undo a previous label by inserting an undo record that targets label_id.
     """
@@ -1079,7 +1369,16 @@ def undo_episode_label(episode_id: str, body: EpisodeUndoIn):
     try:
         # Ensure episode exists
         ep = db.execute(
-            text("SELECT id FROM episodes WHERE id = :id"), {"id": episode_id}
+            text(
+                "SELECT id FROM episodes "
+                "WHERE id = :id AND org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id"
+            ),
+            {
+                "id": episode_id,
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+            },
         ).fetchone()
         if not ep:
             raise HTTPException(status_code=404, detail="episode not found")
@@ -1137,12 +1436,19 @@ def list_events(
     category: Optional[str] = Query(default=None),
     since: Optional[datetime] = Query(default=None),
     until: Optional[datetime] = Query(default=None),
-    before: Optional[datetime] = Query(default=None),
-    limit: int = Query(default=100, ge=1, le=1000),
+    before: Optional[datetime] = Query(default=None),    limit: int = Query(default=100, ge=1, le=1000),
+    scope: "AuthScope" = Depends(require_scope),
 ) -> list[Event]:
     db = SessionLocal()
     try:
         query = db.query(EventDB)
+
+        # Scope enforcement (P0-2): only return data for this API-key scope
+        query = query.filter(
+            EventDB.org_id == scope.org_id,
+            EventDB.home_id == scope.home_id,
+            EventDB.subject_id == scope.subject_id,
+        )
 
         if category:
             query = query.filter(EventDB.category == category)
@@ -1178,6 +1484,72 @@ def list_events(
         ]
     finally:
         db.close()
+
+
+@app.get("/subject_state")
+def get_subject_state(scope: "AuthScope" = Depends(require_scope)) -> dict:
+    """
+    Read-only subject state (P1-1-1 MVP).
+    Scope enforced: returns only this API-key subject.
+    """
+    db = SessionLocal()
+    try:
+        row = db.execute(
+            text(
+                """
+                SELECT org_id, home_id, subject_id, state, state_since, last_event_ts, updated_at
+                FROM subject_state
+                WHERE org_id = :org AND home_id = :home AND subject_id = :sub
+                """
+            ),
+            {"org": scope.org_id, "home": scope.home_id, "sub": scope.subject_id},
+        ).mappings().one_or_none()
+
+        if not row:
+            return {
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+                "state": "unknown",
+                "state_since": None,
+                "last_event_ts": None,
+                "updated_at": None,
+            }
+
+        r = dict(row)
+        # Normalize datetimes to ISO
+        for k in ("state_since", "last_event_ts", "updated_at"):
+            v = r.get(k)
+            if v is not None:
+                try:
+                    r[k] = v.isoformat()
+                except Exception:
+                    pass
+        return r
+    finally:
+        db.close()
+
+
+@app.post("/subject_state/compute_once")
+def compute_subject_state_once(
+    window_minutes: int = Query(default=60, ge=1, le=24*60),
+    scope: "AuthScope" = Depends(require_scope),
+) -> dict:
+    """
+    Computes subject_state for this (org_id, home_id) using DB function.
+    Explicit trigger only; safe & deterministic. No data returned beyond counts.
+    """
+    db = SessionLocal()
+    try:
+        row = db.execute(
+            text("SELECT * FROM public.compute_subject_state_once(:org, :home, :mins)"),
+            {"org": scope.org_id, "home": scope.home_id, "mins": int(window_minutes)},
+        ).mappings().one()
+        db.commit()
+        return {"ok": True, "org_id": scope.org_id, "home_id": scope.home_id, **dict(row)}
+    finally:
+        db.close()
+
 
 
 @app.on_event("startup")
@@ -1221,7 +1593,7 @@ def proposals_expire_once():
 
 
 @app.post("/proposals/mine_once")
-def mine_once() -> dict:
+def mine_once(scope: AuthScope = Depends(require_scope)) -> dict:
     """
     Dev endpoint: run proposals miner immediately.
     Intended for dev-dashboard verification.
@@ -1231,7 +1603,7 @@ def mine_once() -> dict:
 
     db = SessionLocal()
     try:
-        result = mine_proposals(db)
+        result = mine_proposals(db, scope=scope)
         db.execute(
             text(
                 "INSERT INTO job_status (job_key, last_run_at, last_ok_at, last_error_at, last_error_msg, last_payload) "
@@ -1284,6 +1656,7 @@ def list_monitor_modes(
     monitor_key: str | None = None,
     room_id: str | None = None,
     limit: int = Query(default=500, ge=1, le=5000),
+    scope: "AuthScope" = Depends(require_scope),
 ):
     """
     Read current monitor_modes rows for ops/debug without psql.
@@ -1296,8 +1669,8 @@ def list_monitor_modes(
     """
     db = SessionLocal()
     try:
-        where = []
-        params = {"limit": limit}
+        where = ["org_id = :org_id", "home_id = :home_id", "subject_id = :subject_id"]
+        params = {"limit": limit, "org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id}
 
         if monitor_key:
             where.append("monitor_key = :k")
@@ -1324,7 +1697,7 @@ def list_monitor_modes(
 
 
 @app.post("/monitor_modes")
-def set_monitor_mode(payload: dict) -> dict:
+def set_monitor_mode(payload: dict, scope: "AuthScope" = Depends(require_scope)) -> dict:
     """
     Dev endpoint: upsert monitor_modes.
     Expected JSON:
@@ -1341,15 +1714,15 @@ def set_monitor_mode(payload: dict) -> dict:
 
     db = SessionLocal()
     try:
-        _upsert_monitor_mode(db, monitor_key=monitor_key, room_id=room_id, mode=mode)
+        _upsert_monitor_mode(db, scope=scope, monitor_key=monitor_key, room_id=room_id, mode=mode)
         db.commit()
         row = (
             db.execute(
                 text(
                     "SELECT monitor_key, room_id, mode, updated_at "
-                    "FROM monitor_modes WHERE monitor_key=:k AND room_id=:r"
+                    "FROM monitor_modes WHERE org_id=:org_id AND home_id=:home_id AND subject_id=:subject_id AND monitor_key=:k AND room_id=:r"
                 ),
-                {"k": monitor_key, "r": room_id},
+                {"org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id, "k": monitor_key, "r": room_id},
             )
             .mappings()
             .first()

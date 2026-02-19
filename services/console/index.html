@@ -1031,6 +1031,7 @@ function saveExpectedRooms() {
 async function refreshSystemStatus() {
   const out = {};
   const now = new Date();
+  const normRoom = (s) => String(s || "").trim().toLowerCase();
 
   // helpers (local to this function for robustness)
   function setText(id, txt) {
@@ -1289,7 +1290,7 @@ try {
         } catch (_) {}
 
 // Compare to expected rooms (coverage settings)
-        const expected = getExpectedRooms();
+        const expected = getExpectedRooms().map(normRoom);
         missingBaseline = expected.filter(x => !baselineRooms.includes(String(x)));
 
         setBase("baseRoomsWith", baselineRooms.length ? baselineRooms.join(", ") : "(ingen)");
@@ -1366,14 +1367,16 @@ setBase("baseRoomsWith", "—");
 let c5 = 0, c60 = 0;
     const lines = [];
 
-    const byRoom = {}; // room -> {lastTs, c5,c60,c24}
+    const byRoom = {};
+      // room -> {lastTs, c5,c60,c24}
     let unknownCount = 0;
 
     for (let i=0; i<events.length; i++) {
       const e = events[i] || {};
       const ts = Date.parse(e.timestamp);
       const payload = e.payload || {};
-      const room = (payload.room || payload.area) ? (payload.room || payload.area) : "__UNKNOWN__";
+      const roomRaw = (payload.room || payload.area) ? (payload.room || payload.area) : "__UNKNOWN__";
+        const room = (roomRaw === "__UNKNOWN__") ? "__UNKNOWN__" : normRoom(roomRaw);
       if (room === "__UNKNOWN__") unknownCount++;
       if (!byRoom[room]) byRoom[room] = { room: room, lastTs: null, c5:0, c60:0, c24:0 };
 
@@ -1396,7 +1399,7 @@ let c5 = 0, c60 = 0;
 
     // Coverage UI fields (uses expected rooms helpers)
     const roomsSeen = Object.keys(byRoom).filter(r => r !== "__UNKNOWN__").sort();
-    const expected = getExpectedRooms();
+    const expected = getExpectedRooms().map(normRoom);
     const missing = expected.filter(r => !roomsSeen.includes(r));
 
     setText("covRoomsSeen", roomsSeen.length ? roomsSeen.join(", ") : "(ingen)");

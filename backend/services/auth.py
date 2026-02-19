@@ -68,6 +68,7 @@ class AuthScope:
     subject_id: str
     role: str
     api_key_hash: str
+    user_id: str | None
 
 
 def _sha256_hex(s: str) -> str:
@@ -82,7 +83,7 @@ def _lookup_scope_by_api_key(x_api_key: str) -> AuthScope | None:
         row = db.execute(
             text(
                 """
-                SELECT org_id, home_id, subject_id, role, api_key_hash
+                SELECT org_id, home_id, subject_id, role, api_key_hash, user_id
                 FROM api_key_scopes
                 WHERE api_key_hash = :h AND active = true
                 """
@@ -97,6 +98,7 @@ def _lookup_scope_by_api_key(x_api_key: str) -> AuthScope | None:
             subject_id=row["subject_id"],
             role=row["role"],
             api_key_hash=row["api_key_hash"],
+              user_id=str(row["user_id"]) if row.get("user_id") is not None else None,
         )
     finally:
         db.close()

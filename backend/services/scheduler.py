@@ -10,6 +10,8 @@ import traceback
 import uuid
 
 from datetime import datetime, timedelta
+from services.auth import AuthScope
+
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -331,6 +333,7 @@ def run_rule_engine_job():
 
     db = SessionLocal()
     try:
+        scope = _anomaly_pick_one_scope(db)
         cfg = load_rule_config()
         interval_minutes = cfg.scheduler_interval_minutes()
         subject_key = cfg.scheduler_default_subject_key()
@@ -506,6 +509,7 @@ def run_rule_engine_job():
 def run_anomalies_job_safe():
     """Fail-safe wrapper for APScheduler: never raise; updates in-memory status; always logs."""
     from datetime import datetime, timezone
+
     import traceback
 
     ANOMALIES_RUNNER_STATUS["last_run_at"] = datetime.now(timezone.utc).isoformat()
@@ -600,9 +604,45 @@ def setup_scheduler():
 # Minimal deterministic runner helpers. Wiring into APScheduler comes in a later step.
 
 
+def _anomaly_pick_one_scope(db) -> AuthScope:
+    """Deterministic: pick one (org_id, home_id, subject_id) scope from baseline_model_status."""
+    from sqlalchemy import text
+
+    row = (
+        db.execute(
+            text(
+                """
+            SELECT org_id, home_id, subject_id, user_id
+            FROM baseline_model_status
+            ORDER BY computed_at DESC NULLS LAST, model_end DESC
+            LIMIT 1
+            """
+            )
+        )
+        .mappings()
+        .first()
+    )
+    if not row:
+        raise RuntimeError("No baseline_model_status rows -> cannot resolve scope")
+
+    uid = row.get("user_id")
+    if uid is None:
+        raise RuntimeError("baseline_model_status.user_id is NULL -> cannot resolve scope user_id")
+
+    return AuthScope(
+        org_id=str(row.get("org_id") or "default"),
+        home_id=str(row.get("home_id") or "default"),
+        subject_id=str(row.get("subject_id") or "default"),
+        user_id=str(uid),
+        role="system",
+        api_key_hash="scheduler",
+    )
+
+
 def run_anomalies_job_one(
     db,
     *,
+    scope: AuthScope,
     room: str,
     bucket_start,
     close_after_green_buckets: int = 2,
@@ -626,6 +666,7 @@ def run_anomalies_job_one(
 
     scored = score_room_bucket(
         db,
+        scope=scope,
         room=room,
         bucket_start=dt,
         pet_weight=pet_weight,
@@ -634,6 +675,7 @@ def run_anomalies_job_one(
 
     ep = upsert_bucket_result(
         db,
+        scope=scope,
         room=scored.room,
         bucket_start=scored.bucket_start,
         bucket_end=scored.bucket_end,
@@ -686,7 +728,7 @@ def run_anomalies_job_deterministic() -> dict:
 
     db = SessionLocal()
     try:
-        res = run_anomalies_job_one(db, room=room, bucket_start=bucket_start)
+        res = run_anomalies_job_one(db, scope=scope, room=room, bucket_start=bucket_start)
         db.commit()
         return {"ok": True, "result": res}
     except Exception as e:
@@ -696,12 +738,21 @@ def run_anomalies_job_deterministic() -> dict:
         db.close()
 
 
-def _anomaly_pick_one_room_id(db) -> str:
+def _anomaly_pick_one_room_id(db, *, scope: AuthScope) -> str:
     """Deterministic: pick one known room_id from baseline_room_bucket (min(room_id))."""
     from sqlalchemy import text
 
     row = (
-        db.execute(text("SELECT MIN(room_id) AS room_id FROM baseline_room_bucket"))
+        db.execute(
+        text(
+            """
+            SELECT MIN(room_id) AS room_id
+            FROM baseline_room_bucket
+            WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
+            """
+        ),
+        {"org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id},
+    )
         .mappings()
         .first()
     )
@@ -713,8 +764,9 @@ def _anomaly_pick_one_room_id(db) -> str:
 
 def run_anomalies_job_one_deterministic_room(db, *, bucket_start) -> dict:
     """Deterministic: pick room_id from baseline_room_bucket and score one bucket."""
-    room_id = _anomaly_pick_one_room_id(db)
-    return run_anomalies_job_one(db, room=room_id, bucket_start=bucket_start)
+    scope = _anomaly_pick_one_scope(db)
+    room_id = _anomaly_pick_one_room_id(db, scope=scope)
+    return run_anomalies_job_one(db, scope=scope, room=room_id, bucket_start=bucket_start)
 
 
 def _latest_finished_bucket_start_utc(*, bucket_minutes: int = 15):
@@ -748,8 +800,8 @@ def run_anomalies_job_latest_one() -> dict:
     bs = _latest_finished_bucket_start_utc()
     db = SessionLocal()
     try:
-        room_id = _anomaly_pick_one_room_id(db)
-        res = run_anomalies_job_one(db, room=room_id, bucket_start=bs)
+        room_id = _anomaly_pick_one_room_id(db, scope=scope)
+        res = run_anomalies_job_one(db, scope=scope, room=room_id, bucket_start=bs)
         db.commit()
         return {"ok": True, "room": room_id, "bucket_start": bs, "result": res}
     except Exception as e:
@@ -759,7 +811,7 @@ def run_anomalies_job_latest_one() -> dict:
         db.close()
 
 
-def _anomaly_list_room_ids(db) -> list[str]:
+def _anomaly_list_room_ids(db, *, scope: AuthScope) -> list[str]:
     """List known rooms for anomaly scoring. Source: baseline_room_bucket (latest model_end per user)."""
     from sqlalchemy import text
 
@@ -778,12 +830,12 @@ def _anomaly_list_room_ids(db) -> list[str]:
                 """
             SELECT model_end
             FROM baseline_model_status
-            WHERE user_id = CAST(:uid AS uuid)
+            WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
             ORDER BY model_end DESC
             LIMIT 1
             """
             ),
-            {"uid": uid},
+            {"org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id},
         )
         .mappings()
         .first()
@@ -798,12 +850,12 @@ def _anomaly_list_room_ids(db) -> list[str]:
                 """
             SELECT DISTINCT room_id
             FROM baseline_room_bucket
-            WHERE user_id = CAST(:uid AS uuid)
+            WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
               AND model_end = :model_end
             ORDER BY room_id ASC
             """
             ),
-            {"uid": uid, "model_end": model_end},
+            {"org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id, "model_end": model_end},
         )
         .mappings()
         .all()
@@ -828,10 +880,11 @@ def run_anomalies_job() -> dict:
     counts = {"OPEN": 0, "UPDATE": 0, "CLOSE": 0, "NOOP": 0, "ERROR": 0}
     rooms_scored = 0
     try:
-        rooms = _anomaly_list_room_ids(db)
+        scope = _anomaly_pick_one_scope(db)
+        rooms = _anomaly_list_room_ids(db, scope=scope)
         for room_id in rooms:
             try:
-                res = run_anomalies_job_one(db, room=room_id, bucket_start=bucket_start)
+                res = run_anomalies_job_one(db, scope=scope, room=room_id, bucket_start=bucket_start)
                 rooms_scored += 1
                 a = str(res.get("action") or "NOOP").upper()
                 if a not in counts:

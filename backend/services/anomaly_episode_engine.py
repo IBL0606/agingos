@@ -6,6 +6,8 @@ from datetime import datetime, date
 from typing import Optional, Any
 
 from sqlalchemy import text
+
+from services.auth import AuthScope
 from sqlalchemy.orm import Session
 
 from models.anomaly_episode import AnomalyLevel
@@ -34,19 +36,19 @@ class EpisodeProcessResult:
     episode_active: bool
 
 
-def _get_active_episode(db: Session, room: str) -> Optional[dict]:
+def _get_active_episode(db: Session, scope: AuthScope, room: str) -> Optional[dict]:
     row = (
         db.execute(
             text(
                 """
             SELECT id, level, score_total, peak_bucket_score, start_ts, end_ts
             FROM anomaly_episodes
-            WHERE room = :room AND end_ts IS NULL
+            WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id AND room = :room AND end_ts IS NULL
             ORDER BY start_ts DESC
             LIMIT 1
             """
             ),
-            {"room": room},
+            {"room": room, "org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id},
         )
         .mappings()
         .first()
@@ -70,6 +72,7 @@ def _json_safe(x: Any) -> Any:
 def process_bucket_score(
     db: Session,
     *,
+    scope: AuthScope,
     bucket: BucketScore,
     close_after_green_buckets: int = 2,
 ) -> EpisodeProcessResult:
@@ -83,7 +86,7 @@ def process_bucket_score(
     room = bucket.room
     level_i = _level_int(bucket.level)
 
-    active = _get_active_episode(db, room)
+    active = _get_active_episode(db, scope, room)
 
     # Helper: track consecutive green buckets using anomaly_episodes.peak_bucket_details['green_streak'] (lightweight).
     def _get_green_streak(ep_details: Optional[dict]) -> int:
@@ -106,6 +109,7 @@ def process_bucket_score(
         # Open new episode
         ep = create_episode(
             db,
+            scope=scope,
             room=room,
             start_ts=bucket.bucket_start,
             level=level_i,
@@ -154,7 +158,7 @@ def process_bucket_score(
         streak = _get_green_streak(cur_details) + 1
 
         if streak >= close_after_green_buckets:
-            close_episode(db, episode_id=ep_id, end_ts=bucket.bucket_end)
+            close_episode(db, scope=scope, episode_id=ep_id, end_ts=bucket.bucket_end)
             return EpisodeProcessResult(
                 action="closed", episode_id=ep_id, episode_active=False
             )
@@ -206,6 +210,7 @@ def process_bucket_score(
     if cur_peak is None or bucket.score_total >= cur_peak:
         update_episode_peak(
             db,
+            scope=scope,
             episode_id=ep_id,
             level=new_level_i,
             score_total=bucket.score_total,

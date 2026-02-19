@@ -62,3 +62,4 @@ agingos_env/
 # Backup files created by patch scripts
 *.bak
 *.bak_*
+_handoff_*

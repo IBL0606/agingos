@@ -4,9 +4,12 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from typing import Any, Optional
 
 from fastapi import HTTPException
+
+from services.auth import AuthScope
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -33,6 +36,8 @@ def _clamp(x: float, lo: float, hi: float) -> float:
     return lo if x < lo else hi if x > hi else x
 
 
+OSLO = ZoneInfo("Europe/Oslo")
+
 def _level_from_score(score: float) -> str:
     if score >= 4.0:
         return "RED"
@@ -42,7 +47,9 @@ def _level_from_score(score: float) -> str:
 
 
 def _bucket_idx_15m(dt: datetime) -> int:
-    m = dt.hour * 60 + dt.minute
+    # Bucket index must match baseline_bucket_idx_oslo() (Europe/Oslo local time)
+    local = dt.astimezone(OSLO)
+    m = local.hour * 60 + local.minute
     return int(m // 15)
 
 
@@ -50,32 +57,26 @@ def _norm_room(room: str) -> str:
     return (room or "").strip()
 
 
-def _get_instance_user_id(db: Session) -> str:
-    row = (
-        db.execute(text("SELECT id::text AS id FROM app_instance LIMIT 1"))
-        .mappings()
-        .first()
-    )
-    if not row or not row.get("id"):
-        raise HTTPException(
-            status_code=500, detail="app_instance missing (no instance user_id)"
-        )
-    return row["id"]
+def _get_instance_user_id(scope: AuthScope) -> str:
+    uid = getattr(scope, 'user_id', None)
+    if not uid:
+        raise HTTPException(status_code=500, detail='scope missing user_id (api_key_scopes.user_id)')
+    return str(uid)
 
 
-def _get_latest_model_end(db: Session, uid: str) -> Optional[str]:
+def _get_latest_model_end(db: Session, scope: AuthScope) -> Optional[str]:
     row = (
         db.execute(
             text(
                 """
             SELECT model_end
             FROM baseline_model_status
-            WHERE user_id = CAST(:uid AS uuid)
+            WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
             ORDER BY model_end DESC
             LIMIT 1
             """
             ),
-            {"uid": uid},
+            {"org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id},
         )
         .mappings()
         .first()
@@ -85,19 +86,20 @@ def _get_latest_model_end(db: Session, uid: str) -> Optional[str]:
     return row["model_end"]
 
 
-def _prev_room(db: Session, bucket_start: datetime) -> Optional[str]:
+def _prev_room(db: Session, scope: AuthScope, bucket_start: datetime) -> Optional[str]:
     row = (
         db.execute(
             text(
                 """
             SELECT room
             FROM episodes
-            WHERE end_ts IS NOT NULL AND end_ts <= :t
+            WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
+              AND end_ts IS NOT NULL AND end_ts <= :t
             ORDER BY end_ts DESC
             LIMIT 1
             """
             ),
-            {"t": bucket_start},
+            {"t": bucket_start, "org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id},
         )
         .mappings()
         .first()
@@ -107,6 +109,7 @@ def _prev_room(db: Session, bucket_start: datetime) -> Optional[str]:
 
 def _observed_activity(
     db: Session,
+    scope: AuthScope,
     room: str,
     start: datetime,
     end: datetime,
@@ -127,14 +130,15 @@ def _observed_activity(
               start_ts, end_ts, event_rate_per_min,
               class, p_human, p_pet, p_unknown
             FROM episodes
-            WHERE room = :room
+            WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
+              AND room = :room
               AND start_ts < :end
               AND end_ts IS NOT NULL
               AND end_ts > :start
             ORDER BY start_ts ASC
             """
             ),
-            {"room": room, "start": start, "end": end},
+            {"room": room, "start": start, "end": end, "org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id},
         )
         .mappings()
         .all()
@@ -166,9 +170,7 @@ def _observed_activity(
     }
 
 
-def _observed_door_events(
-    db: Session, room: str, start: datetime, end: datetime
-) -> int:
+def _observed_door_events(db: Session, scope: AuthScope, room: str, start: datetime, end: datetime) -> int:
     # events.payload has room/area; we accept both keys.
     row = (
         db.execute(
@@ -176,7 +178,8 @@ def _observed_door_events(
                 """
             SELECT COUNT(*)::int AS n
             FROM events
-            WHERE "timestamp" >= :start AND "timestamp" < :end
+            WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
+              AND "timestamp" >= :start AND "timestamp" < :end
               AND category = 'door'
               AND (
                 (payload->>'room') = :room
@@ -184,7 +187,7 @@ def _observed_door_events(
               )
             """
             ),
-            {"start": start, "end": end, "room": room},
+            {"start": start, "end": end, "room": room, "org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id},
         )
         .mappings()
         .first()
@@ -195,6 +198,7 @@ def _observed_door_events(
 def score_room_bucket(
     db: Session,
     *,
+    scope: AuthScope,
     room: str,
     bucket_start: datetime,
     pet_weight: float = 0.25,
@@ -214,18 +218,41 @@ def score_room_bucket(
         second=0, microsecond=0
     )
     bucket_end = bucket_start + timedelta(minutes=15)
-
-    dow = (int(bucket_start.weekday()) + 1) % 7  # pg_dow: 0=Sunday .. 6=Saturday
-    is_weekend = dow in (0, 6)  # pg weekend: Sunday(0) or Saturday(6)
+    bucket_local = bucket_start.astimezone(OSLO)
+    dow = (int(bucket_local.weekday()) + 1) % 7  # pg_dow: 0=Sunday .. 6=Saturday (OSLO)
+    is_weekend = dow in (0, 6)  # Sunday(0) or Saturday(6)
     bucket_idx = _bucket_idx_15m(bucket_start)
 
-    uid = _get_instance_user_id(db)
-    model_end = _get_latest_model_end(db, uid)
+    uid = _get_instance_user_id(scope)
+
+    model_end = _get_latest_model_end(db, scope)
+    row_status = (
+        db.execute(
+            text(
+                '''
+                SELECT baseline_ready
+                FROM baseline_model_status
+                WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
+                ORDER BY model_end DESC
+                LIMIT 1
+                '''
+            ),
+            {'org_id': scope.org_id, 'home_id': scope.home_id, 'subject_id': scope.subject_id},
+        )
+        .mappings()
+        .first()
+    )
+    baseline_ready = (
+        bool(row_status.get('baseline_ready'))
+        if row_status and row_status.get('baseline_ready') is not None
+        else None
+    )
 
     reasons: list[dict] = []
     details: dict[str, Any] = {
         "user_id": uid,
         "model_end": model_end,
+          "baseline_ready": baseline_ready,
         "room": room,
         "bucket": {
             "start": bucket_start.isoformat(),
@@ -239,13 +266,14 @@ def score_room_bucket(
     # Observed
     activity_obs, act_meta = _observed_activity(
         db,
+        scope,
         room,
         bucket_start,
         bucket_end,
         pet_weight=pet_weight,
         unknown_weight=unknown_weight,
     )
-    door_obs = _observed_door_events(db, room, bucket_start, bucket_end)
+    door_obs = _observed_door_events(db, scope, room, bucket_start, bucket_end)
 
     details["observed"] = {
         "activity_obs": activity_obs,
@@ -294,7 +322,7 @@ def score_room_bucket(
               activity_median, activity_sigma, activity_support_n, sigma_floor,
               door_median, door_sigma, door_support_n
             FROM baseline_room_bucket
-            WHERE user_id = CAST(:uid AS uuid)
+            WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
               AND model_end = :model_end
               AND dow = :dow
               AND is_weekend = :is_weekend
@@ -304,7 +332,9 @@ def score_room_bucket(
             """
             ),
             {
-                "uid": uid,
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
                 "model_end": model_end,
                 "dow": dow,
                 "is_weekend": is_weekend,
@@ -513,7 +543,7 @@ def score_room_bucket(
                 )
 
     # Sequence component via transitions
-    prev = _prev_room(db, bucket_start)
+    prev = _prev_room(db, scope, bucket_start)
     details["observed"]["prev_room"] = prev
 
     if prev and prev != room:
@@ -523,7 +553,7 @@ def score_room_bucket(
                     """
                 SELECT p_smoothed, trans_count, from_total, alpha
                 FROM baseline_transition
-                WHERE user_id = CAST(:uid AS uuid)
+                WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
                   AND model_end = :model_end
                   AND dow = :dow
                   AND is_weekend = :is_weekend
@@ -534,7 +564,9 @@ def score_room_bucket(
                 """
                 ),
                 {
-                    "uid": uid,
+                    "org_id": scope.org_id,
+                    "home_id": scope.home_id,
+                    "subject_id": scope.subject_id,
                     "model_end": model_end,
                     "dow": dow,
                     "is_weekend": is_weekend,

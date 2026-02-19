@@ -2,12 +2,37 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text
 
 from db import SessionLocal
+from services.auth import require_scope, AuthScope
 
 router = APIRouter(prefix="/baseline", tags=["baseline"])
+
+
+def _resolve_user_id_for_scope(db, scope: AuthScope) -> str:
+    """Resolve user_id/app_instance_id for the given scope.
+    Primary: subjects.app_instance_id. Fallback: first app_instance (legacy single-tenant).
+    """
+    row = (
+        db.execute(
+            text(
+                """
+                SELECT app_instance_id::text AS id
+                FROM subjects
+                WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
+                LIMIT 1
+                """
+            ),
+            {"org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id},
+        )
+        .mappings()
+        .first()
+    )
+    if row and row.get("id"):
+        return row["id"]
+    return _get_instance_user_id(db)
 
 
 def _get_instance_user_id(db) -> str:
@@ -24,16 +49,19 @@ def _get_instance_user_id(db) -> str:
 
 
 @router.get("/status")
-def baseline_status() -> dict[str, Any]:
+def baseline_status(scope: AuthScope = Depends(require_scope)) -> dict[str, Any]:
     db = SessionLocal()
     try:
-        uid = _get_instance_user_id(db)
+        uid = _resolve_user_id_for_scope(db, scope)
 
         row = (
             db.execute(
                 text(
                     """
                 SELECT
+                  org_id,
+                  home_id,
+                  subject_id,
                   user_id::text AS user_id,
                   model_start,
                   model_end,
@@ -47,12 +75,13 @@ def baseline_status() -> dict[str, Any]:
                   baseline_ready,
                   computed_at
                 FROM baseline_model_status
-                WHERE user_id = CAST(:uid AS uuid)
+                WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
+                  AND user_id = CAST(:uid AS uuid)
                 ORDER BY model_end DESC
                 LIMIT 1
                 """
                 ),
-                {"uid": uid},
+                {"uid": uid, "org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id},
             )
             .mappings()
             .first()
@@ -88,6 +117,7 @@ def baseline_status() -> dict[str, Any]:
 
 @router.get("")
 def baseline_dev(
+    scope: AuthScope = Depends(require_scope),
     room: Optional[str] = Query(default=None),
     bucket: Optional[int] = Query(default=None, ge=0, le=95),
     dow: Optional[int] = Query(default=None, ge=0, le=6),
@@ -99,7 +129,7 @@ def baseline_dev(
 ) -> dict[str, Any]:
     db = SessionLocal()
     try:
-        uid = _get_instance_user_id(db)
+        uid = _resolve_user_id_for_scope(db, scope)
 
         status = (
             db.execute(
@@ -112,7 +142,7 @@ def baseline_dev(
                 LIMIT 1
                 """
                 ),
-                {"uid": uid},
+                {"uid": uid, "org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id},
             )
             .mappings()
             .first()
@@ -140,7 +170,7 @@ def baseline_dev(
                     ORDER BY room_id
                     """
                     ),
-                    {"uid": uid, "model_end": model_end},
+                    {"uid": uid, "model_end": model_end, "org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id},
                 )
                 .mappings()
                 .all()
@@ -151,8 +181,8 @@ def baseline_dev(
                 "rooms": [dict(r) for r in rows],
             }
 
-        where = ["user_id = CAST(:uid AS uuid)", "model_end = :model_end"]
-        params: dict[str, Any] = {"uid": uid, "model_end": model_end}
+        where = ["org_id = :org_id", "home_id = :home_id", "subject_id = :subject_id", "user_id = CAST(:uid AS uuid)", "model_end = :model_end"]
+        params: dict[str, Any] = {"uid": uid, "model_end": model_end, "org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id}
 
         if room is not None:
             where.append("room_id = :room")
@@ -204,11 +234,14 @@ def baseline_dev(
         transitions: list[dict[str, Any]] = []
         if room is not None:
             t_where = [
+                "org_id = :org_id",
+                "home_id = :home_id",
+                "subject_id = :subject_id",
                 "user_id = CAST(:uid AS uuid)",
                 "model_end = :model_end",
                 "from_room_id = :room",
             ]
-            t_params = {"uid": uid, "model_end": model_end, "room": room}
+            t_params = {"uid": uid, "model_end": model_end, "room": room, "org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id}
 
             if bucket is not None:
                 t_where.append("bucket_idx = :bucket")
