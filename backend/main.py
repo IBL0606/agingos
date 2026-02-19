@@ -11,7 +11,6 @@ from models.db_event import EventDB
 
 from services.scheduler import scheduler, setup_scheduler
 from services.auth import (
-    require_api_key,
     require_scope,
     AuthScope,
     validate_auth_config_on_startup,
@@ -480,9 +479,6 @@ def debug_scope(scope: "AuthScope" = Depends(require_scope)):
 
 
 # --- Episodes SVC (incremental + idempotent) ----------------------------------
-from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel
 
 
 class EpisodesSvcBuildIn(BaseModel):

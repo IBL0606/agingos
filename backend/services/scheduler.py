@@ -337,10 +337,9 @@ def run_rule_engine_job():
         cfg = load_rule_config()
         interval_minutes = cfg.scheduler_interval_minutes()
         subject_key = cfg.scheduler_default_subject_key()
-        org_id = "default"
-        home_id = "default"
-        subject_id = "default"
-
+        org_id = scope.org_id
+        home_id = scope.home_id
+        subject_id = scope.subject_id
         now = utcnow()
         until = now
         since = now - timedelta(minutes=interval_minutes)
@@ -736,6 +735,7 @@ def run_anomalies_job_deterministic() -> dict:
 
     db = SessionLocal()
     try:
+        scope = _anomaly_pick_one_scope(db)
         res = run_anomalies_job_one(
             db, scope=scope, room=room, bucket_start=bucket_start
         )
@@ -816,6 +816,7 @@ def run_anomalies_job_latest_one() -> dict:
     bs = _latest_finished_bucket_start_utc()
     db = SessionLocal()
     try:
+        scope = _anomaly_pick_one_scope(db)
         room_id = _anomaly_pick_one_room_id(db, scope=scope)
         res = run_anomalies_job_one(db, scope=scope, room=room_id, bucket_start=bs)
         db.commit()
@@ -830,15 +831,6 @@ def run_anomalies_job_latest_one() -> dict:
 def _anomaly_list_room_ids(db, *, scope: AuthScope) -> list[str]:
     """List known rooms for anomaly scoring. Source: baseline_room_bucket (latest model_end per user)."""
     from sqlalchemy import text
-
-    row = (
-        db.execute(text("SELECT id::text AS id FROM app_instance LIMIT 1"))
-        .mappings()
-        .first()
-    )
-    if not row or not row.get("id"):
-        raise RuntimeError("app_instance missing (cannot resolve user_id)")
-    uid = row["id"]
 
     me = (
         db.execute(

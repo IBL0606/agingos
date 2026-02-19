@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-import os, sys, json, subprocess
+import os
+import json
+import subprocess
 from datetime import datetime, timezone
 from typing import Optional, Tuple, Dict, Any, List
 
