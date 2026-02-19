@@ -87,7 +87,9 @@ def compute_next_allowed_local(now_local, end_t):
     return candidate
 
 
-def defer_due_to_policy(cur, outbox_id: int, next_attempt_at_utc: datetime, reason: str):
+def defer_due_to_policy(
+    cur, outbox_id: int, next_attempt_at_utc: datetime, reason: str
+):
     # Important: do NOT bump attempt_n for policy deferrals.
     cur.execute(
         """
@@ -260,7 +262,9 @@ def apply_policy_or_none(cur, row) -> bool:
         return False
 
     now_local = utcnow().astimezone(ZoneInfo(tzname))
-    if in_quiet_window(now_local, pol.get("quiet_start_local"), pol.get("quiet_end_local")):
+    if in_quiet_window(
+        now_local, pol.get("quiet_start_local"), pol.get("quiet_end_local")
+    ):
         next_local = compute_next_allowed_local(now_local, pol.get("quiet_end_local"))
         next_utc = next_local.astimezone(timezone.utc)
         defer_due_to_policy(cur, int(row["id"]), next_utc, f"policy_defer:{mode}")

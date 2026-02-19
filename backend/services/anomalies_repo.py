@@ -100,14 +100,18 @@ def update_episode_peak(
     reasons: list[dict],
     peak_bucket_details: Optional[dict],
 ) -> AnomalyEpisode:
-    ep = db.execute(
-        select(AnomalyEpisode).where(
-            AnomalyEpisode.id == episode_id,
-            AnomalyEpisode.org_id == scope.org_id,
-            AnomalyEpisode.home_id == scope.home_id,
-            AnomalyEpisode.subject_id == scope.subject_id,
+    ep = (
+        db.execute(
+            select(AnomalyEpisode).where(
+                AnomalyEpisode.id == episode_id,
+                AnomalyEpisode.org_id == scope.org_id,
+                AnomalyEpisode.home_id == scope.home_id,
+                AnomalyEpisode.subject_id == scope.subject_id,
+            )
         )
-    ).scalars().first()
+        .scalars()
+        .first()
+    )
     if not ep:
         raise KeyError(f"AnomalyEpisode {episode_id} not found")
 
@@ -128,15 +132,21 @@ def update_episode_peak(
     return ep
 
 
-def close_episode(db: Session, *, scope: AuthScope, episode_id: int, end_ts: datetime) -> AnomalyEpisode:
-    ep = db.execute(
-        select(AnomalyEpisode).where(
-            AnomalyEpisode.id == episode_id,
-            AnomalyEpisode.org_id == scope.org_id,
-            AnomalyEpisode.home_id == scope.home_id,
-            AnomalyEpisode.subject_id == scope.subject_id,
+def close_episode(
+    db: Session, *, scope: AuthScope, episode_id: int, end_ts: datetime
+) -> AnomalyEpisode:
+    ep = (
+        db.execute(
+            select(AnomalyEpisode).where(
+                AnomalyEpisode.id == episode_id,
+                AnomalyEpisode.org_id == scope.org_id,
+                AnomalyEpisode.home_id == scope.home_id,
+                AnomalyEpisode.subject_id == scope.subject_id,
+            )
         )
-    ).scalars().first()
+        .scalars()
+        .first()
+    )
     if not ep:
         raise KeyError(f"AnomalyEpisode {episode_id} not found")
     ep.end_ts = end_ts

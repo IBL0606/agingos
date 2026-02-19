@@ -93,10 +93,10 @@ def score_anomaly_bucket(
     # parse bucket_start with datetime.fromisoformat (accept Z)
     bs = bucket_start.strip().replace("Z", "+00:00")
     from datetime import datetime
+
     # Hvis offset mangler +/-
     if " " in bs[-6:]:
         bs = bs.replace(" ", "+", 1)
-
 
     dt = datetime.fromisoformat(bs)
     res = score_room_bucket(
@@ -142,10 +142,10 @@ def run_once_anomaly(
 ):
     bs = bucket_start.strip().replace("Z", "+00:00")
     from datetime import datetime
+
     # Hvis offset mangler +/-
     if " " in bs[-6:]:
         bs = bs.replace(" ", "+", 1)
-
 
     dt = datetime.fromisoformat(bs)
 

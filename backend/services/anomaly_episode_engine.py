@@ -48,7 +48,12 @@ def _get_active_episode(db: Session, scope: AuthScope, room: str) -> Optional[di
             LIMIT 1
             """
             ),
-            {"room": room, "org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id},
+            {
+                "room": room,
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+            },
         )
         .mappings()
         .first()

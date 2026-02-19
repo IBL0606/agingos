@@ -57,9 +57,11 @@ def validate_auth_config_on_startup() -> None:
             "AGINGOS_API_KEYS must be set when AGINGOS_AUTH_MODE=api_key"
         )
 
+
 # -------------------------
 # Tenant scope (P0-2, minimal)
 # -------------------------
+
 
 @dataclass(frozen=True)
 class AuthScope:
@@ -80,16 +82,20 @@ def _lookup_scope_by_api_key(x_api_key: str) -> AuthScope | None:
     h = _sha256_hex(x_api_key)
     db = SessionLocal()
     try:
-        row = db.execute(
-            text(
-                """
+        row = (
+            db.execute(
+                text(
+                    """
                 SELECT org_id, home_id, subject_id, role, api_key_hash, user_id
                 FROM api_key_scopes
                 WHERE api_key_hash = :h AND active = true
                 """
-            ),
-            {"h": h},
-        ).mappings().one_or_none()
+                ),
+                {"h": h},
+            )
+            .mappings()
+            .one_or_none()
+        )
         if not row:
             return None
         return AuthScope(
@@ -98,7 +104,7 @@ def _lookup_scope_by_api_key(x_api_key: str) -> AuthScope | None:
             subject_id=row["subject_id"],
             role=row["role"],
             api_key_hash=row["api_key_hash"],
-              user_id=str(row["user_id"]) if row.get("user_id") is not None else None,
+            user_id=str(row["user_id"]) if row.get("user_id") is not None else None,
         )
     finally:
         db.close()
@@ -120,7 +126,9 @@ def require_scope(
 
     # Second: require DB scope mapping
     if not x_api_key:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
+        )
 
     scope = _lookup_scope_by_api_key(x_api_key)
     if not scope:

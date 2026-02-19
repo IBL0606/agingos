@@ -25,7 +25,11 @@ def _resolve_user_id_for_scope(db, scope: AuthScope) -> str:
                 LIMIT 1
                 """
             ),
-            {"org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id},
+            {
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+            },
         )
         .mappings()
         .first()
@@ -81,7 +85,12 @@ def baseline_status(scope: AuthScope = Depends(require_scope)) -> dict[str, Any]
                 LIMIT 1
                 """
                 ),
-                {"uid": uid, "org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id},
+                {
+                    "uid": uid,
+                    "org_id": scope.org_id,
+                    "home_id": scope.home_id,
+                    "subject_id": scope.subject_id,
+                },
             )
             .mappings()
             .first()
@@ -142,7 +151,12 @@ def baseline_dev(
                 LIMIT 1
                 """
                 ),
-                {"uid": uid, "org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id},
+                {
+                    "uid": uid,
+                    "org_id": scope.org_id,
+                    "home_id": scope.home_id,
+                    "subject_id": scope.subject_id,
+                },
             )
             .mappings()
             .first()
@@ -170,7 +184,13 @@ def baseline_dev(
                     ORDER BY room_id
                     """
                     ),
-                    {"uid": uid, "model_end": model_end, "org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id},
+                    {
+                        "uid": uid,
+                        "model_end": model_end,
+                        "org_id": scope.org_id,
+                        "home_id": scope.home_id,
+                        "subject_id": scope.subject_id,
+                    },
                 )
                 .mappings()
                 .all()
@@ -181,8 +201,20 @@ def baseline_dev(
                 "rooms": [dict(r) for r in rows],
             }
 
-        where = ["org_id = :org_id", "home_id = :home_id", "subject_id = :subject_id", "user_id = CAST(:uid AS uuid)", "model_end = :model_end"]
-        params: dict[str, Any] = {"uid": uid, "model_end": model_end, "org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id}
+        where = [
+            "org_id = :org_id",
+            "home_id = :home_id",
+            "subject_id = :subject_id",
+            "user_id = CAST(:uid AS uuid)",
+            "model_end = :model_end",
+        ]
+        params: dict[str, Any] = {
+            "uid": uid,
+            "model_end": model_end,
+            "org_id": scope.org_id,
+            "home_id": scope.home_id,
+            "subject_id": scope.subject_id,
+        }
 
         if room is not None:
             where.append("room_id = :room")
@@ -241,7 +273,14 @@ def baseline_dev(
                 "model_end = :model_end",
                 "from_room_id = :room",
             ]
-            t_params = {"uid": uid, "model_end": model_end, "room": room, "org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id}
+            t_params = {
+                "uid": uid,
+                "model_end": model_end,
+                "room": room,
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+            }
 
             if bucket is not None:
                 t_where.append("bucket_idx = :bucket")

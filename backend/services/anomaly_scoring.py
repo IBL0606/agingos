@@ -38,6 +38,7 @@ def _clamp(x: float, lo: float, hi: float) -> float:
 
 OSLO = ZoneInfo("Europe/Oslo")
 
+
 def _level_from_score(score: float) -> str:
     if score >= 4.0:
         return "RED"
@@ -58,9 +59,11 @@ def _norm_room(room: str) -> str:
 
 
 def _get_instance_user_id(scope: AuthScope) -> str:
-    uid = getattr(scope, 'user_id', None)
+    uid = getattr(scope, "user_id", None)
     if not uid:
-        raise HTTPException(status_code=500, detail='scope missing user_id (api_key_scopes.user_id)')
+        raise HTTPException(
+            status_code=500, detail="scope missing user_id (api_key_scopes.user_id)"
+        )
     return str(uid)
 
 
@@ -76,7 +79,11 @@ def _get_latest_model_end(db: Session, scope: AuthScope) -> Optional[str]:
             LIMIT 1
             """
             ),
-            {"org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id},
+            {
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+            },
         )
         .mappings()
         .first()
@@ -99,7 +106,12 @@ def _prev_room(db: Session, scope: AuthScope, bucket_start: datetime) -> Optiona
             LIMIT 1
             """
             ),
-            {"t": bucket_start, "org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id},
+            {
+                "t": bucket_start,
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+            },
         )
         .mappings()
         .first()
@@ -138,7 +150,14 @@ def _observed_activity(
             ORDER BY start_ts ASC
             """
             ),
-            {"room": room, "start": start, "end": end, "org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id},
+            {
+                "room": room,
+                "start": start,
+                "end": end,
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+            },
         )
         .mappings()
         .all()
@@ -170,7 +189,9 @@ def _observed_activity(
     }
 
 
-def _observed_door_events(db: Session, scope: AuthScope, room: str, start: datetime, end: datetime) -> int:
+def _observed_door_events(
+    db: Session, scope: AuthScope, room: str, start: datetime, end: datetime
+) -> int:
     # events.payload has room/area; we accept both keys.
     row = (
         db.execute(
@@ -187,7 +208,14 @@ def _observed_door_events(db: Session, scope: AuthScope, room: str, start: datet
               )
             """
             ),
-            {"start": start, "end": end, "room": room, "org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id},
+            {
+                "start": start,
+                "end": end,
+                "room": room,
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+            },
         )
         .mappings()
         .first()
@@ -229,22 +257,26 @@ def score_room_bucket(
     row_status = (
         db.execute(
             text(
-                '''
+                """
                 SELECT baseline_ready
                 FROM baseline_model_status
                 WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
                 ORDER BY model_end DESC
                 LIMIT 1
-                '''
+                """
             ),
-            {'org_id': scope.org_id, 'home_id': scope.home_id, 'subject_id': scope.subject_id},
+            {
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+            },
         )
         .mappings()
         .first()
     )
     baseline_ready = (
-        bool(row_status.get('baseline_ready'))
-        if row_status and row_status.get('baseline_ready') is not None
+        bool(row_status.get("baseline_ready"))
+        if row_status and row_status.get("baseline_ready") is not None
         else None
     )
 
@@ -252,7 +284,7 @@ def score_room_bucket(
     details: dict[str, Any] = {
         "user_id": uid,
         "model_end": model_end,
-          "baseline_ready": baseline_ready,
+        "baseline_ready": baseline_ready,
         "room": room,
         "bucket": {
             "start": bucket_start.isoformat(),

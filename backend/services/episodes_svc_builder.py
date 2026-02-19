@@ -31,6 +31,7 @@ def _payload_get(payload: Any) -> Dict[str, Any]:
     # psycopg2 may return JSON as string in some paths
     try:
         import json as _json
+
         if isinstance(payload, str):
             return _json.loads(payload)
     except Exception:
@@ -41,7 +42,9 @@ def _payload_get(payload: Any) -> Dict[str, Any]:
         return {}
 
 
-def ensure_state_row(cur, *, org_id: str, home_id: str, subject_id: str, builder_name: str) -> None:
+def ensure_state_row(
+    cur, *, org_id: str, home_id: str, subject_id: str, builder_name: str
+) -> None:
     cur.execute(
         """
         INSERT INTO episode_builder_state (org_id, home_id, subject_id, builder_name)
@@ -91,16 +94,16 @@ def fetch_events(
     ]
 
     if since is not None:
-        where.append("\"timestamp\" >= %s")
+        where.append('"timestamp" >= %s')
         params.append(since)
     if until is not None:
-        where.append("\"timestamp\" < %s")
+        where.append('"timestamp" < %s')
         params.append(until)
 
     if since is None and until is None:
         # incremental watermark filtering
         if wm_ts is not None:
-            where.append("(\"timestamp\" > %s OR (\"timestamp\" = %s AND id > %s))")
+            where.append('("timestamp" > %s OR ("timestamp" = %s AND id > %s))')
             params.extend([wm_ts, wm_ts, (wm_id or 0)])
 
     sql = f"""
@@ -245,8 +248,20 @@ def build_presence_room_v1(
 
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            ensure_state_row(cur, org_id=org_id, home_id=home_id, subject_id=subject_id, builder_name=builder_name)
-            wm_ts, wm_id = read_watermark_for_update(cur, org_id=org_id, home_id=home_id, subject_id=subject_id, builder_name=builder_name)
+            ensure_state_row(
+                cur,
+                org_id=org_id,
+                home_id=home_id,
+                subject_id=subject_id,
+                builder_name=builder_name,
+            )
+            wm_ts, wm_id = read_watermark_for_update(
+                cur,
+                org_id=org_id,
+                home_id=home_id,
+                subject_id=subject_id,
+                builder_name=builder_name,
+            )
 
             watermark_before_ts, watermark_before_id = wm_ts, wm_id
 
@@ -270,7 +285,14 @@ def build_presence_room_v1(
                 eid_row = int(e["id"])
                 ts = e["ts"]
 
-                if last_seen_ts is None or ts > last_seen_ts or (ts == last_seen_ts and (last_seen_id is None or eid_row > last_seen_id)):
+                if (
+                    last_seen_ts is None
+                    or ts > last_seen_ts
+                    or (
+                        ts == last_seen_ts
+                        and (last_seen_id is None or eid_row > last_seen_id)
+                    )
+                ):
                     last_seen_ts, last_seen_id = ts, eid_row
 
                 payload = _payload_get(e["payload"])
@@ -360,7 +382,10 @@ def build_presence_room_v1(
                             end_event_id=e.get("event_id"),
                             event_n=o["event_n"],
                             is_open=False,
-                            meta={"close_reason": "off_event", "entity_id": payload.get("entity_id", "")},
+                            meta={
+                                "close_reason": "off_event",
+                                "entity_id": payload.get("entity_id", ""),
+                            },
                         )
                         episodes_upserted += 1
                         del open_by_room[room_id]

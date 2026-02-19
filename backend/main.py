@@ -10,7 +10,12 @@ from models.event import Event
 from models.db_event import EventDB
 
 from services.scheduler import scheduler, setup_scheduler
-from services.auth import require_api_key, require_scope, AuthScope, validate_auth_config_on_startup
+from services.auth import (
+    require_api_key,
+    require_scope,
+    AuthScope,
+    validate_auth_config_on_startup,
+)
 from services.proposals_miner import mine_proposals
 from services.proposals_expiry import expire_testing_proposals
 
@@ -42,7 +47,6 @@ app.include_router(anomalies_router)
 @app.get("/health")
 def health():
     return {"status": "ok"}
-
 
 
 @app.get("/health/detail")
@@ -85,14 +89,18 @@ def health_detail(scope: "AuthScope" = Depends(require_scope)):
     # ---- ingest lag (events) ----
     db = SessionLocal()
     try:
-        row = db.execute(
-            text("""
+        row = (
+            db.execute(
+                text("""
                 SELECT MAX("timestamp") AS max_ts, COUNT(*)::int AS n
                 FROM events
                 WHERE org_id = :org AND home_id = :home AND subject_id = :sub
             """),
-            {"org": scope.org_id, "home": scope.home_id, "sub": scope.subject_id},
-        ).mappings().one()
+                {"org": scope.org_id, "home": scope.home_id, "sub": scope.subject_id},
+            )
+            .mappings()
+            .one()
+        )
 
         max_ts = row["max_ts"]
         n = int(row["n"] or 0)
@@ -109,8 +117,12 @@ def health_detail(scope: "AuthScope" = Depends(require_scope)):
         }
 
         # Threshold is explicit and returned; can be tuned later without changing semantics.
-        INGEST_LAG_DEGRADED_S = int(os.getenv("AGINGOS_HEALTH_INGEST_LAG_DEGRADED_S", "900"))  # 15 min
-        INGEST_LAG_ERROR_S = int(os.getenv("AGINGOS_HEALTH_INGEST_LAG_ERROR_S", "7200"))      # 2 hours
+        INGEST_LAG_DEGRADED_S = int(
+            os.getenv("AGINGOS_HEALTH_INGEST_LAG_DEGRADED_S", "900")
+        )  # 15 min
+        INGEST_LAG_ERROR_S = int(
+            os.getenv("AGINGOS_HEALTH_INGEST_LAG_ERROR_S", "7200")
+        )  # 2 hours
         out["components"]["ingest"]["thresholds"] = {
             "degraded_seconds": INGEST_LAG_DEGRADED_S,
             "error_seconds": INGEST_LAG_ERROR_S,
@@ -127,8 +139,9 @@ def health_detail(scope: "AuthScope" = Depends(require_scope)):
             degrade("DEGRADED", f"ingest lag >= {INGEST_LAG_DEGRADED_S}s")
 
         # ---- baseline stale (baseline_model_status) ----
-        b = db.execute(
-            text("""
+        b = (
+            db.execute(
+                text("""
                 SELECT model_start, model_end, baseline_ready, computed_at,
                        days_in_window, days_with_data,
                        room_bucket_rows, room_bucket_supported,
@@ -138,23 +151,38 @@ def health_detail(scope: "AuthScope" = Depends(require_scope)):
                 ORDER BY model_end DESC
                 LIMIT 1
             """),
-            {"org": scope.org_id, "home": scope.home_id, "sub": scope.subject_id},
-        ).mappings().one_or_none()
+                {"org": scope.org_id, "home": scope.home_id, "sub": scope.subject_id},
+            )
+            .mappings()
+            .one_or_none()
+        )
 
         # Expected end day (Oslo "yesterday") computed in DB to avoid timezone guessing in app.
-        exp = db.execute(text("""
+        exp = (
+            db.execute(
+                text("""
             SELECT ((now() AT TIME ZONE 'Europe/Oslo')::date - 1) AS expected_end_day
-        """)).mappings().one()
+        """)
+            )
+            .mappings()
+            .one()
+        )
         expected_end = exp["expected_end_day"]
 
         out["components"]["baseline"] = {
             "status": "OK",
-            "expected_model_end": (expected_end.isoformat() if expected_end is not None else None),
+            "expected_model_end": (
+                expected_end.isoformat() if expected_end is not None else None
+            ),
             "latest": None,
         }
 
-        BASELINE_MAX_AGE_HOURS = int(os.getenv("AGINGOS_HEALTH_BASELINE_MAX_AGE_HOURS", "36"))
-        out["components"]["baseline"]["thresholds"] = {"max_age_hours": BASELINE_MAX_AGE_HOURS}
+        BASELINE_MAX_AGE_HOURS = int(
+            os.getenv("AGINGOS_HEALTH_BASELINE_MAX_AGE_HOURS", "36")
+        )
+        out["components"]["baseline"]["thresholds"] = {
+            "max_age_hours": BASELINE_MAX_AGE_HOURS
+        }
 
         if not b:
             out["components"]["baseline"]["status"] = "ERROR"
@@ -183,12 +211,19 @@ def health_detail(scope: "AuthScope" = Depends(require_scope)):
             if not baseline_ready:
                 out["components"]["baseline"]["status"] = "DEGRADED"
                 degrade("DEGRADED", "baseline_ready=false")
-            if expected_end is not None and model_end is not None and model_end < expected_end:
+            if (
+                expected_end is not None
+                and model_end is not None
+                and model_end < expected_end
+            ):
                 out["components"]["baseline"]["status"] = "DEGRADED"
                 degrade("DEGRADED", "baseline model_end is behind expected_end_day")
             if age_hours is not None and age_hours > BASELINE_MAX_AGE_HOURS:
                 out["components"]["baseline"]["status"] = "DEGRADED"
-                degrade("DEGRADED", f"baseline computed_at older than {BASELINE_MAX_AGE_HOURS}h")
+                degrade(
+                    "DEGRADED",
+                    f"baseline computed_at older than {BASELINE_MAX_AGE_HOURS}h",
+                )
 
     finally:
         db.close()
@@ -201,7 +236,9 @@ def health_detail(scope: "AuthScope" = Depends(require_scope)):
         "jobs": [
             {
                 "id": j.id,
-                "next_run_time": (j.next_run_time.isoformat() if j.next_run_time else None),
+                "next_run_time": (
+                    j.next_run_time.isoformat() if j.next_run_time else None
+                ),
                 "trigger": str(j.trigger),
             }
             for j in jobs
@@ -228,6 +265,8 @@ def health_detail(scope: "AuthScope" = Depends(require_scope)):
         degrade("DEGRADED", "anomalies runner has never run in this process")
 
     return out
+
+
 @app.post("/pattern_miner/run_once")
 def pattern_miner_run_once(request: Request):
     # manual trigger for testing (auth already enforced globally)
@@ -420,8 +459,6 @@ def ai_anomalies(
         }
 
 
-
-
 @app.get("/debug/scope")
 def debug_scope(scope: "AuthScope" = Depends(require_scope)):
     """Debug: return resolved scope for current API key."""
@@ -429,27 +466,43 @@ def debug_scope(scope: "AuthScope" = Depends(require_scope)):
         return scope.model_dump()
     except Exception:
         # pydantic v1 fallback
-        return getattr(scope, "dict", lambda: {"org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id, "role": getattr(scope, "role", None), "user_id": getattr(scope, "user_id", None)})()
+        return getattr(
+            scope,
+            "dict",
+            lambda: {
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+                "role": getattr(scope, "role", None),
+                "user_id": getattr(scope, "user_id", None),
+            },
+        )()
+
 
 # --- Episodes SVC (incremental + idempotent) ----------------------------------
 from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel
 
+
 class EpisodesSvcBuildIn(BaseModel):
-    since: Optional[str] = None      # ISO 8601 (UTC/offset), optional window replay
+    since: Optional[str] = None  # ISO 8601 (UTC/offset), optional window replay
     until: Optional[str] = None
     advance_watermark: bool = False  # only relevant when since/until provided
     batch: int = 5000
     builder_name: str = "episodes_svc_v1"
+
 
 def _parse_iso_ts(s: Optional[str]) -> Optional[datetime]:
     if not s:
         return None
     return datetime.fromisoformat(s.replace("Z", "+00:00"))
 
+
 @app.post("/episodes_svc/build_once")
-def episodes_svc_build_once(body: EpisodesSvcBuildIn, scope: "AuthScope" = Depends(require_scope)):
+def episodes_svc_build_once(
+    body: EpisodesSvcBuildIn, scope: "AuthScope" = Depends(require_scope)
+):
     """
     Build presence-room episodes into episodes_svc.
     - Incremental by default (uses episode_builder_state watermark).
@@ -461,13 +514,14 @@ def episodes_svc_build_once(body: EpisodesSvcBuildIn, scope: "AuthScope" = Depen
     # DB DSN: same convention as elsewhere in backend
     # Prefer DATABASE_URL if set; fallback to local docker-compose defaults.
     import os
+
     dsn = os.getenv("DATABASE_URL")
     if not dsn:
         host = os.getenv("PGHOST", "db")
         port = os.getenv("PGPORT", "5432")
         user = os.getenv("PGUSER", "agingos")
-        pwd  = os.getenv("PGPASSWORD", "agingos")
-        db   = os.getenv("PGDATABASE", "agingos")
+        pwd = os.getenv("PGPASSWORD", "agingos")
+        db = os.getenv("PGDATABASE", "agingos")
         dsn = f"postgresql://{user}:{pwd}@{host}:{port}/{db}"
 
     since = _parse_iso_ts(body.since)
@@ -487,7 +541,11 @@ def episodes_svc_build_once(body: EpisodesSvcBuildIn, scope: "AuthScope" = Depen
 
     return {
         "builder": body.builder_name,
-        "scope": {"org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id},
+        "scope": {
+            "org_id": scope.org_id,
+            "home_id": scope.home_id,
+            "subject_id": scope.subject_id,
+        },
         "since": body.since,
         "until": body.until,
         "advance_watermark": bool(body.advance_watermark),
@@ -500,14 +558,19 @@ def episodes_svc_build_once(body: EpisodesSvcBuildIn, scope: "AuthScope" = Depen
             "unknown_state": res.skipped_unknown_state,
         },
         "watermark_before": {
-            "last_event_ts": res.watermark_before_ts.isoformat() if res.watermark_before_ts else None,
+            "last_event_ts": res.watermark_before_ts.isoformat()
+            if res.watermark_before_ts
+            else None,
             "last_event_row_id": res.watermark_before_id,
         },
         "watermark_after": {
-            "last_event_ts": res.watermark_after_ts.isoformat() if res.watermark_after_ts else None,
+            "last_event_ts": res.watermark_after_ts.isoformat()
+            if res.watermark_after_ts
+            else None,
             "last_event_row_id": res.watermark_after_id,
         },
     }
+
 
 @app.post("/event")
 def receive_event(event: Event, scope: AuthScope = Depends(require_scope)):
@@ -531,7 +594,9 @@ def receive_event(event: Event, scope: AuthScope = Depends(require_scope)):
             constraint = getattr(getattr(e.orig, "diag", None), "constraint_name", None)
             if constraint == "events_event_id_unique":
                 return {"received": True, "deduped": True}
-            raise HTTPException(status_code=500, detail=f"db integrity error: {constraint or str(e)}")
+            raise HTTPException(
+                status_code=500, detail=f"db integrity error: {constraint or str(e)}"
+            )
     finally:
         db.close()
 
@@ -666,7 +731,9 @@ def _monitor_key_from_action_target(action_target: str) -> str:
     return FRIENDLY_TO_RULE.get(key, key)
 
 
-def _upsert_monitor_mode(db, *, scope: "AuthScope", monitor_key: str, room_id: str, mode: str) -> None:
+def _upsert_monitor_mode(
+    db, *, scope: "AuthScope", monitor_key: str, room_id: str, mode: str
+) -> None:
     db.execute(
         text(
             """
@@ -676,7 +743,14 @@ def _upsert_monitor_mode(db, *, scope: "AuthScope", monitor_key: str, room_id: s
               DO UPDATE SET mode = EXCLUDED.mode, updated_at = now()
             """
         ),
-        {"org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id, "k": monitor_key, "r": room_id, "m": mode},
+        {
+            "org_id": scope.org_id,
+            "home_id": scope.home_id,
+            "subject_id": scope.subject_id,
+            "k": monitor_key,
+            "r": room_id,
+            "m": mode,
+        },
     )
 
 
@@ -723,7 +797,20 @@ def list_proposals(
                 LIMIT :limit
                 """
             )
-            rows = db.execute(q, {"org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id, "last_ts": last, "limit": limit}).mappings().all()
+            rows = (
+                db.execute(
+                    q,
+                    {
+                        "org_id": scope.org_id,
+                        "home_id": scope.home_id,
+                        "subject_id": scope.subject_id,
+                        "last_ts": last,
+                        "limit": limit,
+                    },
+                )
+                .mappings()
+                .all()
+            )
         else:
             q = text(
                 """
@@ -754,7 +841,19 @@ def list_proposals(
                 LIMIT :limit
                 """
             )
-            rows = db.execute(q, {"org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id, "limit": limit}).mappings().all()
+            rows = (
+                db.execute(
+                    q,
+                    {
+                        "org_id": scope.org_id,
+                        "home_id": scope.home_id,
+                        "subject_id": scope.subject_id,
+                        "limit": limit,
+                    },
+                )
+                .mappings()
+                .all()
+            )
 
         return [dict(r) for r in rows]
     finally:
@@ -792,7 +891,12 @@ def _proposal_transition(
             text(
                 "SELECT proposal_id, state, action_target, room_id FROM proposals WHERE proposal_id = :id AND org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id FOR UPDATE"
             ),
-            {"id": proposal_id, "org_id": org_id, "home_id": home_id, "subject_id": subject_id},
+            {
+                "id": proposal_id,
+                "org_id": org_id,
+                "home_id": home_id,
+                "subject_id": subject_id,
+            },
         )
         .mappings()
         .one_or_none()
@@ -918,7 +1022,11 @@ def _proposal_transition(
 
 
 @app.post("/proposals/{proposal_id}/test")
-def test_proposal(proposal_id: int, body: dict = Body(default={}), scope: AuthScope = Depends(require_scope)):
+def test_proposal(
+    proposal_id: int,
+    body: dict = Body(default={}),
+    scope: AuthScope = Depends(require_scope),
+):
     db = SessionLocal()
     try:
         with db.begin():
@@ -938,7 +1046,11 @@ def test_proposal(proposal_id: int, body: dict = Body(default={}), scope: AuthSc
 
 
 @app.post("/proposals/{proposal_id}/activate")
-def activate_proposal(proposal_id: int, body: dict = Body(default={}), scope: AuthScope = Depends(require_scope)):
+def activate_proposal(
+    proposal_id: int,
+    body: dict = Body(default={}),
+    scope: AuthScope = Depends(require_scope),
+):
     db = SessionLocal()
     try:
         with db.begin():
@@ -958,7 +1070,11 @@ def activate_proposal(proposal_id: int, body: dict = Body(default={}), scope: Au
 
 
 @app.post("/proposals/{proposal_id}/reject")
-def reject_proposal(proposal_id: int, body: dict = Body(default={}), scope: AuthScope = Depends(require_scope)):
+def reject_proposal(
+    proposal_id: int,
+    body: dict = Body(default={}),
+    scope: AuthScope = Depends(require_scope),
+):
     db = SessionLocal()
     try:
         with db.begin():
@@ -1044,7 +1160,13 @@ def list_episodes(
         params["org_id"] = scope.org_id
         params["home_id"] = scope.home_id
         params["subject_id"] = scope.subject_id
-        where = ["org_id = :org_id", "home_id = :home_id", "subject_id = :subject_id", "start_ts >= :since", "start_ts < :until"]
+        where = [
+            "org_id = :org_id",
+            "home_id = :home_id",
+            "subject_id = :subject_id",
+            "start_ts >= :since",
+            "start_ts < :until",
+        ]
 
         # Filters
         if classification:
@@ -1292,7 +1414,9 @@ class EpisodeUndoIn(BaseModel):
 
 
 @app.post("/episodes/{episode_id}/label")
-def set_episode_label(episode_id: str, body: EpisodeLabelIn, scope: "AuthScope" = Depends(require_scope)):
+def set_episode_label(
+    episode_id: str, body: EpisodeLabelIn, scope: "AuthScope" = Depends(require_scope)
+):
     """
     Persist a user label for an episode (audit trail in episode_labels).
     """
@@ -1351,7 +1475,9 @@ def set_episode_label(episode_id: str, body: EpisodeLabelIn, scope: "AuthScope" 
 
 
 @app.post("/episodes/{episode_id}/label/undo")
-def undo_episode_label(episode_id: str, body: EpisodeUndoIn, scope: "AuthScope" = Depends(require_scope)):
+def undo_episode_label(
+    episode_id: str, body: EpisodeUndoIn, scope: "AuthScope" = Depends(require_scope)
+):
     """
     Undo a previous label by inserting an undo record that targets label_id.
     """
@@ -1436,7 +1562,8 @@ def list_events(
     category: Optional[str] = Query(default=None),
     since: Optional[datetime] = Query(default=None),
     until: Optional[datetime] = Query(default=None),
-    before: Optional[datetime] = Query(default=None),    limit: int = Query(default=100, ge=1, le=1000),
+    before: Optional[datetime] = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=1000),
     scope: "AuthScope" = Depends(require_scope),
 ) -> list[Event]:
     db = SessionLocal()
@@ -1494,16 +1621,20 @@ def get_subject_state(scope: "AuthScope" = Depends(require_scope)) -> dict:
     """
     db = SessionLocal()
     try:
-        row = db.execute(
-            text(
-                """
+        row = (
+            db.execute(
+                text(
+                    """
                 SELECT org_id, home_id, subject_id, state, state_since, last_event_ts, updated_at
                 FROM subject_state
                 WHERE org_id = :org AND home_id = :home AND subject_id = :sub
                 """
-            ),
-            {"org": scope.org_id, "home": scope.home_id, "sub": scope.subject_id},
-        ).mappings().one_or_none()
+                ),
+                {"org": scope.org_id, "home": scope.home_id, "sub": scope.subject_id},
+            )
+            .mappings()
+            .one_or_none()
+        )
 
         if not row:
             return {
@@ -1532,7 +1663,7 @@ def get_subject_state(scope: "AuthScope" = Depends(require_scope)) -> dict:
 
 @app.post("/subject_state/compute_once")
 def compute_subject_state_once(
-    window_minutes: int = Query(default=60, ge=1, le=24*60),
+    window_minutes: int = Query(default=60, ge=1, le=24 * 60),
     scope: "AuthScope" = Depends(require_scope),
 ) -> dict:
     """
@@ -1541,15 +1672,29 @@ def compute_subject_state_once(
     """
     db = SessionLocal()
     try:
-        row = db.execute(
-            text("SELECT * FROM public.compute_subject_state_once(:org, :home, :mins)"),
-            {"org": scope.org_id, "home": scope.home_id, "mins": int(window_minutes)},
-        ).mappings().one()
+        row = (
+            db.execute(
+                text(
+                    "SELECT * FROM public.compute_subject_state_once(:org, :home, :mins)"
+                ),
+                {
+                    "org": scope.org_id,
+                    "home": scope.home_id,
+                    "mins": int(window_minutes),
+                },
+            )
+            .mappings()
+            .one()
+        )
         db.commit()
-        return {"ok": True, "org_id": scope.org_id, "home_id": scope.home_id, **dict(row)}
+        return {
+            "ok": True,
+            "org_id": scope.org_id,
+            "home_id": scope.home_id,
+            **dict(row),
+        }
     finally:
         db.close()
-
 
 
 @app.on_event("startup")
@@ -1670,7 +1815,12 @@ def list_monitor_modes(
     db = SessionLocal()
     try:
         where = ["org_id = :org_id", "home_id = :home_id", "subject_id = :subject_id"]
-        params = {"limit": limit, "org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id}
+        params = {
+            "limit": limit,
+            "org_id": scope.org_id,
+            "home_id": scope.home_id,
+            "subject_id": scope.subject_id,
+        }
 
         if monitor_key:
             where.append("monitor_key = :k")
@@ -1697,7 +1847,9 @@ def list_monitor_modes(
 
 
 @app.post("/monitor_modes")
-def set_monitor_mode(payload: dict, scope: "AuthScope" = Depends(require_scope)) -> dict:
+def set_monitor_mode(
+    payload: dict, scope: "AuthScope" = Depends(require_scope)
+) -> dict:
     """
     Dev endpoint: upsert monitor_modes.
     Expected JSON:
@@ -1714,7 +1866,9 @@ def set_monitor_mode(payload: dict, scope: "AuthScope" = Depends(require_scope))
 
     db = SessionLocal()
     try:
-        _upsert_monitor_mode(db, scope=scope, monitor_key=monitor_key, room_id=room_id, mode=mode)
+        _upsert_monitor_mode(
+            db, scope=scope, monitor_key=monitor_key, room_id=room_id, mode=mode
+        )
         db.commit()
         row = (
             db.execute(
@@ -1722,7 +1876,13 @@ def set_monitor_mode(payload: dict, scope: "AuthScope" = Depends(require_scope))
                     "SELECT monitor_key, room_id, mode, updated_at "
                     "FROM monitor_modes WHERE org_id=:org_id AND home_id=:home_id AND subject_id=:subject_id AND monitor_key=:k AND room_id=:r"
                 ),
-                {"org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id, "k": monitor_key, "r": room_id},
+                {
+                    "org_id": scope.org_id,
+                    "home_id": scope.home_id,
+                    "subject_id": scope.subject_id,
+                    "k": monitor_key,
+                    "r": room_id,
+                },
             )
             .mappings()
             .first()

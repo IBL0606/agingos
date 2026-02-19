@@ -23,17 +23,19 @@ def db_connect():
         host = os.getenv("PGHOST", "localhost")
         port = os.getenv("PGPORT", "5432")
         user = os.getenv("PGUSER", "agingos")
-        pwd  = os.getenv("PGPASSWORD", "agingos")
-        db   = os.getenv("PGDATABASE", "agingos")
+        pwd = os.getenv("PGPASSWORD", "agingos")
+        db = os.getenv("PGDATABASE", "agingos")
         dsn = f"postgresql://{user}:{pwd}@{host}:{port}/{db}"
     return psycopg2.connect(dsn)
 
 
 def get_scope_via_api() -> Dict[str, str]:
     base_url = os.getenv("BASE_URL")
-    api_key  = os.getenv("API_KEY")
+    api_key = os.getenv("API_KEY")
     if not base_url or not api_key:
-        raise RuntimeError("BASE_URL and API_KEY must be set to fetch scope via /debug/scope")
+        raise RuntimeError(
+            "BASE_URL and API_KEY must be set to fetch scope via /debug/scope"
+        )
 
     # Use existing wrapper if present, else raw curl
     wrapper = os.path.join(os.path.dirname(__file__), "curl_api.sh")
@@ -48,10 +50,16 @@ def get_scope_via_api() -> Dict[str, str]:
     for k in ("org_id", "home_id", "subject_id"):
         if k not in scope or not scope[k]:
             raise RuntimeError(f"Scope missing {k}: {scope}")
-    return {"org_id": scope["org_id"], "home_id": scope["home_id"], "subject_id": scope["subject_id"]}
+    return {
+        "org_id": scope["org_id"],
+        "home_id": scope["home_id"],
+        "subject_id": scope["subject_id"],
+    }
 
 
-def ensure_state_row(cur, org_id: str, home_id: str, subject_id: str, builder_name: str) -> None:
+def ensure_state_row(
+    cur, org_id: str, home_id: str, subject_id: str, builder_name: str
+) -> None:
     cur.execute(
         """
         INSERT INTO episode_builder_state (org_id, home_id, subject_id, builder_name)
@@ -62,7 +70,9 @@ def ensure_state_row(cur, org_id: str, home_id: str, subject_id: str, builder_na
     )
 
 
-def read_watermark_for_update(cur, org_id: str, home_id: str, subject_id: str, builder_name: str) -> Tuple[Optional[datetime], Optional[int]]:
+def read_watermark_for_update(
+    cur, org_id: str, home_id: str, subject_id: str, builder_name: str
+) -> Tuple[Optional[datetime], Optional[int]]:
     cur.execute(
         """
         SELECT last_event_ts, last_event_row_id
@@ -78,10 +88,17 @@ def read_watermark_for_update(cur, org_id: str, home_id: str, subject_id: str, b
     return (row["last_event_ts"], row["last_event_row_id"])
 
 
-def fetch_events(cur, org_id: str, home_id: str, subject_id: str,
-                wm_ts: Optional[datetime], wm_id: Optional[int],
-                since: Optional[datetime], until: Optional[datetime],
-                batch: int) -> List[Dict[str, Any]]:
+def fetch_events(
+    cur,
+    org_id: str,
+    home_id: str,
+    subject_id: str,
+    wm_ts: Optional[datetime],
+    wm_id: Optional[int],
+    since: Optional[datetime],
+    until: Optional[datetime],
+    batch: int,
+) -> List[Dict[str, Any]]:
     # Presence-only v1 (deterministisk med room+state)
     params = [org_id, home_id, subject_id]
     where = [
@@ -92,16 +109,16 @@ def fetch_events(cur, org_id: str, home_id: str, subject_id: str,
     ]
 
     if since is not None:
-        where.append("\"timestamp\" >= %s")
+        where.append('"timestamp" >= %s')
         params.append(since)
     if until is not None:
-        where.append("\"timestamp\" < %s")
+        where.append('"timestamp" < %s')
         params.append(until)
 
     if since is None and until is None:
         # incremental watermark filtering
         if wm_ts is not None:
-            where.append("(\"timestamp\" > %s OR (\"timestamp\" = %s AND id > %s))")
+            where.append('("timestamp" > %s OR ("timestamp" = %s AND id > %s))')
             params.extend([wm_ts, wm_ts, (wm_id or 0)])
 
     sql = f"""
@@ -130,12 +147,23 @@ def payload_get(payload_json) -> Dict[str, Any]:
         return {}
 
 
-def upsert_episode(cur, org_id: str, home_id: str, subject_id: str,
-                  episode_type: str, room_id: str,
-                  start_ts: datetime, end_ts: datetime,
-                  start_row_id: Optional[int], end_row_id: Optional[int],
-                  start_event_id: Optional[str], end_event_id: Optional[str],
-                  event_n: int, is_open: bool, meta: Dict[str, Any]) -> None:
+def upsert_episode(
+    cur,
+    org_id: str,
+    home_id: str,
+    subject_id: str,
+    episode_type: str,
+    room_id: str,
+    start_ts: datetime,
+    end_ts: datetime,
+    start_row_id: Optional[int],
+    end_row_id: Optional[int],
+    start_event_id: Optional[str],
+    end_event_id: Optional[str],
+    event_n: int,
+    is_open: bool,
+    meta: Dict[str, Any],
+) -> None:
     cur.execute(
         """
         INSERT INTO episodes_svc (
@@ -157,19 +185,35 @@ def upsert_episode(cur, org_id: str, home_id: str, subject_id: str,
           meta = episodes_svc.meta || EXCLUDED.meta
         """,
         (
-            org_id, home_id, subject_id,
-            episode_type, room_id,
-            start_ts, end_ts,
-            start_row_id, end_row_id,
-            start_event_id, end_event_id,
-            event_n, is_open, json.dumps(meta),
+            org_id,
+            home_id,
+            subject_id,
+            episode_type,
+            room_id,
+            start_ts,
+            end_ts,
+            start_row_id,
+            end_row_id,
+            start_event_id,
+            end_event_id,
+            event_n,
+            is_open,
+            json.dumps(meta),
         ),
     )
 
 
-def update_builder_state(cur, org_id: str, home_id: str, subject_id: str, builder_name: str,
-                        last_ts: Optional[datetime], last_id: Optional[int],
-                        ok: bool, err_msg: Optional[str]) -> None:
+def update_builder_state(
+    cur,
+    org_id: str,
+    home_id: str,
+    subject_id: str,
+    builder_name: str,
+    last_ts: Optional[datetime],
+    last_id: Optional[int],
+    ok: bool,
+    err_msg: Optional[str],
+) -> None:
     now = datetime.now(timezone.utc)
     if ok:
         cur.execute(
@@ -228,14 +272,18 @@ def main():
         conn.autocommit = False
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             ensure_state_row(cur, org_id, home_id, subject_id, builder_name)
-            wm_ts, wm_id = read_watermark_for_update(cur, org_id, home_id, subject_id, builder_name)
+            wm_ts, wm_id = read_watermark_for_update(
+                cur, org_id, home_id, subject_id, builder_name
+            )
 
             out["watermark_before"] = {
                 "last_event_ts": wm_ts.isoformat() if wm_ts else None,
                 "last_event_row_id": wm_id,
             }
 
-            events = fetch_events(cur, org_id, home_id, subject_id, wm_ts, wm_id, since, until, batch)
+            events = fetch_events(
+                cur, org_id, home_id, subject_id, wm_ts, wm_id, since, until, batch
+            )
 
             # Simple deterministic presence-room episodes:
             # - One open episode per room at a time
@@ -250,7 +298,14 @@ def main():
             for e in events:
                 eid_row = int(e["id"])
                 ts = e["ts"]
-                if last_seen_ts is None or ts > last_seen_ts or (ts == last_seen_ts and (last_seen_id is None or eid_row > last_seen_id)):
+                if (
+                    last_seen_ts is None
+                    or ts > last_seen_ts
+                    or (
+                        ts == last_seen_ts
+                        and (last_seen_id is None or eid_row > last_seen_id)
+                    )
+                ):
                     last_seen_ts, last_seen_id = ts, eid_row
 
                 payload = payload_get(e["payload"])
@@ -287,12 +342,19 @@ def main():
                         }
                         upsert_episode(
                             cur,
-                            org_id, home_id, subject_id,
-                            episode_type, room_id,
-                            ts, ts,
-                            eid_row, eid_row,
-                            e.get("event_id"), e.get("event_id"),
-                            1, True,
+                            org_id,
+                            home_id,
+                            subject_id,
+                            episode_type,
+                            room_id,
+                            ts,
+                            ts,
+                            eid_row,
+                            eid_row,
+                            e.get("event_id"),
+                            e.get("event_id"),
+                            1,
+                            True,
                             {"entity_id": payload.get("entity_id", "")},
                         )
                         episodes_upserted += 1
@@ -305,12 +367,19 @@ def main():
                         o["end_event_id"] = e.get("event_id")
                         upsert_episode(
                             cur,
-                            org_id, home_id, subject_id,
-                            episode_type, room_id,
-                            o["start_ts"], ts,
-                            o["start_row_id"], eid_row,
-                            o["start_event_id"], e.get("event_id"),
-                            o["event_n"], True,
+                            org_id,
+                            home_id,
+                            subject_id,
+                            episode_type,
+                            room_id,
+                            o["start_ts"],
+                            ts,
+                            o["start_row_id"],
+                            eid_row,
+                            o["start_event_id"],
+                            e.get("event_id"),
+                            o["event_n"],
+                            True,
                             {"entity_id": payload.get("entity_id", "")},
                         )
                         episodes_upserted += 1
@@ -324,13 +393,23 @@ def main():
                         o["end_event_id"] = e.get("event_id")
                         upsert_episode(
                             cur,
-                            org_id, home_id, subject_id,
-                            episode_type, room_id,
-                            o["start_ts"], ts,
-                            o["start_row_id"], eid_row,
-                            o["start_event_id"], e.get("event_id"),
-                            o["event_n"], False,
-                            {"close_reason": "off_event", "entity_id": payload.get("entity_id", "")},
+                            org_id,
+                            home_id,
+                            subject_id,
+                            episode_type,
+                            room_id,
+                            o["start_ts"],
+                            ts,
+                            o["start_row_id"],
+                            eid_row,
+                            o["start_event_id"],
+                            e.get("event_id"),
+                            o["event_n"],
+                            False,
+                            {
+                                "close_reason": "off_event",
+                                "entity_id": payload.get("entity_id", ""),
+                            },
                         )
                         episodes_upserted += 1
                         del open_by_room[room_id]
@@ -341,13 +420,43 @@ def main():
             # watermark update rules
             if since is None and until is None:
                 # incremental run => always advance to last processed event
-                update_builder_state(cur, org_id, home_id, subject_id, builder_name, last_seen_ts, last_seen_id, True, None)
+                update_builder_state(
+                    cur,
+                    org_id,
+                    home_id,
+                    subject_id,
+                    builder_name,
+                    last_seen_ts,
+                    last_seen_id,
+                    True,
+                    None,
+                )
             else:
                 # window replay => only advance if explicitly asked
                 if advance_watermark:
-                    update_builder_state(cur, org_id, home_id, subject_id, builder_name, last_seen_ts, last_seen_id, True, None)
+                    update_builder_state(
+                        cur,
+                        org_id,
+                        home_id,
+                        subject_id,
+                        builder_name,
+                        last_seen_ts,
+                        last_seen_id,
+                        True,
+                        None,
+                    )
                 else:
-                    update_builder_state(cur, org_id, home_id, subject_id, builder_name, wm_ts, wm_id, True, None)
+                    update_builder_state(
+                        cur,
+                        org_id,
+                        home_id,
+                        subject_id,
+                        builder_name,
+                        wm_ts,
+                        wm_id,
+                        True,
+                        None,
+                    )
 
             conn.commit()
 
@@ -355,15 +464,31 @@ def main():
             out["episodes_upserted"] = episodes_upserted
             out["skipped"] = skipped
             out["watermark_after"] = {
-                "last_event_ts": (last_seen_ts.isoformat() if (since is None and until is None and last_seen_ts) else (wm_ts.isoformat() if wm_ts else None)),
-                "last_event_row_id": (last_seen_id if (since is None and until is None) else wm_id),
+                "last_event_ts": (
+                    last_seen_ts.isoformat()
+                    if (since is None and until is None and last_seen_ts)
+                    else (wm_ts.isoformat() if wm_ts else None)
+                ),
+                "last_event_row_id": (
+                    last_seen_id if (since is None and until is None) else wm_id
+                ),
             }
             out["finished_at"] = utcnow()
 
     except Exception as e:
         try:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                update_builder_state(cur, org_id, home_id, subject_id, builder_name, None, None, False, str(e))
+                update_builder_state(
+                    cur,
+                    org_id,
+                    home_id,
+                    subject_id,
+                    builder_name,
+                    None,
+                    None,
+                    False,
+                    str(e),
+                )
                 conn.commit()
         except Exception:
             pass

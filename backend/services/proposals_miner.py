@@ -128,7 +128,9 @@ def _upsert_proposal(
     )
 
 
-def mine_proposals(db: Session, *, scope: AuthScope, now: datetime | None = None) -> dict[str, Any]:
+def mine_proposals(
+    db: Session, *, scope: AuthScope, now: datetime | None = None
+) -> dict[str, Any]:
     """
     MVP miner (pilot-friendly thresholds, no spam):
       1) NIGHT_ACTIVITY_EARLY_SIGNAL_1_OF_7  (per subject)
@@ -179,7 +181,18 @@ def mine_proposals(db: Session, *, scope: AuthScope, now: datetime | None = None
         """
     )
 
-    night_rows = db.execute(night_q, {"org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id}).mappings().all()
+    night_rows = (
+        db.execute(
+            night_q,
+            {
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+            },
+        )
+        .mappings()
+        .all()
+    )
     night_upserts = 0
     for r in night_rows:
         subject_id = scope.subject_id
@@ -266,7 +279,18 @@ def mine_proposals(db: Session, *, scope: AuthScope, now: datetime | None = None
         """
     )
 
-    door_rows = db.execute(door_q, {"org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id}).mappings().all()
+    door_rows = (
+        db.execute(
+            door_q,
+            {
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+            },
+        )
+        .mappings()
+        .all()
+    )
     door_upserts = 0
     for r in door_rows:
         subject_id = scope.subject_id
@@ -326,7 +350,18 @@ def mine_proposals(db: Session, *, scope: AuthScope, now: datetime | None = None
         """
     )
 
-    bs_rows = db.execute(bootstrap_q, {"org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id}).mappings().all()
+    bs_rows = (
+        db.execute(
+            bootstrap_q,
+            {
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+            },
+        )
+        .mappings()
+        .all()
+    )
     bs_upserts = 0
     for r in bs_rows:
         subject_id = scope.subject_id
@@ -419,7 +454,18 @@ def mine_proposals(db: Session, *, scope: AuthScope, now: datetime | None = None
         """
     )
 
-    nr_rows = db.execute(night_room_q, {"org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id}).mappings().all()
+    nr_rows = (
+        db.execute(
+            night_room_q,
+            {
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+            },
+        )
+        .mappings()
+        .all()
+    )
     night_room_upserts = 0
     for r in nr_rows:
         subject_id = scope.subject_id
@@ -492,7 +538,17 @@ def run_proposals_miner_job() -> None:
 
     db = SessionLocal()
     try:
-        result = mine_proposals(db, scope=AuthScope(org_id='default', home_id='default', subject_id='default', role='system', user_id=None, api_key_hash=None))
+        result = mine_proposals(
+            db,
+            scope=AuthScope(
+                org_id="default",
+                home_id="default",
+                subject_id="default",
+                role="system",
+                user_id=None,
+                api_key_hash=None,
+            ),
+        )
         _set_job_status(
             db, job_key="proposals_miner", ok=True, now=utcnow(), payload=result
         )
