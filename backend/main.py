@@ -32,15 +32,12 @@ from typing import Optional
 
 from util.time import require_utc_aware
 
-app = FastAPI(
-    title="AgingOS Backend",
-    dependencies=[Depends(require_scope)],
-)
+app = FastAPI(title="AgingOS Backend")
 
-app.include_router(rules_router)
-app.include_router(deviations_router)
-app.include_router(baseline_router)
-app.include_router(anomalies_router)
+app.include_router(rules_router, dependencies=[Depends(require_scope)])
+app.include_router(deviations_router, dependencies=[Depends(require_scope)])
+app.include_router(baseline_router, dependencies=[Depends(require_scope)])
+app.include_router(anomalies_router, dependencies=[Depends(require_scope)])
 
 
 @app.get("/health")
