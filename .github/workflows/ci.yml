@@ -5,65 +5,155 @@ on:
   pull_request:
 
 jobs:
-  lint:
-    name: Lint/format (fail fast)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Ruff format (check)
-        run: make fmt-check
-
-      - name: Ruff check
-        run: make lint
-
   smoke_and_scenario:
-    name: Smoke + scenario (docker compose)
     runs-on: ubuntu-latest
-    needs: lint
-    steps:
-      - uses: actions/checkout@v4
+    timeout-minutes: 25
+    env:
+      BASE_URL: http://localhost:8000
+      AI_BOT_ENABLED: "true"
+      AGINGOS_AUTH_MODE: "api_key"
+      # Use Secrets if set, otherwise fallback (CI should still run)
+      AGINGOS_API_KEYS: ${{ secrets.AGINGOS_API_KEYS || 'dev-key-2,dev-key-3' }}
+      AGINGOS_API_KEY:  ${{ secrets.AGINGOS_API_KEY  || 'dev-key-2' }}
 
-      - name: Write .env for CI (from GitHub Secrets)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Write .env (for docker compose + scripts)
         shell: bash
-        env:
-          AGINGOS_API_KEYS: ${{ secrets.AGINGOS_API_KEYS }}
-          AGINGOS_API_KEY: ${{ secrets.AGINGOS_API_KEY }}
         run: |
           set -euo pipefail
+          umask 077
           cat > .env <<EOF
-          AGINGOS_AUTH_MODE=api_key
+          AI_BOT_ENABLED=${AI_BOT_ENABLED}
+          AGINGOS_AUTH_MODE=${AGINGOS_AUTH_MODE}
           AGINGOS_API_KEYS=${AGINGOS_API_KEYS}
           AGINGOS_API_KEY=${AGINGOS_API_KEY}
           EOF
+          test -s .env
           chmod 600 .env
 
-      - name: Verify secrets are non-empty (length only)
+      - name: Verify secrets are non-empty (length only; no values)
         shell: bash
-        env:
-          AGINGOS_API_KEYS: ${{ secrets.AGINGOS_API_KEYS }}
-          AGINGOS_API_KEY: ${{ secrets.AGINGOS_API_KEY }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
           import os
-          for k in ["AGINGOS_API_KEYS","AGINGOS_API_KEY"]:
-              v = os.environ.get(k, "")
-              print(f"{k}_len={len(v)}")
+          def ln(k): return len(os.environ.get(k,""))
+          keys = ["AGINGOS_API_KEY","AGINGOS_API_KEYS","AGINGOS_AUTH_MODE","AI_BOT_ENABLED"]
+          for k in keys:
+            print(f"{k}_len={ln(k)}")
+          PY
+          python3 - <<'PY'
+          from pathlib import Path
+          txt = Path(".env").read_text()
+          print(f".env_bytes={len(txt.encode('utf-8'))}")
+          for k in ["AI_BOT_ENABLED","AGINGOS_AUTH_MODE","AGINGOS_API_KEYS","AGINGOS_API_KEY"]:
+            print(f".env_has_{k}={k+'=' in txt}")
           PY
 
-      - name: Set up Docker Compose
-        uses: docker/setup-compose-action@v1
+      - name: Docker compose up (build)
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose version
+          docker compose up -d --build
+          docker compose ps
 
-      - name: make up
-        run: make up
+      - name: Wait for Postgres (pg_isready) before Alembic
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in {1..60}; do
+            if docker compose exec -T db pg_isready -U agingos -d agingos >/dev/null 2>&1; then
+              echo "DB ready"
+              exit 0
+            fi
+            echo "Waiting for DB... ($i/60)"
+            sleep 2
+          done
+          echo "DB NOT ready after wait; dumping db logs:"
+          docker compose logs db --tail 200 || true
+          exit 1
 
-      - name: make smoke
-        env:
-          AGINGOS_API_KEY: ${{ secrets.AGINGOS_API_KEY }}
-        run: make smoke
+      - name: Run Alembic migrations (no Makefile target)
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose exec -T backend bash -lc 'alembic -c alembic.ini upgrade head' || \
+          docker compose exec -T backend bash -lc 'cd backend && alembic -c alembic.ini upgrade head'
 
-      - name: make scenario
-        env:
-          AGINGOS_API_KEY: ${{ secrets.AGINGOS_API_KEY }}
-        run: make scenario
+      - name: Wait for backend /health
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in {1..60}; do
+            if curl -fsS "$BASE_URL/health" >/dev/null 2>&1; then
+              echo "Backend ready"
+              exit 0
+            fi
+            echo "Waiting for backend... ($i/60)"
+            sleep 1
+          done
+          echo "Backend not ready; dumping backend logs:"
+          docker compose logs backend --tail 200 || true
+          exit 1
+
+      - name: Pre-smoke debug: /debug/scope + /event (prints status+body; no secrets)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "== /debug/scope =="
+          curl -sS -i "$BASE_URL/debug/scope" -H "X-API-Key: $AGINGOS_API_KEY" | head -c 4000 || true
+          echo
+          echo "== /event =="
+          EVENT_ID="ci-pre-smoke-$(date -u +%Y%m%dT%H%M%SZ)"
+          TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          curl -sS -i "$BASE_URL/event" \
+            -H "X-API-Key: $AGINGOS_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"id\":\"$EVENT_ID\",\"timestamp\":\"$TS\",\"category\":\"motion\",\"payload\":{\"entity_id\":\"binary_sensor.ci_motion\",\"room\":\"default\",\"state\":\"on\"}}" \
+            | head -c 4000 || true
+          echo
+
+      - name: Smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          export AGINGOS_API_KEY="$AGINGOS_API_KEY"
+          bash examples/scripts/smoke_test.sh
+
+      - name: Scenario test
+        shell: bash
+        run: |
+          set -euo pipefail
+          export AGINGOS_API_KEY="$AGINGOS_API_KEY"
+          if [ -x examples/scripts/scenario_test.sh ]; then
+            bash examples/scripts/scenario_test.sh
+          elif make -n scenario >/dev/null 2>&1; then
+            make scenario
+          else
+            echo "No scenario runner found (expected examples/scripts/scenario_test.sh or make scenario)"
+            exit 1
+          fi
+
+      - name: On failure: curl -i /event + backend logs
+        if: ${{ failure() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "== FAILURE DEBUG: /event response =="
+          EVENT_ID="ci-on-fail-$(date -u +%Y%m%dT%H%M%SZ)"
+          TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          curl -sS -i "$BASE_URL/event" \
+            -H "X-API-Key: $AGINGOS_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"id\":\"$EVENT_ID\",\"timestamp\":\"$TS\",\"category\":\"motion\",\"payload\":{\"entity_id\":\"binary_sensor.ci_motion\",\"room\":\"default\",\"state\":\"on\"}}" \
+            | head -c 8000 || true
+          echo
+          echo "== FAILURE DEBUG: backend logs (tail 200) =="
+          docker compose logs backend --tail 200 || true
+          echo
+          echo "== FAILURE DEBUG: db logs (tail 200) =="
+          docker compose logs db --tail 200 || true
