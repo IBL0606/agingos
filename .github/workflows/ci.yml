@@ -26,6 +26,9 @@ jobs:
 
       - name: Write .env for CI (from GitHub Secrets)
         shell: bash
+        env:
+          AGINGOS_API_KEYS: ${{ secrets.AGINGOS_API_KEYS }}
+          AGINGOS_API_KEY: ${{ secrets.AGINGOS_API_KEY }}
         run: |
           set -euo pipefail
           cat > .env <<EOF
@@ -34,12 +37,12 @@ jobs:
           AGINGOS_API_KEY=${AGINGOS_API_KEY}
           EOF
           chmod 600 .env
-        env:
-          AGINGOS_API_KEYS: ${{ secrets.AGINGOS_API_KEYS }}
-          AGINGOS_API_KEY: ${{ secrets.AGINGOS_API_KEY }}
 
       - name: Verify secrets are non-empty (length only)
         shell: bash
+        env:
+          AGINGOS_API_KEYS: ${{ secrets.AGINGOS_API_KEYS }}
+          AGINGOS_API_KEY: ${{ secrets.AGINGOS_API_KEY }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -48,9 +51,7 @@ jobs:
               v = os.environ.get(k, "")
               print(f"{k}_len={len(v)}")
           PY
-        env:
-          AGINGOS_API_KEYS: ${{ secrets.AGINGOS_API_KEYS }}
-          AGINGOS_API_KEY: ${{ secrets.AGINGOS_API_KEY }}
+
 
       - name: Set up Docker Compose
         uses: docker/setup-compose-action@v1
