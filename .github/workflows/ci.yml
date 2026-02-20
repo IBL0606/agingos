@@ -84,6 +84,94 @@ jobs:
           docker compose exec -T backend bash -lc 'alembic -c alembic.ini upgrade head' || \
           docker compose exec -T backend bash -lc 'cd backend && alembic -c alembic.ini upgrade head'
 
+
+      - name: Bootstrap DB schema (api_key_scopes + events scope columns)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # 1) Create api_key_scopes if missing (additive)
+          docker compose exec -T db psql -U agingos -d agingos -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE TABLE IF NOT EXISTS public.api_key_scopes (
+            api_key_hash text PRIMARY KEY,
+            org_id       text NOT NULL,
+            home_id      text NOT NULL,
+            subject_id   text NOT NULL,
+            role         text NOT NULL,
+            active       boolean NOT NULL DEFAULT true,
+            created_at   timestamptz NOT NULL DEFAULT now(),
+            updated_at   timestamptz NOT NULL DEFAULT now(),
+            user_id      text NULL,
+            CONSTRAINT api_key_scopes_role_check CHECK (role IN ('operator','service','readonly'))
+          );
+
+          CREATE INDEX IF NOT EXISTS ix_api_key_scopes_active
+          ON public.api_key_scopes (org_id, home_id, subject_id)
+          WHERE active = true;
+          SQL
+
+          # 2) Ensure events has org/home/subject columns (additive + backfill + safe indexes)
+          docker compose exec -T db psql -U agingos -d agingos -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF to_regclass('public.events') IS NOT NULL THEN
+              EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS org_id text';
+              EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS home_id text';
+              EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS subject_id text';
+
+              EXECUTE 'UPDATE public.events SET org_id=''default'' WHERE org_id IS NULL';
+              EXECUTE 'UPDATE public.events SET home_id=''default'' WHERE home_id IS NULL';
+              EXECUTE 'UPDATE public.events SET subject_id=''default'' WHERE subject_id IS NULL';
+
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN org_id SET DEFAULT ''default''';
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN home_id SET DEFAULT ''default''';
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN subject_id SET DEFAULT ''default''';
+
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN org_id SET NOT NULL';
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN home_id SET NOT NULL';
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN subject_id SET NOT NULL';
+
+              EXECUTE 'CREATE INDEX IF NOT EXISTS ix_events_scope_ts ON public.events (org_id, home_id, subject_id, "timestamp")';
+
+              -- Create UNIQUE only if no duplicates exist
+              IF NOT EXISTS (
+                SELECT 1 FROM (
+                  SELECT org_id, home_id, event_id
+                  FROM public.events
+                  GROUP BY 1,2,3
+                  HAVING COUNT(*) > 1
+                ) d
+              ) THEN
+                EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS ux_events_scope_event_id ON public.events (org_id, home_id, event_id)';
+              ELSE
+                EXECUTE 'CREATE INDEX IF NOT EXISTS ix_events_scope_event_id ON public.events (org_id, home_id, event_id)';
+              END IF;
+            END IF;
+          END $$;
+          SQL
+
+          # 3) Seed api_key_scopes for every key in AGINGOS_API_KEYS
+          #    (hashes are piped; nothing printed to logs)
+          python3 - <<'PY' | while read -r H; do
+          import os, hashlib
+          raw = os.environ.get("AGINGOS_API_KEYS","")
+          keys = [k.strip() for k in raw.split(",") if k.strip()]
+          for k in keys:
+              print(hashlib.sha256(k.encode("utf-8")).hexdigest())
+          PY
+            docker compose exec -T db psql -U agingos -d agingos -v ON_ERROR_STOP=1 --set=h="$H" <<'SQL' >/dev/null
+          INSERT INTO public.api_key_scopes (api_key_hash, org_id, home_id, subject_id, role, active, user_id)
+          VALUES (:'h','default','default','default','operator',true,NULL)
+          ON CONFLICT (api_key_hash) DO UPDATE
+            SET org_id=EXCLUDED.org_id,
+                home_id=EXCLUDED.home_id,
+                subject_id=EXCLUDED.subject_id,
+                role=EXCLUDED.role,
+                active=EXCLUDED.active,
+                updated_at=now();
+          SQL
+          done
+
       - name: Wait for backend /health
         shell: bash
         run: |
@@ -100,7 +188,7 @@ jobs:
           docker compose logs backend --tail 200 || true
           exit 1
 
-      - name: Pre-smoke debug: /debug/scope + /event (prints status+body; no secrets)
+      - name: "Pre-smoke debug: /debug/scope + /event (prints status+body; no secrets)"
         shell: bash
         run: |
           set -euo pipefail
@@ -138,7 +226,7 @@ jobs:
             exit 1
           fi
 
-      - name: On failure: curl -i /event + backend logs
+      - name: "On failure: curl -i /event + backend logs"
         if: ${{ failure() }}
         shell: bash
         run: |
