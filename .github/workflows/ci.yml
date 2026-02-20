@@ -27,7 +27,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat > .env <<'EOF'
+          cat > .env <<EOF
           AGINGOS_AUTH_MODE=api_key
           AGINGOS_API_KEYS=${AGINGOS_API_KEYS}
           AGINGOS_API_KEY=${AGINGOS_API_KEY}
