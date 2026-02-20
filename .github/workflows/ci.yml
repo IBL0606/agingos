@@ -55,6 +55,39 @@ jobs:
       - name: Set up Docker Compose
         uses: docker/setup-compose-action@v1
 
+      - name: Debug auth + /event response (no secrets)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "== .env keys present? =="
+          python3 - <<'PY'
+          import pathlib, re
+          p = pathlib.Path(".env")
+          print("env_exists:", p.exists(), "size:", p.stat().st_size if p.exists() else None)
+          if p.exists():
+              t = p.read_text()
+              for k in ["AGINGOS_AUTH_MODE","AGINGOS_API_KEYS","AGINGOS_API_KEY"]:
+                  m = re.search(rf"^{k}=(.*)$", t, re.M)
+                  v = (m.group(1).strip() if m else "")
+                  print(f"{k}_present={bool(m)} len={len(v)}")
+          PY
+          echo "== curl /health =="
+          curl -iS --max-time 10 http://localhost:8000/health || true
+          echo
+          echo "== curl /event (NO KEY) =="
+          curl -iS --max-time 10 -X POST http://localhost:8000/event             -H "Content-Type: application/json"             -d "{"id":"ci-debug","event_id":"ci-debug","category":"motion","timestamp":"2026-02-20T00:00:00Z","payload":{}}" || true
+          echo
+          echo "== curl /event (WITH KEY from secrets) =="
+          # Henter key direkte fra secrets-env (ikke printer innhold)
+          if [ -n "${AGINGOS_API_KEY:-}" ]; then
+            curl -iS --max-time 10 -X POST http://localhost:8000/event               -H "Content-Type: application/json"               -H "X-API-Key: ${AGINGOS_API_KEY}"               -d "{"id":"ci-debug2","event_id":"ci-debug2","category":"motion","timestamp":"2026-02-20T00:00:00Z","payload":{}}" || true
+          else
+            echo "AGINGOS_API_KEY is empty in step env"
+          fi
+        env:
+          AGINGOS_API_KEYS: ${{ secrets.AGINGOS_API_KEYS }}
+          AGINGOS_API_KEY: ${{ secrets.AGINGOS_API_KEY }}
+
       - name: Run smoke + scenario
         run: |
           make up
