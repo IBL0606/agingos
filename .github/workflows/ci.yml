@@ -89,11 +89,18 @@ jobs:
           AGINGOS_API_KEY: ${{ secrets.AGINGOS_API_KEY }}
 
       - name: Run smoke + scenario
+      shell: bash
         run: |
+        set -euo pipefail
           make up
+
+        # IMPORTANT: export vars from .env into this shell so smoke_test.sh sees them
+        set -a
+        . ./.env
+        set +a
+
           make smoke
           make scenario
-
       - name: Tear down
         if: always()
         run: make down
