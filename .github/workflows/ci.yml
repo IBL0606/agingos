@@ -23,6 +23,7 @@ jobs:
     needs: lint
     steps:
       - uses: actions/checkout@v4
+
       - name: Write .env for CI (from GitHub Secrets)
         shell: bash
         run: |
@@ -37,6 +38,19 @@ jobs:
           AGINGOS_API_KEYS: ${{ secrets.AGINGOS_API_KEYS }}
           AGINGOS_API_KEY: ${{ secrets.AGINGOS_API_KEY }}
 
+      - name: Verify secrets are non-empty (length only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          for k in ["AGINGOS_API_KEYS","AGINGOS_API_KEY"]:
+              v = os.environ.get(k, "")
+              print(f"{k}_len={len(v)}")
+          PY
+        env:
+          AGINGOS_API_KEYS: ${{ secrets.AGINGOS_API_KEYS }}
+          AGINGOS_API_KEY: ${{ secrets.AGINGOS_API_KEY }}
 
       - name: Set up Docker Compose
         uses: docker/setup-compose-action@v1
