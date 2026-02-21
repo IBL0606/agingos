@@ -308,18 +308,44 @@ def _close_stale_deviations(
     return closed_count
 
 
-def _get_monitor_mode(db, *, monitor_key: str, room_id: str = "__GLOBAL__") -> str:
+def _get_monitor_mode(
+    db,
+    *,
+    monitor_key: str,
+    room_id: str = "__GLOBAL__",
+    org_id: str = "default",
+    home_id: str = "default",
+    subject_id: str = "default",
+) -> str:
+    """
+    monitor_modes lookup policy:
+      1) exact scope + (monitor_key, room_id)
+      2) exact scope + (monitor_key, "__GLOBAL__") fallback
+      3) default "ON"
+    """
     try:
+        q = text(
+            "SELECT mode FROM monitor_modes "
+            "WHERE org_id=:org AND home_id=:home AND subject_id=:sub "
+            "  AND monitor_key=:k AND room_id=:r"
+        )
         row = (
             db.execute(
-                text(
-                    "SELECT mode FROM monitor_modes WHERE monitor_key=:k AND room_id=:r"
-                ),
-                {"k": monitor_key, "r": room_id},
+                q,
+                {"org": org_id, "home": home_id, "sub": subject_id, "k": monitor_key, "r": room_id},
             )
             .mappings()
             .one_or_none()
         )
+        if (not row) and room_id != "__GLOBAL__":
+            row = (
+                db.execute(
+                    q,
+                    {"org": org_id, "home": home_id, "sub": subject_id, "k": monitor_key, "r": "__GLOBAL__"},
+                )
+                .mappings()
+                .one_or_none()
+            )
         if row and row.get("mode") in ("OFF", "TEST", "ON"):
             return row["mode"]
     except Exception:
@@ -389,7 +415,7 @@ def run_rule_engine_job():
                     spec = RULE_REGISTRY[rid]
                     rule_devs = spec.eval_fn(db, since=r_since, until=r_until, now=now)
 
-                    mode = _get_monitor_mode(db, monitor_key=rid, room_id="__GLOBAL__")
+                    mode = _get_monitor_mode(db, monitor_key=rid, room_id="__GLOBAL__", org_id=org_id, home_id=home_id, subject_id=subject_id)
                     if mode == "OFF":
                         rule_devs = []
 
@@ -515,6 +541,7 @@ def run_anomalies_job_safe():
     """Fail-safe wrapper for APScheduler: never raise; updates in-memory status; always logs."""
     from datetime import datetime, timezone
 
+    from sqlalchemy.exc import ProgrammingError
     import traceback
 
     ANOMALIES_RUNNER_STATUS["last_run_at"] = datetime.now(timezone.utc).isoformat()
@@ -542,6 +569,17 @@ def run_anomalies_job_safe():
             rooms_scored=out.get("rooms_scored"),
             counts=out.get("counts"),
         )
+    except ProgrammingError:
+        # baseline not installed; skipping anomalies job (rules-only mode)
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        ANOMALIES_RUNNER_STATUS["last_ok_at"] = None
+        ANOMALIES_RUNNER_STATUS["last_error_at"] = None
+        ANOMALIES_RUNNER_STATUS["last_error_msg"] = None
+        return {"skipped": True, "reason": "baseline_model_status_missing"}
+
     except Exception as e:
         ANOMALIES_RUNNER_STATUS["last_error_at"] = datetime.now(
             timezone.utc
@@ -610,31 +648,57 @@ def setup_scheduler():
 
 
 def _anomaly_pick_one_scope(db) -> AuthScope:
-    """Deterministic: pick one (org_id, home_id, subject_id) scope from baseline_model_status."""
+    """Pick one (org_id, home_id, subject_id, user_id) scope.
+
+    Primary source: baseline_model_status (if present).
+    Fallback: default scope with user_id='system' to avoid crashing scheduler
+    on deployments where baseline tables are not installed yet.
+    """
     from sqlalchemy import text
+    from sqlalchemy.exc import ProgrammingError
 
-    row = (
-        db.execute(
-            text(
-                """
-            SELECT org_id, home_id, subject_id, user_id
-            FROM baseline_model_status
-            ORDER BY computed_at DESC NULLS LAST, model_end DESC
-            LIMIT 1
-            """
+    try:
+        row = (
+            db.execute(
+                text(
+                    """
+                    SELECT org_id, home_id, subject_id, user_id
+                    FROM baseline_model_status
+                    ORDER BY computed_at DESC NULLS LAST, model_end DESC
+                    LIMIT 1
+                    """
+                )
             )
+            .mappings()
+            .first()
         )
-        .mappings()
-        .first()
-    )
-    if not row:
-        raise RuntimeError("No baseline_model_status rows -> cannot resolve scope")
+    except ProgrammingError:
+        # Missing table / bad schema: clear aborted transaction then run in "rules-only" mode
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        # Missing table / bad schema: run in "rules-only" mode
+        return AuthScope(
+            org_id="default",
+            home_id="default",
+            subject_id="default",
+            user_id="system",
+            role="system",
+            api_key_hash="scheduler",
+        )
 
-    uid = row.get("user_id")
-    if uid is None:
-        raise RuntimeError(
-            "baseline_model_status.user_id is NULL -> cannot resolve scope user_id"
+    if not row:
+        return AuthScope(
+            org_id="default",
+            home_id="default",
+            subject_id="default",
+            user_id="system",
+            role="system",
+            api_key_hash="scheduler",
         )
+
+    uid = row.get("user_id") or "system"
 
     return AuthScope(
         org_id=str(row.get("org_id") or "default"),
@@ -644,8 +708,6 @@ def _anomaly_pick_one_scope(db) -> AuthScope:
         role="system",
         api_key_hash="scheduler",
     )
-
-
 def run_anomalies_job_one(
     db,
     *,

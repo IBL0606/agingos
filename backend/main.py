@@ -135,23 +135,31 @@ def health_detail(scope: "AuthScope" = Depends(require_scope)):
             degrade("DEGRADED", f"ingest lag >= {INGEST_LAG_DEGRADED_S}s")
 
         # ---- baseline stale (baseline_model_status) ----
-        b = (
-            db.execute(
-                text("""
-                SELECT model_start, model_end, baseline_ready, computed_at,
-                       days_in_window, days_with_data,
-                       room_bucket_rows, room_bucket_supported,
-                       transition_rows, transition_supported
-                FROM baseline_model_status
-                WHERE org_id = :org AND home_id = :home AND subject_id = :sub
-                ORDER BY model_end DESC
-                LIMIT 1
-            """),
-                {"org": scope.org_id, "home": scope.home_id, "sub": scope.subject_id},
+        baseline_table_missing = False
+        try:
+            b = (
+                db.execute(
+                    text("""
+                    SELECT model_start, model_end, baseline_ready, computed_at,
+                           days_in_window, days_with_data,
+                           room_bucket_rows, room_bucket_supported,
+                           transition_rows, transition_supported
+                    FROM baseline_model_status
+                    WHERE org_id = :org AND home_id = :home AND subject_id = :sub
+                    ORDER BY model_end DESC
+                    LIMIT 1
+                """),
+                    {"org": scope.org_id, "home": scope.home_id, "sub": scope.subject_id},
+                ).mappings().one_or_none()
             )
-            .mappings()
-            .one_or_none()
-        )
+        except Exception as e:
+            from sqlalchemy.exc import ProgrammingError
+            if isinstance(e, ProgrammingError):
+                db.rollback()
+                baseline_table_missing = True
+                b = None
+            else:
+                raise
 
         # Expected end day (Oslo "yesterday") computed in DB to avoid timezone guessing in app.
         exp = (
@@ -180,7 +188,10 @@ def health_detail(scope: "AuthScope" = Depends(require_scope)):
             "max_age_hours": BASELINE_MAX_AGE_HOURS
         }
 
-        if not b:
+        if baseline_table_missing:
+            out["components"]["baseline"]["status"] = "SKIPPED"
+            degrade("DEGRADED", "baseline tables missing (rules-only mode)")
+        elif not b:
             out["components"]["baseline"]["status"] = "ERROR"
             degrade("ERROR", "no baseline_model_status rows for this scope")
         else:

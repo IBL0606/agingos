@@ -1,14 +1,12 @@
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 from uuid import UUID, uuid4
 from datetime import datetime
 
 
 class Window(BaseModel):
-    since: datetime
-    until: datetime
-
-
+    since: Optional[datetime] = None
+    until: Optional[datetime] = None
 class DeviationV1(BaseModel):
     deviation_id: UUID = Field(default_factory=uuid4)
     rule_id: str
@@ -16,5 +14,5 @@ class DeviationV1(BaseModel):
     severity: str
     title: str
     explanation: str
-    evidence: List[str] = []
+    evidence: List[str] = Field(default_factory=list)
     window: Window
