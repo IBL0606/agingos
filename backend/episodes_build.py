@@ -12,6 +12,7 @@ Scope (Chat 1):
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import re
 from dataclasses import dataclass
@@ -108,17 +109,46 @@ def db_dsn_from_env() -> str:
     return f"postgresql://{user}:{password}@{host}:{port}/{dbname}"
 
 
-def fetch_events(conn, since: datetime, until: datetime) -> List[RawEvent]:
+def sha256_hex(v: str) -> str:
+    return hashlib.sha256((v or "").encode("utf-8")).hexdigest()
+
+
+def resolve_scope(conn, api_key, org_id: str, home_id: str, subject_id: str):
+    # api_key => api_key_scopes (must exist+active)
+    if api_key:
+        h = sha256_hex(api_key)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT org_id, home_id, subject_id FROM api_key_scopes WHERE api_key_hash=%s AND active=true LIMIT 1",
+                (h,),
+            )
+            row = cur.fetchone()
+        if not row:
+            raise SystemExit(f"No active api_key_scopes row for sha256(api-key)={h}")
+        return row[0], row[1], row[2], "api-key"
+    # args/default
+    return (
+        (org_id or "default"),
+        (home_id or "default"),
+        (subject_id or "default"),
+        "args/default",
+    )
+
+
+def fetch_events(
+    conn, since: datetime, until: datetime, org_id: str, home_id: str, subject_id: str
+) -> List[RawEvent]:
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """
             SELECT id, "timestamp" as ts, category, payload
             FROM events
             WHERE "timestamp" >= %s AND "timestamp" < %s
+              AND org_id = %s AND home_id = %s AND subject_id = %s
               AND category IN ('presence','motion','door')
             ORDER BY "timestamp" ASC, id ASC
             """,
-            (since, until),
+            (since, until, org_id, home_id, subject_id),
         )
         rows = cur.fetchall()
     out: List[RawEvent] = []
@@ -617,23 +647,33 @@ def score_episode(ep: EpisodeDraft) -> tuple[str, float, float, float, list[dict
 # -----------------------------------------------------------------------------
 
 
-def delete_overlap(conn, since: datetime, until: datetime) -> int:
+def delete_overlap(
+    conn, since: datetime, until: datetime, org_id: str, home_id: str, subject_id: str
+) -> int:
     """Delete existing episodes overlapping [since, until) to make rebuild idempotent."""
     with conn.cursor() as cur:
         cur.execute(
             """
             DELETE FROM episodes
-            WHERE start_ts < %s
+            WHERE org_id = %s AND home_id = %s AND subject_id = %s
+              AND start_ts < %s
               AND COALESCE(end_ts, start_ts) > %s
             """,
-            (until, since),
+            (org_id, home_id, subject_id, until, since),
         )
         n = cur.rowcount or 0
     conn.commit()
     return int(n)
 
 
-def insert_episodes(conn, eps: List[EpisodeDraft], dry_run: bool = True) -> int:
+def insert_episodes(
+    conn,
+    eps: List[EpisodeDraft],
+    dry_run: bool = True,
+    org_id: str = "default",
+    home_id: str = "default",
+    subject_id: str = "default",
+) -> int:
     """
     Insert episodes with classification=unknown (rules later).
     """
@@ -662,7 +702,8 @@ def insert_episodes(conn, eps: List[EpisodeDraft], dry_run: bool = True) -> int:
                   tod_bucket, weekday,
                   room_type, room_sequence,
                   class, p_human, p_pet, p_unknown,
-                  classifier_version, feature_version, reasons, reason_summary, score_debug
+                  classifier_version, feature_version, reasons, reason_summary, score_debug,
+                                      org_id, home_id, subject_id
                 ) VALUES (
                   %s, %s, %s,
                   %s, %s, %s::jsonb,
@@ -674,7 +715,8 @@ def insert_episodes(conn, eps: List[EpisodeDraft], dry_run: bool = True) -> int:
                   %s, %s,
                   NULL, '[]'::jsonb,
                   %s, %s, %s, %s,
-                  %s, %s, %s::jsonb, %s, %s::jsonb
+                  %s, %s, %s::jsonb, %s, %s::jsonb,
+                    %s, %s, %s
                 )
                 """,
                 (
@@ -716,6 +758,9 @@ def insert_episodes(conn, eps: List[EpisodeDraft], dry_run: bool = True) -> int:
                             "timeout_s": ep.timeout_s,
                         }
                     ),
+                    org_id,
+                    home_id,
+                    subject_id,
                 ),
             )
         conn.commit()
@@ -724,6 +769,26 @@ def insert_episodes(conn, eps: List[EpisodeDraft], dry_run: bool = True) -> int:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
+    ap.add_argument(
+        "--api-key",
+        default=None,
+        help="Resolve scope via api_key_scopes (sha256(key)); hard-fail if missing/inactive",
+    )
+    ap.add_argument(
+        "--org-id",
+        default="default",
+        help="Scope org_id (used if --api-key not provided)",
+    )
+    ap.add_argument(
+        "--home-id",
+        default="default",
+        help="Scope home_id (used if --api-key not provided)",
+    )
+    ap.add_argument(
+        "--subject-id",
+        default="default",
+        help="Scope subject_id (used if --api-key not provided)",
+    )
     ap.add_argument(
         "--last", default="24h", help="Window to read events from (e.g. 24h, 7d)"
     )
@@ -742,7 +807,11 @@ def main() -> int:
     dsn = db_dsn_from_env()
     conn = psycopg2.connect(dsn)
     try:
-        events = fetch_events(conn, since, until)
+        org_id, home_id, subject_id, scope_src = resolve_scope(
+            conn, args.api_key, args.org_id, args.home_id, args.subject_id
+        )
+        print(f"scope={org_id}/{home_id}/{subject_id} scope_src={scope_src}")
+        events = fetch_events(conn, since, until, org_id, home_id, subject_id)
         eps = build_episodes(events)
 
         print(
@@ -757,11 +826,18 @@ def main() -> int:
                 )
 
         if (not args.dry_run) and args.delete_overlap:
-            deleted = delete_overlap(conn, since, until)
+            deleted = delete_overlap(conn, since, until, org_id, home_id, subject_id)
 
             print(f"deleted_overlap={deleted}")
 
-        written = insert_episodes(conn, eps, dry_run=args.dry_run)
+        written = insert_episodes(
+            conn,
+            eps,
+            dry_run=args.dry_run,
+            org_id=org_id,
+            home_id=home_id,
+            subject_id=subject_id,
+        )
         if args.dry_run:
             print("dry-run: no DB writes")
         else:

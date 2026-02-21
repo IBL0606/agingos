@@ -1,53 +1,33 @@
-# Formål:
-#   Samle runtime-parametre for scheduler og regler (lookback, expire, terskler/tidsvinduer) på ett sted.
-#
-# Kilde til sannhet:
-#   Denne filen er “source of truth” for domeneparametre. Regelkode skal ikke hardkode terskler/tider.
-#
-# Retningslinjer for endring:
-#   - Endres via PR.
-#   - Oppdater docs/contracts/rule-config.md og README ved endringer.
-#   - Defaults skal speile sim-baseline-v1 med mindre annet er eksplisitt besluttet.
-
-scheduler:
-  interval_minutes: 1
-  default_subject_key: "default"
-
 defaults:
   lookback_minutes: 60
-  expire_after_minutes: 60
-
+  expire_after_minutes: 180
 rules:
   R-001:
     enabled_in_scheduler: true
-    lookback_minutes: 60
-    expire_after_minutes: 60
-    params: 
-      motion_categories: ["motion", "presence"]
-      payload_state_keys: ["state", "value"]
-      motion_on_value: "on"
+    lookback_minutes: 180
+    expire_after_minutes: 360
   R-002:
     enabled_in_scheduler: true
-    lookback_minutes: 60
-    expire_after_minutes: 60
-    params:
-      category: "door"
-      payload_state_keys: ["state", "value"]
-      trigger_value: "open"
-      night_window:
-        start_local_time: "23:00:00"
-        end_local_time: "06:00:00"
-
+    lookback_minutes: 240
+    expire_after_minutes: 720
   R-003:
     enabled_in_scheduler: true
-    lookback_minutes: 60
-    expire_after_minutes: 60
-    params:
-      door_category: "door"
-      motion_category: "presence"
-      payload_state_keys: ["state", "value"]
-      door_name_keys: ["door", "name"]
-      required_door_name: "inngangsdor"
-      door_open_value: "open"
-      motion_on_value: "on"
-      followup_minutes: 10
+    lookback_minutes: 240
+    expire_after_minutes: 720
+  R-004:
+    enabled_in_scheduler: false
+  R-005:
+    enabled_in_scheduler: false
+  R-006:
+    enabled_in_scheduler: false
+  R-007:
+    enabled_in_scheduler: false
+  R-008:
+    enabled_in_scheduler: false
+  R-009:
+    enabled_in_scheduler: false
+  R-010:
+    enabled_in_scheduler: false
+scheduler:
+  interval_minutes: 5
+  default_subject_key: default

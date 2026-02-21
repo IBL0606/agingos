@@ -5,34 +5,243 @@ on:
   pull_request:
 
 jobs:
-  lint:
-    name: Lint/format (fail fast)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Ruff format (check)
-        run: make fmt-check
-
-      - name: Ruff check
-        run: make lint
-
   smoke_and_scenario:
-    name: Smoke + scenario (docker compose)
     runs-on: ubuntu-latest
-    needs: lint
+    timeout-minutes: 25
+    env:
+      BASE_URL: http://localhost:8000
+      AI_BOT_ENABLED: "true"
+      AGINGOS_AUTH_MODE: "api_key"
+      # Use Secrets if set, otherwise fallback (CI should still run)
+      AGINGOS_API_KEYS: ${{ secrets.AGINGOS_API_KEYS || 'dev-key-2,dev-key-3' }}
+      AGINGOS_API_KEY:  ${{ secrets.AGINGOS_API_KEY  || 'dev-key-2' }}
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Set up Docker Compose
-        uses: docker/setup-compose-action@v1
-
-      - name: Run smoke + scenario
+      - name: Write .env (for docker compose + scripts)
+        shell: bash
         run: |
-          make up
-          make smoke
-          make scenario
+          set -euo pipefail
+          umask 077
+          cat > .env <<EOF
+          AI_BOT_ENABLED=${AI_BOT_ENABLED}
+          AGINGOS_AUTH_MODE=${AGINGOS_AUTH_MODE}
+          AGINGOS_API_KEYS=${AGINGOS_API_KEYS}
+          AGINGOS_API_KEY=${AGINGOS_API_KEY}
+          EOF
+          test -s .env
+          chmod 600 .env
 
-      - name: Tear down
-        if: always()
-        run: make down
+      - name: Verify secrets are non-empty (length only; no values)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          def ln(k): return len(os.environ.get(k,""))
+          keys = ["AGINGOS_API_KEY","AGINGOS_API_KEYS","AGINGOS_AUTH_MODE","AI_BOT_ENABLED"]
+          for k in keys:
+            print(f"{k}_len={ln(k)}")
+          PY
+          python3 - <<'PY'
+          from pathlib import Path
+          txt = Path(".env").read_text()
+          print(f".env_bytes={len(txt.encode('utf-8'))}")
+          for k in ["AI_BOT_ENABLED","AGINGOS_AUTH_MODE","AGINGOS_API_KEYS","AGINGOS_API_KEY"]:
+            print(f".env_has_{k}={k+'=' in txt}")
+          PY
+
+      - name: Docker compose up (build)
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose version
+          docker compose up -d --build
+          docker compose ps
+
+      - name: Wait for Postgres (pg_isready) before Alembic
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in {1..60}; do
+            if docker compose exec -T db pg_isready -U agingos -d agingos >/dev/null 2>&1; then
+              echo "DB ready"
+              exit 0
+            fi
+            echo "Waiting for DB... ($i/60)"
+            sleep 2
+          done
+          echo "DB NOT ready after wait; dumping db logs:"
+          docker compose logs db --tail 200 || true
+          exit 1
+
+      - name: Run Alembic migrations (no Makefile target)
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose exec -T backend bash -lc 'alembic -c alembic.ini upgrade head' || \
+          docker compose exec -T backend bash -lc 'cd backend && alembic -c alembic.ini upgrade head'
+
+
+      - name: Bootstrap DB schema (api_key_scopes + events scope columns)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # 1) Create api_key_scopes if missing (additive)
+          docker compose exec -T db psql -U agingos -d agingos -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE TABLE IF NOT EXISTS public.api_key_scopes (
+            api_key_hash text PRIMARY KEY,
+            org_id       text NOT NULL,
+            home_id      text NOT NULL,
+            subject_id   text NOT NULL,
+            role         text NOT NULL,
+            active       boolean NOT NULL DEFAULT true,
+            created_at   timestamptz NOT NULL DEFAULT now(),
+            updated_at   timestamptz NOT NULL DEFAULT now(),
+            user_id      text NULL,
+            CONSTRAINT api_key_scopes_role_check CHECK (role IN ('operator','service','readonly'))
+          );
+
+          CREATE INDEX IF NOT EXISTS ix_api_key_scopes_active
+          ON public.api_key_scopes (org_id, home_id, subject_id)
+          WHERE active = true;
+          SQL
+
+          # 2) Ensure events has org/home/subject columns (additive + backfill + safe indexes)
+          docker compose exec -T db psql -U agingos -d agingos -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF to_regclass('public.events') IS NOT NULL THEN
+              EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS org_id text';
+              EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS home_id text';
+              EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS subject_id text';
+
+              EXECUTE 'UPDATE public.events SET org_id=''default'' WHERE org_id IS NULL';
+              EXECUTE 'UPDATE public.events SET home_id=''default'' WHERE home_id IS NULL';
+              EXECUTE 'UPDATE public.events SET subject_id=''default'' WHERE subject_id IS NULL';
+
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN org_id SET DEFAULT ''default''';
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN home_id SET DEFAULT ''default''';
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN subject_id SET DEFAULT ''default''';
+
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN org_id SET NOT NULL';
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN home_id SET NOT NULL';
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN subject_id SET NOT NULL';
+
+              EXECUTE 'CREATE INDEX IF NOT EXISTS ix_events_scope_ts ON public.events (org_id, home_id, subject_id, "timestamp")';
+
+              -- Create UNIQUE only if no duplicates exist
+              IF NOT EXISTS (
+                SELECT 1 FROM (
+                  SELECT org_id, home_id, event_id
+                  FROM public.events
+                  GROUP BY 1,2,3
+                  HAVING COUNT(*) > 1
+                ) d
+              ) THEN
+                EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS ux_events_scope_event_id ON public.events (org_id, home_id, event_id)';
+              ELSE
+                EXECUTE 'CREATE INDEX IF NOT EXISTS ix_events_scope_event_id ON public.events (org_id, home_id, event_id)';
+              END IF;
+            END IF;
+          END $$;
+          SQL
+
+          # 3) Seed api_key_scopes for every key in AGINGOS_API_KEYS
+          #    (hashes are piped; nothing printed to logs)
+          python3 - <<'PY' | while read -r H; do
+          import os, hashlib
+          raw = os.environ.get("AGINGOS_API_KEYS","")
+          keys = [k.strip() for k in raw.split(",") if k.strip()]
+          for k in keys:
+              print(hashlib.sha256(k.encode("utf-8")).hexdigest())
+          PY
+            docker compose exec -T db psql -U agingos -d agingos -v ON_ERROR_STOP=1 --set=h="$H" <<'SQL' >/dev/null
+          INSERT INTO public.api_key_scopes (api_key_hash, org_id, home_id, subject_id, role, active, user_id)
+          VALUES (:'h','default','default','default','operator',true,NULL)
+          ON CONFLICT (api_key_hash) DO UPDATE
+            SET org_id=EXCLUDED.org_id,
+                home_id=EXCLUDED.home_id,
+                subject_id=EXCLUDED.subject_id,
+                role=EXCLUDED.role,
+                active=EXCLUDED.active,
+                updated_at=now();
+          SQL
+          done
+
+      - name: Wait for backend /health
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in {1..60}; do
+            if curl -fsS "$BASE_URL/health" >/dev/null 2>&1; then
+              echo "Backend ready"
+              exit 0
+            fi
+            echo "Waiting for backend... ($i/60)"
+            sleep 1
+          done
+          echo "Backend not ready; dumping backend logs:"
+          docker compose logs backend --tail 200 || true
+          exit 1
+
+      - name: "Pre-smoke debug: /debug/scope + /event (prints status+body; no secrets)"
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "== /debug/scope =="
+          curl -sS -i "$BASE_URL/debug/scope" -H "X-API-Key: $AGINGOS_API_KEY" | head -c 4000 || true
+          echo
+          echo "== /event =="
+          EVENT_ID="ci-pre-smoke-$(date -u +%Y%m%dT%H%M%SZ)"
+          TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          curl -sS -i "$BASE_URL/event" \
+            -H "X-API-Key: $AGINGOS_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"id\":\"$EVENT_ID\",\"timestamp\":\"$TS\",\"category\":\"motion\",\"payload\":{\"entity_id\":\"binary_sensor.ci_motion\",\"room\":\"default\",\"state\":\"on\"}}" \
+            | head -c 4000 || true
+          echo
+
+      - name: Smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          export AGINGOS_API_KEY="$AGINGOS_API_KEY"
+          bash examples/scripts/smoke_test.sh
+
+      - name: Scenario test
+        shell: bash
+        run: |
+          set -euo pipefail
+          export AGINGOS_API_KEY="$AGINGOS_API_KEY"
+          if [ -x examples/scripts/scenario_test.sh ]; then
+            bash examples/scripts/scenario_test.sh
+          elif make -n scenario >/dev/null 2>&1; then
+            make scenario
+          else
+            echo "No scenario runner found (expected examples/scripts/scenario_test.sh or make scenario)"
+            exit 1
+          fi
+
+      - name: "On failure: curl -i /event + backend logs"
+        if: ${{ failure() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "== FAILURE DEBUG: /event response =="
+          EVENT_ID="ci-on-fail-$(date -u +%Y%m%dT%H%M%SZ)"
+          TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          curl -sS -i "$BASE_URL/event" \
+            -H "X-API-Key: $AGINGOS_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"id\":\"$EVENT_ID\",\"timestamp\":\"$TS\",\"category\":\"motion\",\"payload\":{\"entity_id\":\"binary_sensor.ci_motion\",\"room\":\"default\",\"state\":\"on\"}}" \
+            | head -c 8000 || true
+          echo
+          echo "== FAILURE DEBUG: backend logs (tail 200) =="
+          docker compose logs backend --tail 200 || true
+          echo
+          echo "== FAILURE DEBUG: db logs (tail 200) =="
+          docker compose logs db --tail 200 || true

@@ -5,6 +5,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy import select
+
+from services.auth import AuthScope
 from sqlalchemy.orm import Session
 
 from models.anomaly_episode import AnomalyEpisode
@@ -14,12 +16,18 @@ from util.time import utcnow
 def list_episodes(
     db: Session,
     *,
+    scope: AuthScope,
     since: datetime,
     room: Optional[str] = None,
     active_only: bool = False,
     limit: int = 200,
 ) -> list[AnomalyEpisode]:
-    q = select(AnomalyEpisode).where(AnomalyEpisode.start_ts >= since)
+    q = select(AnomalyEpisode).where(
+        AnomalyEpisode.org_id == scope.org_id,
+        AnomalyEpisode.home_id == scope.home_id,
+        AnomalyEpisode.subject_id == scope.subject_id,
+        AnomalyEpisode.start_ts >= since,
+    )
     if room:
         q = q.where(AnomalyEpisode.room == room)
     if active_only:
@@ -33,6 +41,7 @@ def list_episodes(
 def create_episode(
     db: Session,
     *,
+    scope: AuthScope,
     room: str,
     start_ts: datetime,
     level: int,
@@ -49,6 +58,9 @@ def create_episode(
     baseline_ref: Optional[dict] = None,
 ) -> AnomalyEpisode:
     ep = AnomalyEpisode(
+        org_id=scope.org_id,
+        home_id=scope.home_id,
+        subject_id=scope.subject_id,
         room=room,
         start_ts=start_ts,
         end_ts=None,
@@ -76,6 +88,7 @@ def create_episode(
 def update_episode_peak(
     db: Session,
     *,
+    scope: AuthScope,
     episode_id: int,
     level: int,
     score_total: float,
@@ -87,7 +100,18 @@ def update_episode_peak(
     reasons: list[dict],
     peak_bucket_details: Optional[dict],
 ) -> AnomalyEpisode:
-    ep = db.get(AnomalyEpisode, episode_id)
+    ep = (
+        db.execute(
+            select(AnomalyEpisode).where(
+                AnomalyEpisode.id == episode_id,
+                AnomalyEpisode.org_id == scope.org_id,
+                AnomalyEpisode.home_id == scope.home_id,
+                AnomalyEpisode.subject_id == scope.subject_id,
+            )
+        )
+        .scalars()
+        .first()
+    )
     if not ep:
         raise KeyError(f"AnomalyEpisode {episode_id} not found")
 
@@ -108,8 +132,21 @@ def update_episode_peak(
     return ep
 
 
-def close_episode(db: Session, *, episode_id: int, end_ts: datetime) -> AnomalyEpisode:
-    ep = db.get(AnomalyEpisode, episode_id)
+def close_episode(
+    db: Session, *, scope: AuthScope, episode_id: int, end_ts: datetime
+) -> AnomalyEpisode:
+    ep = (
+        db.execute(
+            select(AnomalyEpisode).where(
+                AnomalyEpisode.id == episode_id,
+                AnomalyEpisode.org_id == scope.org_id,
+                AnomalyEpisode.home_id == scope.home_id,
+                AnomalyEpisode.subject_id == scope.subject_id,
+            )
+        )
+        .scalars()
+        .first()
+    )
     if not ep:
         raise KeyError(f"AnomalyEpisode {episode_id} not found")
     ep.end_ts = end_ts

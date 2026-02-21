@@ -94,6 +94,11 @@ class AnomalyEpisode(Base):
     reasons_peak: Mapped[dict | list | None] = mapped_column(JSONB, nullable=True)
     reasons_last: Mapped[dict | list | None] = mapped_column(JSONB, nullable=True)
 
+    # Tenant scope (P0-2)
+    org_id: Mapped[str] = mapped_column(Text, nullable=False, default="default")
+    home_id: Mapped[str] = mapped_column(Text, nullable=False, default="default")
+    subject_id: Mapped[str] = mapped_column(Text, nullable=False, default="default")
+
 
 Index("ix_anomaly_episodes_start_ts", AnomalyEpisode.start_ts)
 Index("ix_anomaly_episodes_room_start_ts", AnomalyEpisode.room, AnomalyEpisode.start_ts)

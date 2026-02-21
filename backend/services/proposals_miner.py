@@ -10,6 +10,8 @@ from typing import Any
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
+from services.auth import AuthScope
+
 from util.time import utcnow
 
 
@@ -54,6 +56,7 @@ def _upsert_proposal(
     db: Session,
     *,
     org_id: str,
+    home_id: str,
     subject_id: str,
     room_id: str | None,
     proposal_type: str,
@@ -73,7 +76,7 @@ def _upsert_proposal(
     q = text(
         """
         INSERT INTO proposals (
-          org_id, subject_id, room_id,
+          org_id, home_id, subject_id, room_id,
           proposal_type, dedupe_key,
           state, priority,
           evidence, why,
@@ -82,7 +85,7 @@ def _upsert_proposal(
           window_start, window_end
         )
         VALUES (
-          :org_id, :subject_id, :room_id,
+          :org_id, :home_id, :subject_id, :room_id,
           :proposal_type, :dedupe_key,
           'NEW', :priority,
           CAST(:evidence AS jsonb), CAST(:why AS jsonb),
@@ -90,7 +93,7 @@ def _upsert_proposal(
           now(), now(),
           :window_start, :window_end
         )
-        ON CONFLICT (org_id, subject_id, proposal_type, dedupe_key)
+        ON CONFLICT (org_id, home_id, subject_id, proposal_type, dedupe_key)
         WHERE state IN ('NEW','TESTING','ACTIVE')
         DO UPDATE SET
           last_detected_at = now(),
@@ -109,6 +112,7 @@ def _upsert_proposal(
         q,
         dict(
             org_id=org_id,
+            home_id=home_id,
             subject_id=subject_id,
             room_id=room_id,
             proposal_type=proposal_type,
@@ -124,7 +128,9 @@ def _upsert_proposal(
     )
 
 
-def mine_proposals(db: Session, *, now: datetime | None = None) -> dict[str, Any]:
+def mine_proposals(
+    db: Session, *, scope: AuthScope, now: datetime | None = None
+) -> dict[str, Any]:
     """
     MVP miner (pilot-friendly thresholds, no spam):
       1) NIGHT_ACTIVITY_EARLY_SIGNAL_1_OF_7  (per subject)
@@ -135,7 +141,6 @@ def mine_proposals(db: Session, *, now: datetime | None = None) -> dict[str, Any
     org_id: "default" (MVP)
     """
     now = now or utcnow()
-    org_id = "default"
 
     # 1) NIGHT_ACTIVITY_EARLY_SIGNAL_1_OF_7
     # Define "night" using Europe/Oslo local hour: hour>=22 OR hour<7
@@ -143,25 +148,22 @@ def mine_proposals(db: Session, *, now: datetime | None = None) -> dict[str, Any
         """
         WITH ae AS (
           SELECT
-            (peak_bucket_details->>'user_id') AS subject_id,
             start_ts,
             (start_ts AT TIME ZONE 'Europe/Oslo') AS local_ts
           FROM anomaly_episodes
-          WHERE start_ts >= (now() - interval '8 days')
-            AND peak_bucket_details ? 'user_id'
+          WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
+            AND start_ts >= (now() - interval '8 days')
         ),
         nights AS (
           SELECT
-            subject_id,
             (local_ts::date) AS local_date,
             COUNT(*)::int AS cnt
           FROM ae
           WHERE (EXTRACT(HOUR FROM local_ts) >= 22 OR EXTRACT(HOUR FROM local_ts) < 7)
-          GROUP BY 1,2
+          GROUP BY 1
         ),
         windowed AS (
           SELECT
-            subject_id,
             COUNT(*) FILTER (WHERE cnt >= 1)::int AS nights_over_threshold,
             ARRAY_AGG(
               jsonb_build_object('date', local_date::text, 'count', cnt)
@@ -169,10 +171,8 @@ def mine_proposals(db: Session, *, now: datetime | None = None) -> dict[str, Any
             ) AS per_night
           FROM nights
           WHERE local_date >= ((now() AT TIME ZONE 'Europe/Oslo')::date - 6)
-          GROUP BY 1
         )
         SELECT
-          subject_id,
           nights_over_threshold,
           per_night
         FROM windowed
@@ -181,10 +181,21 @@ def mine_proposals(db: Session, *, now: datetime | None = None) -> dict[str, Any
         """
     )
 
-    night_rows = db.execute(night_q).mappings().all()
+    night_rows = (
+        db.execute(
+            night_q,
+            {
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+            },
+        )
+        .mappings()
+        .all()
+    )
     night_upserts = 0
     for r in night_rows:
-        subject_id = r["subject_id"]
+        subject_id = scope.subject_id
         evidence = {
             "nights_window": 7,
             "nights_over_threshold": int(r["nights_over_threshold"]),
@@ -202,7 +213,8 @@ def mine_proposals(db: Session, *, now: datetime | None = None) -> dict[str, Any
         ]
         _upsert_proposal(
             db,
-            org_id=org_id,
+            org_id=scope.org_id,
+            home_id=scope.home_id,
             subject_id=subject_id,
             room_id=None,
             proposal_type="NIGHT_ACTIVITY_EARLY_SIGNAL_1_OF_7",
@@ -228,18 +240,16 @@ def mine_proposals(db: Session, *, now: datetime | None = None) -> dict[str, Any
         """
         WITH ae AS (
           SELECT
-            (peak_bucket_details->>'user_id') AS subject_id,
             start_ts,
             reasons,
             reasons_last,
             COALESCE((peak_bucket_details->'observed'->>'door_obs')::int, 0) AS door_obs_peak
           FROM anomaly_episodes
-          WHERE start_ts >= (now() - interval '14 days')
-            AND peak_bucket_details ? 'user_id'
+          WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
+            AND start_ts >= (now() - interval '14 days')
         ),
         door AS (
           SELECT
-            subject_id,
             (start_ts AT TIME ZONE 'Europe/Oslo')::date AS local_date,
             COUNT(*)::int AS cnt
           FROM ae
@@ -251,30 +261,39 @@ def mine_proposals(db: Session, *, now: datetime | None = None) -> dict[str, Any
               WHERE (elem->>'reason_code') LIKE 'EVENT_DOOR%'
             )
           )
-          GROUP BY 1,2
+          GROUP BY 1
         ),
         agg AS (
           SELECT
-            subject_id,
             COALESCE(SUM(cnt), 0)::int AS door_anomaly_count,
             ARRAY_AGG(
               jsonb_build_object('date', local_date::text, 'count', cnt)
               ORDER BY local_date DESC
             ) AS per_day
           FROM door
-          GROUP BY 1
         )
-        SELECT subject_id, door_anomaly_count, per_day
+        SELECT door_anomaly_count, per_day
         FROM agg
         WHERE door_anomaly_count >= 3
         ;
         """
     )
 
-    door_rows = db.execute(door_q).mappings().all()
+    door_rows = (
+        db.execute(
+            door_q,
+            {
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+            },
+        )
+        .mappings()
+        .all()
+    )
     door_upserts = 0
     for r in door_rows:
-        subject_id = r["subject_id"]
+        subject_id = scope.subject_id
         door_anomaly_count = int(r["door_anomaly_count"])
         evidence = {
             "window_days": 14,
@@ -293,7 +312,8 @@ def mine_proposals(db: Session, *, now: datetime | None = None) -> dict[str, Any
         ]
         _upsert_proposal(
             db,
-            org_id=org_id,
+            org_id=scope.org_id,
+            home_id=scope.home_id,
             subject_id=subject_id,
             room_id=None,
             proposal_type="DOOR_ANOMALY_BURST_3_OF_14",
@@ -319,23 +339,32 @@ def mine_proposals(db: Session, *, now: datetime | None = None) -> dict[str, Any
     bootstrap_q = text(
         """
         SELECT
-          (peak_bucket_details->>'user_id') AS subject_id,
           COUNT(*)::int AS anomaly_count,
           MAX(start_ts) AS last_ts
         FROM anomaly_episodes
-        WHERE start_ts >= (now() - interval '7 days')
-          AND peak_bucket_details ? 'user_id'
+        WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
+            AND start_ts >= (now() - interval '7 days')
           AND level >= 1
-        GROUP BY 1
         HAVING COUNT(*) >= 1
         ;
         """
     )
 
-    bs_rows = db.execute(bootstrap_q).mappings().all()
+    bs_rows = (
+        db.execute(
+            bootstrap_q,
+            {
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+            },
+        )
+        .mappings()
+        .all()
+    )
     bs_upserts = 0
     for r in bs_rows:
-        subject_id = r["subject_id"]
+        subject_id = scope.subject_id
         anomaly_count = int(r["anomaly_count"])
         evidence = {
             "window_days": 7,
@@ -354,7 +383,8 @@ def mine_proposals(db: Session, *, now: datetime | None = None) -> dict[str, Any
         ]
         _upsert_proposal(
             db,
-            org_id=org_id,
+            org_id=scope.org_id,
+            home_id=scope.home_id,
             subject_id=subject_id,
             room_id=None,
             proposal_type="BOOTSTRAP_MONITORING_TEST",
@@ -380,18 +410,16 @@ def mine_proposals(db: Session, *, now: datetime | None = None) -> dict[str, Any
         """
         WITH ae AS (
           SELECT
-            (peak_bucket_details->>'user_id') AS subject_id,
             room AS room_id,
             id AS episode_id,
             level,
             (start_ts AT TIME ZONE 'Europe/Oslo') AS local_ts
           FROM anomaly_episodes
-          WHERE start_ts >= (now() - interval '8 days')
-            AND peak_bucket_details ? 'user_id'
+          WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
+            AND start_ts >= (now() - interval '8 days')
         ),
         night_eps AS (
           SELECT
-            subject_id,
             room_id,
             episode_id,
             level,
@@ -412,25 +440,35 @@ def mine_proposals(db: Session, *, now: datetime | None = None) -> dict[str, Any
         ),
         agg AS (
           SELECT
-            subject_id,
             room_id,
             COUNT(DISTINCT night_date)::int AS nights_hit,
             ARRAY_AGG(DISTINCT night_date ORDER BY night_date DESC) AS night_dates,
             ARRAY_AGG(episode_id ORDER BY episode_id DESC) AS episode_ids
           FROM filtered
-          GROUP BY 1,2
+          GROUP BY 1
         )
-        SELECT subject_id, room_id, nights_hit, night_dates, episode_ids
+        SELECT room_id, nights_hit, night_dates, episode_ids
         FROM agg
         WHERE nights_hit >= 4
         ;
         """
     )
 
-    nr_rows = db.execute(night_room_q).mappings().all()
+    nr_rows = (
+        db.execute(
+            night_room_q,
+            {
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+            },
+        )
+        .mappings()
+        .all()
+    )
     night_room_upserts = 0
     for r in nr_rows:
-        subject_id = r["subject_id"]
+        subject_id = scope.subject_id
         room_id = r["room_id"]
         nights_hit = int(r["nights_hit"] or 0)
         night_dates = r["night_dates"] or []
@@ -456,7 +494,8 @@ def mine_proposals(db: Session, *, now: datetime | None = None) -> dict[str, Any
 
         _upsert_proposal(
             db,
-            org_id=org_id,
+            org_id=scope.org_id,
+            home_id=scope.home_id,
             subject_id=subject_id,
             room_id=room_id,
             proposal_type="NIGHT_ACTIVITY_FREQUENT_4_OF_7",
@@ -499,7 +538,17 @@ def run_proposals_miner_job() -> None:
 
     db = SessionLocal()
     try:
-        result = mine_proposals(db)
+        result = mine_proposals(
+            db,
+            scope=AuthScope(
+                org_id="default",
+                home_id="default",
+                subject_id="default",
+                role="system",
+                user_id=None,
+                api_key_hash=None,
+            ),
+        )
         _set_job_status(
             db, job_key="proposals_miner", ok=True, now=utcnow(), payload=result
         )

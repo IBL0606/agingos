@@ -7,15 +7,13 @@ from util.time import utcnow
 
 from sqlalchemy.orm import Session
 
-from dataclasses import dataclass
-from typing import Callable, Dict, List
+from typing import List
 
 from config.rule_config import load_rule_config
 from schemas.deviation_v1 import DeviationV1
 
-from services.rules.r001 import eval_r001_no_motion
-from services.rules.r002 import eval_r002_front_door_open_at_night
-from services.rules.r003 import eval_r003_front_door_open_no_motion_after
+from services.rules.registry import RULE_REGISTRY
+
 
 logger = logging.getLogger("rule_engine")
 
@@ -25,40 +23,6 @@ logger = logging.getLogger("rule_engine")
 # ---------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
-class RuleSpec:
-    """
-    Regelspesifikasjon for registry.
-
-    - rule_id: "R-001", "R-002", ...
-    - eval_fn: funksjon som evaluerer regelen og returnerer en liste med DeviationV1
-    - description: kort menneskelig beskrivelse (for docs/feilsøking)
-    """
-
-    rule_id: str
-    eval_fn: Callable[[Session, datetime, datetime, datetime], List[DeviationV1]]
-    description: str
-
-
-# Registry-prinsipp:
-# - Nye regler legges til her (én gang), og brukes deretter av routes og scheduler.
-RULE_REGISTRY: Dict[str, RuleSpec] = {
-    "R-001": RuleSpec(
-        rule_id="R-001",
-        eval_fn=eval_r001_no_motion,
-        description="Ingen bevegelse i valgt tidsvindu",
-    ),
-    "R-002": RuleSpec(
-        rule_id="R-002",
-        eval_fn=eval_r002_front_door_open_at_night,
-        description="Ytterdør åpnet på natt",
-    ),
-    "R-003": RuleSpec(
-        rule_id="R-003",
-        eval_fn=eval_r003_front_door_open_no_motion_after,
-        description="Dør åpnet, men ingen bevegelse etterpå",
-    ),
-}
 
 
 def evaluate_rules(

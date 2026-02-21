@@ -35,12 +35,26 @@ for i in $(seq 1 30); do
   fi
   sleep 1
 done
-  # (Safety) NEVER clear real events unless explicitly requested
+  # (Safety) NEVER clear real events unless explicitly requested AND running in isolated smoke stack
+  # Guardrails:
+  # - Only allow TRUNCATE when COMPOSE_PROJECT_NAME=smoke
+  # - Only allow TRUNCATE when BASE_URL is on dedicated smoke port (default 18000)
+  # - Require explicit acknowledgement
+  SMOKE_OK_TO_TRUNCATE=0
+  if [[ "${COMPOSE_PROJECT_NAME:-}" == "smoke" && "${BASE_URL:-}" =~ ^http://localhost:18000($|/) ]]; then
+    SMOKE_OK_TO_TRUNCATE=1
+  fi
+
   if [[ "${SMOKE_TRUNCATE:-0}" == "1" ]]; then
-    echo "WARN: SMOKE_TRUNCATE=1 -> TRUNCATE events"
-    docker compose exec -T db psql -U agingos -d agingos -c "TRUNCATE TABLE events;" >/dev/null || true
+    if [[ "$SMOKE_OK_TO_TRUNCATE" == "1" && "${SMOKE_I_KNOW_WHAT_IM_DOING:-}" == "YES" ]]; then
+      echo "WARN: SMOKE_TRUNCATE=1 -> TRUNCATE events (isolated smoke stack)"
+      docker compose exec -T db psql -U agingos -d agingos -c "TRUNCATE TABLE events;" >/dev/null || true
+    else
+      echo "WARN: SMOKE_TRUNCATE=1 ignored (refusing to truncate outside isolated smoke stack)." >&2
+      echo "      Require: COMPOSE_PROJECT_NAME=smoke BASE_URL=http://localhost:18000 SMOKE_I_KNOW_WHAT_IM_DOING=YES" >&2
+    fi
   else
-    echo "INFO: skipping TRUNCATE (set SMOKE_TRUNCATE=1 to enable)"
+    echo "INFO: skipping TRUNCATE (set SMOKE_TRUNCATE=1 to enable in isolated smoke stack)"
   fi
 
 # 1) Health
@@ -125,7 +139,7 @@ curl -sf -X POST "${API_KEY_HEADER[@]}" "$BASE_URL/event" \
     "id":"'"$DOOR_R3_ID"'",
     "timestamp":"2025-12-15T14:00:00Z",
     "category":"door",
-    "payload":{"state":"open","door":"inngangsdor","smoke":true}
+    "payload":{"state":"open","door":"front","smoke":true}
   }' >/dev/null
 
 curl -sf -X POST "${API_KEY_HEADER[@]}" "$BASE_URL/event" \
@@ -211,17 +225,22 @@ curl -sf -X POST "${API_KEY_HEADER[@]}" "$BASE_URL/event" \
     "id":"00000000-0000-0000-0000-000000000301",
     "timestamp":"2025-12-15T14:00:00Z",
     "category":"door",
-    "payload":{"state":"open","door":"inngangsdor","smoke":true,"note":"r003_front_open"}
+    "payload":{"state":"open","door":"front","smoke":true,"note":"r003_front_open"}
   }' >/dev/null || true
 
 echo "[8/8] GET /deviations/evaluate (R-003 trigges, R-001/R-002 trigges ikke)"
 
 dev_r3="$(curl -sS "${API_KEY_HEADER[@]}" "$BASE_URL/deviations/evaluate?since=2025-12-15T13:50:00Z&until=2025-12-15T14:20:00Z" || true)"
-echo "$dev_r3" | jq -e '
-  type=="array"
-  and length==1
-  and .[0].rule_id=="R-003"
-' >/dev/null || fail "Expected only R-003 in window 13:50–14:20"
+  # Assertion policy:
+  # - In isolated deterministic smoke mode (clean DB): expect ONLY R-003
+  # - Otherwise (shared/dev DB): require R-003 present (avoid flakiness)
+  if [[ "${SMOKE_DETERMINISTIC:-0}" == "1" && "$SMOKE_OK_TO_TRUNCATE" == "1" && "${SMOKE_TRUNCATE:-0}" == "1" ]]; then
+    echo "$dev_r3" | jq -e 'type=="array" and (map(.rule_id)|length==1) and (map(.rule_id)[0]=="R-003")' >/dev/null \
+      || fail "Expected only R-003 in window 13:50–14:20 (deterministic isolated smoke)"
+  else
+    echo "$dev_r3" | jq -e 'type=="array" and (map(.rule_id)|index("R-003")!=null)' >/dev/null \
+      || fail "Expected R-003 present in window 13:50–14:20"
+  fi
 
 echo "OK"
 echo

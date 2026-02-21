@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from sqlalchemy import select
+
+from services.auth import AuthScope
 from sqlalchemy.orm import Session
 
 from models.anomaly_episode import AnomalyEpisode
@@ -98,6 +100,7 @@ def _should_close_by_timeout(
 def upsert_bucket_result(
     db: Session,
     *,
+    scope: AuthScope,
     room: str,
     bucket_start: datetime,
     bucket_end: datetime,
@@ -127,7 +130,13 @@ def upsert_bucket_result(
     active_ep = (
         db.execute(
             select(AnomalyEpisode)
-            .where(AnomalyEpisode.room == room_n, AnomalyEpisode.end_ts.is_(None))
+            .where(
+                AnomalyEpisode.org_id == scope.org_id,
+                AnomalyEpisode.home_id == scope.home_id,
+                AnomalyEpisode.subject_id == scope.subject_id,
+                AnomalyEpisode.room == room_n,
+                AnomalyEpisode.end_ts.is_(None),
+            )
             .with_for_update()
         )
         .scalars()
@@ -139,6 +148,9 @@ def upsert_bucket_result(
         if not _should_open(level_text):
             return None
         ep = AnomalyEpisode(
+            org_id=scope.org_id,
+            home_id=scope.home_id,
+            subject_id=scope.subject_id,
             room=room_n,
             start_ts=bucket_start,
             end_ts=None,

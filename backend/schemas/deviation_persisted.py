@@ -1,11 +1,11 @@
 from pydantic import BaseModel
-from typing import Any
+from typing import Any, Optional
 from datetime import datetime
 
 
 class Window(BaseModel):
-    since: datetime
-    until: datetime
+    since: Optional[datetime] = None
+    until: Optional[datetime] = None
 
 
 class DeviationPersisted(BaseModel):

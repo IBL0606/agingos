@@ -10,6 +10,8 @@ import traceback
 import uuid
 
 from datetime import datetime, timedelta
+from services.auth import AuthScope
+
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -195,11 +197,18 @@ def _upsert_open_deviation(
     subject_key: str,
     now: datetime,
     deviation_v1: dict,
+    *,
+    org_id: str = "default",
+    home_id: str = "default",
+    subject_id: str = "default",
 ) -> None:
     existing = (
         db.query(Deviation)
         .filter(Deviation.rule_id == rule_row.id)
         .filter(Deviation.subject_key == subject_key)
+        .filter(Deviation.org_id == org_id)
+        .filter(Deviation.home_id == home_id)
+        .filter(Deviation.subject_id == subject_id)
         .filter(Deviation.status.in_([DeviationStatus.OPEN, DeviationStatus.ACK]))
         .one_or_none()
     )
@@ -243,6 +252,9 @@ def _upsert_open_deviation(
         started_at=now,
         last_seen_at=now,
         subject_key=subject_key,
+        org_id=org_id,
+        home_id=home_id,
+        subject_id=subject_id,
         context=context,
         evidence=evidence,
     )
@@ -254,6 +266,9 @@ def _close_stale_deviations(
     *,
     subject_key: str,
     now: datetime,
+    org_id: str = "default",
+    home_id: str = "default",
+    subject_id: str = "default",
 ) -> int:
     """
     Close deviations that have not been seen within expire_after_minutes.
@@ -269,13 +284,17 @@ def _close_stale_deviations(
     candidates = (
         db.query(Deviation)
         .filter(Deviation.subject_key == subject_key)
+        .filter(Deviation.org_id == org_id)
+        .filter(Deviation.home_id == home_id)
+        .filter(Deviation.subject_id == subject_id)
         .filter(Deviation.status.in_([DeviationStatus.OPEN, DeviationStatus.ACK]))
         .all()
     )
 
     for dev in candidates:
         # rules.yaml keys are the rule "key" like "R-002". In DB that is Rule.name.
-        rule_key = getattr(dev, "rule_id", None) or getattr(dev, "rule_key", None)
+        rule_row = db.query(Rule).filter(Rule.id == dev.rule_id).one_or_none()
+        rule_key = rule_row.name if rule_row else None
         if not rule_key:
             continue
 
@@ -289,18 +308,44 @@ def _close_stale_deviations(
     return closed_count
 
 
-def _get_monitor_mode(db, *, monitor_key: str, room_id: str = "__GLOBAL__") -> str:
+def _get_monitor_mode(
+    db,
+    *,
+    monitor_key: str,
+    room_id: str = "__GLOBAL__",
+    org_id: str = "default",
+    home_id: str = "default",
+    subject_id: str = "default",
+) -> str:
+    """
+    monitor_modes lookup policy:
+      1) exact scope + (monitor_key, room_id)
+      2) exact scope + (monitor_key, "__GLOBAL__") fallback
+      3) default "ON"
+    """
     try:
+        q = text(
+            "SELECT mode FROM monitor_modes "
+            "WHERE org_id=:org AND home_id=:home AND subject_id=:sub "
+            "  AND monitor_key=:k AND room_id=:r"
+        )
         row = (
             db.execute(
-                text(
-                    "SELECT mode FROM monitor_modes WHERE monitor_key=:k AND room_id=:r"
-                ),
-                {"k": monitor_key, "r": room_id},
+                q,
+                {"org": org_id, "home": home_id, "sub": subject_id, "k": monitor_key, "r": room_id},
             )
             .mappings()
             .one_or_none()
         )
+        if (not row) and room_id != "__GLOBAL__":
+            row = (
+                db.execute(
+                    q,
+                    {"org": org_id, "home": home_id, "sub": subject_id, "k": monitor_key, "r": "__GLOBAL__"},
+                )
+                .mappings()
+                .one_or_none()
+            )
         if row and row.get("mode") in ("OFF", "TEST", "ON"):
             return row["mode"]
     except Exception:
@@ -314,10 +359,13 @@ def run_rule_engine_job():
 
     db = SessionLocal()
     try:
+        scope = _anomaly_pick_one_scope(db)
         cfg = load_rule_config()
         interval_minutes = cfg.scheduler_interval_minutes()
         subject_key = cfg.scheduler_default_subject_key()
-
+        org_id = scope.org_id
+        home_id = scope.home_id
+        subject_id = scope.subject_id
         now = utcnow()
         until = now
         since = now - timedelta(minutes=interval_minutes)
@@ -367,7 +415,7 @@ def run_rule_engine_job():
                     spec = RULE_REGISTRY[rid]
                     rule_devs = spec.eval_fn(db, since=r_since, until=r_until, now=now)
 
-                    mode = _get_monitor_mode(db, monitor_key=rid, room_id="__GLOBAL__")
+                    mode = _get_monitor_mode(db, monitor_key=rid, room_id="__GLOBAL__", org_id=org_id, home_id=home_id, subject_id=subject_id)
                     if mode == "OFF":
                         rule_devs = []
 
@@ -398,6 +446,9 @@ def run_rule_engine_job():
                             subject_key=subject_key,
                             now=now,
                             deviation_v1=dct,
+                            org_id=org_id,
+                            home_id=home_id,
+                            subject_id=subject_id,
                         )
                         upserted_for_rule += 1
 
@@ -439,7 +490,14 @@ def run_rule_engine_job():
                 )
                 continue
 
-        closed = _close_stale_deviations(db, subject_key=subject_key, now=now)
+        closed = _close_stale_deviations(
+            db,
+            subject_key=subject_key,
+            now=now,
+            org_id=org_id,
+            home_id=home_id,
+            subject_id=subject_id,
+        )
 
         db.commit()
 
@@ -482,6 +540,8 @@ def run_rule_engine_job():
 def run_anomalies_job_safe():
     """Fail-safe wrapper for APScheduler: never raise; updates in-memory status; always logs."""
     from datetime import datetime, timezone
+
+    from sqlalchemy.exc import ProgrammingError
     import traceback
 
     ANOMALIES_RUNNER_STATUS["last_run_at"] = datetime.now(timezone.utc).isoformat()
@@ -509,6 +569,17 @@ def run_anomalies_job_safe():
             rooms_scored=out.get("rooms_scored"),
             counts=out.get("counts"),
         )
+    except ProgrammingError:
+        # baseline not installed; skipping anomalies job (rules-only mode)
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        ANOMALIES_RUNNER_STATUS["last_ok_at"] = None
+        ANOMALIES_RUNNER_STATUS["last_error_at"] = None
+        ANOMALIES_RUNNER_STATUS["last_error_msg"] = None
+        return {"skipped": True, "reason": "baseline_model_status_missing"}
+
     except Exception as e:
         ANOMALIES_RUNNER_STATUS["last_error_at"] = datetime.now(
             timezone.utc
@@ -576,9 +647,71 @@ def setup_scheduler():
 # Minimal deterministic runner helpers. Wiring into APScheduler comes in a later step.
 
 
+def _anomaly_pick_one_scope(db) -> AuthScope:
+    """Pick one (org_id, home_id, subject_id, user_id) scope.
+
+    Primary source: baseline_model_status (if present).
+    Fallback: default scope with user_id='system' to avoid crashing scheduler
+    on deployments where baseline tables are not installed yet.
+    """
+    from sqlalchemy import text
+    from sqlalchemy.exc import ProgrammingError
+
+    try:
+        row = (
+            db.execute(
+                text(
+                    """
+                    SELECT org_id, home_id, subject_id, user_id
+                    FROM baseline_model_status
+                    ORDER BY computed_at DESC NULLS LAST, model_end DESC
+                    LIMIT 1
+                    """
+                )
+            )
+            .mappings()
+            .first()
+        )
+    except ProgrammingError:
+        # Missing table / bad schema: clear aborted transaction then run in "rules-only" mode
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        # Missing table / bad schema: run in "rules-only" mode
+        return AuthScope(
+            org_id="default",
+            home_id="default",
+            subject_id="default",
+            user_id="system",
+            role="system",
+            api_key_hash="scheduler",
+        )
+
+    if not row:
+        return AuthScope(
+            org_id="default",
+            home_id="default",
+            subject_id="default",
+            user_id="system",
+            role="system",
+            api_key_hash="scheduler",
+        )
+
+    uid = row.get("user_id") or "system"
+
+    return AuthScope(
+        org_id=str(row.get("org_id") or "default"),
+        home_id=str(row.get("home_id") or "default"),
+        subject_id=str(row.get("subject_id") or "default"),
+        user_id=str(uid),
+        role="system",
+        api_key_hash="scheduler",
+    )
 def run_anomalies_job_one(
     db,
     *,
+    scope: AuthScope,
     room: str,
     bucket_start,
     close_after_green_buckets: int = 2,
@@ -602,6 +735,7 @@ def run_anomalies_job_one(
 
     scored = score_room_bucket(
         db,
+        scope=scope,
         room=room,
         bucket_start=dt,
         pet_weight=pet_weight,
@@ -610,6 +744,7 @@ def run_anomalies_job_one(
 
     ep = upsert_bucket_result(
         db,
+        scope=scope,
         room=scored.room,
         bucket_start=scored.bucket_start,
         bucket_end=scored.bucket_end,
@@ -662,7 +797,10 @@ def run_anomalies_job_deterministic() -> dict:
 
     db = SessionLocal()
     try:
-        res = run_anomalies_job_one(db, room=room, bucket_start=bucket_start)
+        scope = _anomaly_pick_one_scope(db)
+        res = run_anomalies_job_one(
+            db, scope=scope, room=room, bucket_start=bucket_start
+        )
         db.commit()
         return {"ok": True, "result": res}
     except Exception as e:
@@ -672,12 +810,25 @@ def run_anomalies_job_deterministic() -> dict:
         db.close()
 
 
-def _anomaly_pick_one_room_id(db) -> str:
+def _anomaly_pick_one_room_id(db, *, scope: AuthScope) -> str:
     """Deterministic: pick one known room_id from baseline_room_bucket (min(room_id))."""
     from sqlalchemy import text
 
     row = (
-        db.execute(text("SELECT MIN(room_id) AS room_id FROM baseline_room_bucket"))
+        db.execute(
+            text(
+                """
+            SELECT MIN(room_id) AS room_id
+            FROM baseline_room_bucket
+            WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
+            """
+            ),
+            {
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+            },
+        )
         .mappings()
         .first()
     )
@@ -689,8 +840,11 @@ def _anomaly_pick_one_room_id(db) -> str:
 
 def run_anomalies_job_one_deterministic_room(db, *, bucket_start) -> dict:
     """Deterministic: pick room_id from baseline_room_bucket and score one bucket."""
-    room_id = _anomaly_pick_one_room_id(db)
-    return run_anomalies_job_one(db, room=room_id, bucket_start=bucket_start)
+    scope = _anomaly_pick_one_scope(db)
+    room_id = _anomaly_pick_one_room_id(db, scope=scope)
+    return run_anomalies_job_one(
+        db, scope=scope, room=room_id, bucket_start=bucket_start
+    )
 
 
 def _latest_finished_bucket_start_utc(*, bucket_minutes: int = 15):
@@ -724,8 +878,9 @@ def run_anomalies_job_latest_one() -> dict:
     bs = _latest_finished_bucket_start_utc()
     db = SessionLocal()
     try:
-        room_id = _anomaly_pick_one_room_id(db)
-        res = run_anomalies_job_one(db, room=room_id, bucket_start=bs)
+        scope = _anomaly_pick_one_scope(db)
+        room_id = _anomaly_pick_one_room_id(db, scope=scope)
+        res = run_anomalies_job_one(db, scope=scope, room=room_id, bucket_start=bs)
         db.commit()
         return {"ok": True, "room": room_id, "bucket_start": bs, "result": res}
     except Exception as e:
@@ -735,18 +890,9 @@ def run_anomalies_job_latest_one() -> dict:
         db.close()
 
 
-def _anomaly_list_room_ids(db) -> list[str]:
+def _anomaly_list_room_ids(db, *, scope: AuthScope) -> list[str]:
     """List known rooms for anomaly scoring. Source: baseline_room_bucket (latest model_end per user)."""
     from sqlalchemy import text
-
-    row = (
-        db.execute(text("SELECT id::text AS id FROM app_instance LIMIT 1"))
-        .mappings()
-        .first()
-    )
-    if not row or not row.get("id"):
-        raise RuntimeError("app_instance missing (cannot resolve user_id)")
-    uid = row["id"]
 
     me = (
         db.execute(
@@ -754,12 +900,16 @@ def _anomaly_list_room_ids(db) -> list[str]:
                 """
             SELECT model_end
             FROM baseline_model_status
-            WHERE user_id = CAST(:uid AS uuid)
+            WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
             ORDER BY model_end DESC
             LIMIT 1
             """
             ),
-            {"uid": uid},
+            {
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+            },
         )
         .mappings()
         .first()
@@ -774,12 +924,17 @@ def _anomaly_list_room_ids(db) -> list[str]:
                 """
             SELECT DISTINCT room_id
             FROM baseline_room_bucket
-            WHERE user_id = CAST(:uid AS uuid)
+            WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
               AND model_end = :model_end
             ORDER BY room_id ASC
             """
             ),
-            {"uid": uid, "model_end": model_end},
+            {
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+                "model_end": model_end,
+            },
         )
         .mappings()
         .all()
@@ -804,10 +959,13 @@ def run_anomalies_job() -> dict:
     counts = {"OPEN": 0, "UPDATE": 0, "CLOSE": 0, "NOOP": 0, "ERROR": 0}
     rooms_scored = 0
     try:
-        rooms = _anomaly_list_room_ids(db)
+        scope = _anomaly_pick_one_scope(db)
+        rooms = _anomaly_list_room_ids(db, scope=scope)
         for room_id in rooms:
             try:
-                res = run_anomalies_job_one(db, room=room_id, bucket_start=bucket_start)
+                res = run_anomalies_job_one(
+                    db, scope=scope, room=room_id, bucket_start=bucket_start
+                )
                 rooms_scored += 1
                 a = str(res.get("action") or "NOOP").upper()
                 if a not in counts:

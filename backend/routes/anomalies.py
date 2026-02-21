@@ -2,6 +2,7 @@ from services.anomalies_repo_lifecycle import upsert_bucket_result
 # backend/routes/anomalies.py
 
 from fastapi import APIRouter, Depends, Query
+from services.auth import require_scope, AuthScope
 from sqlalchemy.orm import Session
 from typing import Optional, List
 
@@ -64,10 +65,11 @@ def get_anomalies(
     min_level: Optional[str] = Query(default=None, description="GREEN|YELLOW|RED"),
     limit: int = Query(default=200, ge=1, le=2000),
     db: Session = Depends(get_db),
+    scope: AuthScope = Depends(require_scope),
 ):
     since = parse_last_param_to_since(last)
     eps = list_episodes(
-        db, since=since, room=room, active_only=active_only, limit=limit
+        db, scope=scope, since=since, room=room, active_only=active_only, limit=limit
     )
 
     if min_level:
@@ -86,14 +88,20 @@ def score_anomaly_bucket(
     pet_weight: float = Query(0.25, ge=0.0, le=1.0),
     unknown_weight: float = Query(0.50, ge=0.0, le=1.0),
     db: Session = Depends(get_db),
+    scope: AuthScope = Depends(require_scope),
 ):
     # parse bucket_start with datetime.fromisoformat (accept Z)
     bs = bucket_start.strip().replace("Z", "+00:00")
     from datetime import datetime
 
+    # Hvis offset mangler +/-
+    if " " in bs[-6:]:
+        bs = bs.replace(" ", "+", 1)
+
     dt = datetime.fromisoformat(bs)
     res = score_room_bucket(
         db,
+        scope=scope,
         room=room,
         bucket_start=dt,
         pet_weight=pet_weight,
@@ -130,14 +138,20 @@ def run_once_anomaly(
     pet_weight: float = Query(0.25, ge=0.0, le=1.0),
     unknown_weight: float = Query(0.50, ge=0.0, le=1.0),
     db: Session = Depends(get_db),
+    scope: AuthScope = Depends(require_scope),
 ):
     bs = bucket_start.strip().replace("Z", "+00:00")
     from datetime import datetime
+
+    # Hvis offset mangler +/-
+    if " " in bs[-6:]:
+        bs = bs.replace(" ", "+", 1)
 
     dt = datetime.fromisoformat(bs)
 
     scored = score_room_bucket(
         db,
+        scope=scope,
         room=room,
         bucket_start=dt,
         pet_weight=pet_weight,
@@ -146,6 +160,7 @@ def run_once_anomaly(
 
     ep = upsert_bucket_result(
         db,
+        scope=scope,
         room=scored.room,
         bucket_start=scored.bucket_start,
         bucket_end=scored.bucket_end,
