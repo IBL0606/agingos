@@ -149,11 +149,18 @@ def health_detail(scope: "AuthScope" = Depends(require_scope)):
                     ORDER BY model_end DESC
                     LIMIT 1
                 """),
-                    {"org": scope.org_id, "home": scope.home_id, "sub": scope.subject_id},
-                ).mappings().one_or_none()
+                    {
+                        "org": scope.org_id,
+                        "home": scope.home_id,
+                        "sub": scope.subject_id,
+                    },
+                )
+                .mappings()
+                .one_or_none()
             )
         except Exception as e:
             from sqlalchemy.exc import ProgrammingError
+
             if isinstance(e, ProgrammingError):
                 db.rollback()
                 baseline_table_missing = True

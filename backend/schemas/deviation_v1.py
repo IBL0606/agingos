@@ -7,6 +7,8 @@ from datetime import datetime
 class Window(BaseModel):
     since: Optional[datetime] = None
     until: Optional[datetime] = None
+
+
 class DeviationV1(BaseModel):
     deviation_id: UUID = Field(default_factory=uuid4)
     rule_id: str

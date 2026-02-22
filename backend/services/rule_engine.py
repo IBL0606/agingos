@@ -7,22 +7,35 @@ from util.time import utcnow
 
 from sqlalchemy.orm import Session
 
-from typing import List
 
 from config.rule_config import load_rule_config
 from schemas.deviation_v1 import DeviationV1
 
 from services.rules.registry import RULE_REGISTRY
-
+from services.rules.context import RuleContext
 
 logger = logging.getLogger("rule_engine")
+
+
+def _call_rule(
+    spec, db: Session, since: datetime, until: datetime, now: datetime, rule_id: str
+) -> list[DeviationV1]:
+    """Adapter: supports both legacy rule signatures and RuleContext-based rules."""
+    cfg = load_rule_config()
+    params = cfg.rule_params(rule_id)
+    ctx = RuleContext(session=db, since=since, until=until, now=now, params=params)
+    fn = spec.eval_fn
+    try:
+        # New style: fn(ctx)
+        return fn(ctx)  # type: ignore[misc]
+    except TypeError:
+        # Legacy: fn(db, since, until, now)
+        return fn(db, since=since, until=until, now=now)  # type: ignore[misc]
 
 
 # ---------------------------------------------------------------------------
 # Thin-slice rule engine (registry) - én sannhet for beregning av avvik (Avvik v1)
 # ---------------------------------------------------------------------------
-
-
 
 
 def evaluate_rules(
@@ -58,7 +71,9 @@ def evaluate_rules(
         if spec is None:
             # Ukjent regel-id; ignorer (kan evt. gjøres strict senere)
             continue
-        devs.extend(spec.eval_fn(db, since=since, until=until, now=now))
+        devs.extend(
+            _call_rule(spec, db, since=since, until=until, now=now, rule_id=rid)
+        )
 
     return devs
 
@@ -93,7 +108,9 @@ def evaluate_rules_for_scheduler(
         since = now - timedelta(minutes=lookback)
         until = now
 
-        devs.extend(spec.eval_fn(db, since=since, until=until, now=now))
+        devs.extend(
+            _call_rule(spec, db, since=since, until=until, now=now, rule_id=rid)
+        )
 
     return devs
 

@@ -6,8 +6,6 @@ Scenario navn: "status_flow_open_ack_close_reopen"
 Given/When/Then er skrevet eksplisitt i testen for å gjøre livssyklusreglene etterprøvbare.
 """
 
-from datetime import timedelta
-
 try:
     # Repo/host layout
     from backend.db import SessionLocal  # type: ignore
@@ -53,6 +51,7 @@ def test_status_flow_open_ack_stale_close_trigger_reopens():
         rule_row = _ensure_rule(db, rule_key)
 
         from util.time import utcnow
+
         now = utcnow()
 
         # Cleanup: gjør testen idempotent ift unique active constraint

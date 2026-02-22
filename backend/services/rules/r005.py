@@ -6,7 +6,9 @@ from sqlalchemy.orm import Session
 from schemas.deviation_v1 import DeviationV1
 
 
-def eval_r005_todo(db: Session, *, since: datetime, until: datetime, now: datetime) -> list[DeviationV1]:
+def eval_r005_todo(
+    db: Session, *, since: datetime, until: datetime, now: datetime
+) -> list[DeviationV1]:
     """TODO R-005: implement rule logic.
 
     Contract:
