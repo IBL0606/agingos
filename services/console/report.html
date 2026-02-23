@@ -352,6 +352,17 @@
   </div>
 
 <script>
+  function getStreamId() {
+    try { return String(localStorage.getItem("agingos_stream_id") || "prod").trim() || "prod"; }
+    catch (e) { return "prod"; }
+  }
+  function eventsUrl(pathWithQs) {
+    const s = encodeURIComponent(getStreamId());
+    const u = String(pathWithQs || "");
+    if (!u.includes("/events?")) return u;
+    return u + (u.includes("stream_id=") ? "" : ("&stream_id=" + s));
+  }
+
   // TOPBAR_API_MINI v1
 
   // REPORT_NOTICE_V1
@@ -798,7 +809,7 @@
     // Events coverage
     let events = [];
     try {
-      const ev = await apiGet("/events?limit=" + encodeURIComponent(String(thr.events_limit)));
+      const ev = await apiGet(eventsUrl("/events?limit=" + encodeURIComponent(String(thr.events_limit))));
       // backend seems to return list; keep it flexible
       events = Array.isArray(ev) ? ev : (ev && Array.isArray(ev.events) ? ev.events : []);
     } catch (e) {

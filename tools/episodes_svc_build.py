@@ -102,11 +102,12 @@ def fetch_events(
     batch: int,
 ) -> List[Dict[str, Any]]:
     # Presence-only v1 (deterministisk med room+state)
-    params = [org_id, home_id, subject_id]
+    params = [org_id, home_id, subject_id, os.getenv("AGINGOS_STREAM_ID","prod")]
     where = [
         "org_id=%s",
         "home_id=%s",
         "subject_id=%s",
+        "stream_id=%s",
         "category='presence'",
     ]
 

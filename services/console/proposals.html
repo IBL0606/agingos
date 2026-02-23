@@ -103,7 +103,17 @@
         NB: denne siden antar endpoints <code>GET /monitor_modes</code> og <code>POST /monitor_modes</code (eller tilsvarende). Hvis de ikke finnes, viser vi feilmelding.
       </div>
     </div>
+</div>
+  
+  <div class="card" style="margin-top:12px;">
+    <h2>Observasjoner i testperioden</h2>
+    <div class="small muted" style="margin-top:-2px;">
+      Når du setter et forslag i <span class="pill TESTING">TESTING</span>, samler vi en enkel oppsummering av relevante hendelser i perioden.
+      (Dette bruker <code>/events</code> og fungerer selv om baseline ikke er klar.)
+    </div>
+    <div id="obsHost" class="small" style="margin-top:10px;">Laster…</div>
   </div>
+
 
   <div class="card" style="margin-top:12px;">
     <div class="row" style="justify-content:space-between; align-items:flex-end;">
@@ -146,6 +156,17 @@
   </div>
 
   <script>
+  function getStreamId() {
+    try { return String(localStorage.getItem("agingos_stream_id") || "prod").trim() || "prod"; }
+    catch (e) { return "prod"; }
+  }
+  function eventsUrl(pathWithQs) {
+    const s = encodeURIComponent(getStreamId());
+    const u = String(pathWithQs || "");
+    if (!u.includes("/events?")) return u;
+    return u + (u.includes("stream_id=") ? "" : ("&stream_id=" + s));
+  }
+
   // TOPBAR_API_MINI v1
   function _topbarGetApiBase() {
     try {
@@ -199,6 +220,18 @@
 function escapeHtml(x){
   return String(x ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
 }
+
+async function sendProposalFeedback(proposalId, verdict, note){
+  const payload = { verdict: verdict, source: "ui" };
+  if (note) payload.note = note;
+  try {
+    await api(`/proposals/${proposalId}/feedback`, { method:"POST", body: JSON.stringify(payload) });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e && e.message ? e.message : String(e) };
+  }
+}
+
 function isTestDeviation(dev){
   const ev = dev && dev.evidence;
   return ev && typeof ev === 'object' && ev._monitor_mode === 'TEST';
@@ -367,6 +400,121 @@ function _asRows(data){
         return "";
       }
 
+
+      function proposalEventsHref(p){
+        // Deep-link into events.html using supported params: since, until, category, room, auto
+        const qs = new URLSearchParams();
+        if (p && p.room_id) qs.set("room", String(p.room_id));
+
+        const t = String(p?.proposal_type ?? "");
+        if (t === "DOOR_ANOMALY_BURST_3_OF_14") qs.set("category", "door");
+        else if (t === "NIGHT_ACTIVITY_EARLY_SIGNAL_1_OF_7") qs.set("category", "motion,presence");
+
+        const parseMs = (x) => {
+          const ms = Date.parse(String(x || ""));
+          return Number.isFinite(ms) ? ms : null;
+        };
+        const toIso = (ms) => new Date(ms).toISOString();
+
+        const testUntilMs = parseMs(p?.test_until);
+        const createdMs = parseMs(p?.created_at);
+
+        if (p?.state === "TESTING" && testUntilMs !== null) {
+          const sinceMs = testUntilMs - (7 * 24 * 60 * 60 * 1000);
+          qs.set("since", toIso(sinceMs));
+          qs.set("until", toIso(testUntilMs));
+          qs.set("auto", "1");
+        } else if (createdMs !== null) {
+          const nowMs = Date.now();
+          qs.set("since", toIso(createdMs));
+          qs.set("until", toIso(nowMs));
+          qs.set("auto", "1");
+        }
+
+        const q = qs.toString();
+        return q ? (`/events.html?` + q) : `/events.html`;
+      }
+
+      function eventCategoryHint(p){
+        const t = String(p?.proposal_type ?? "");
+        if (t === "DOOR_ANOMALY_BURST_3_OF_14") return "door";
+        if (t === "NIGHT_ACTIVITY_EARLY_SIGNAL_1_OF_7") return "motion,presence";
+        return "";
+      }
+
+      function computeObsWindow(p){
+        // Use same robust logic as link builder.
+        const parseMs = (x) => {
+          const ms = Date.parse(String(x || ""));
+          return Number.isFinite(ms) ? ms : null;
+        };
+        const testUntilMs = parseMs(p?.test_until);
+        if (p?.state === "TESTING" && testUntilMs !== null) {
+          const sinceMs = testUntilMs - (7 * 24 * 60 * 60 * 1000);
+          return { since: new Date(sinceMs).toISOString(), until: new Date(testUntilMs).toISOString() };
+        }
+        return null;
+      }
+
+      async function fetchEventsCount({ since, until, room, category }){
+        const qs = new URLSearchParams();
+        qs.set("since", since);
+        qs.set("until", until);
+        qs.set("limit", "1000");
+        if (room) qs.set("room", room);
+        // events.html UI supports comma categories, but API supports single category.
+        // We'll request without category if multiple are suggested; count will still be useful.
+        if (category && category.indexOf(",") === -1) qs.set("category", category);
+        const rows = await api(eventsUrl("/events?" + qs.toString()));
+        return Array.isArray(rows) ? rows.length : 0;
+      }
+
+      async function refreshObservations(list){
+        const host = document.getElementById("obsHost");
+        if (!host) return;
+
+        const all = Array.isArray(list) ? list : [];
+        const testing = all.filter(p => p && p.state === "TESTING");
+
+        if (testing.length === 0) {
+          host.innerHTML = '<div class="muted">Ingen forslag i TEST akkurat nå. Når du trykker <b>Test</b> på et forslag, vil observasjoner dukke opp her.</div>';
+          return;
+        }
+
+        host.textContent = "Laster observasjoner…";
+
+        const parts = [];
+        for (const p of testing) {
+          const w = computeObsWindow(p);
+          const title = escapeHtml(String(p?.proposal_type || "Forslag"));
+          const room = p?.room_id ? String(p.room_id) : "";
+          const cat = eventCategoryHint(p);
+          let line = '';
+          if (!w) {
+            line = '<div class="muted">Mangler test-vindu for dette forslaget (ingen test_until).</div>';
+          } else {
+            let n = 0;
+            try {
+              n = await fetchEventsCount({ since: w.since, until: w.until, room: room, category: cat });
+            } catch(e) {
+              n = -1;
+            }
+            const when = `<span class="mono">${escapeHtml(w.since)}</span> → <span class="mono">${escapeHtml(w.until)}</span>`;
+            const link = `<a class="navlink" style="padding:0;border:none" href="${proposalEventsHref(p)}">Se relevante hendelser →</a>`;
+            const countText = (n >= 0) ? `<b>${n}</b> events` : `<span class="muted">feil ved henting av events</span>`;
+            line = `<div class="small" style="margin-top:6px;">Periode: ${when} · ${countText} ${room ? ("· rom: <span class=\"mono\">"+escapeHtml(room)+"</span>") : ""} · ${link}</div>`;
+          }
+
+          parts.append(
+            `<div style="padding:10px;border:1px solid #1f2a37;border-radius:12px;background:#0b0f14;margin-top:10px;">` +
+            `<div><span class="pill TESTING">TESTING</span> <span class="mono">#${p.proposal_id}</span> · <b>${title}</b></div>` +
+            line +
+            `</div>`
+          );
+        }
+        host.innerHTML = parts.join("");
+      }
+
 async function refreshMinerStatus() {
       const el = $("minerStatus");
       el.textContent = "loading…";
@@ -398,6 +546,8 @@ async function refreshMinerStatus() {
       let list = [];
       try {
         list = await api("/proposals");
+          try { await refreshObservations(list); } catch(e) { /* ignore */ }
+
       } catch (e) {
         const tr = document.createElement("tr");
         tr.innerHTML = `<td colspan="10" class="mono">ERROR loading /proposals: ${e.message}</td>`;
@@ -424,11 +574,20 @@ async function refreshMinerStatus() {
           <td class="mono">${p.action_target || ""}</td>
           <td class="small">${escapeHtml(explText)}</td>
           <td class="small mono">${ev}</td>
-          <td class="small">${escapeHtml(nextText)}</td>
+          <td class="small">
+            ${escapeHtml(nextText)}
+            <div class="small" style="margin-top:6px">
+              <a class="navlink" style="padding:0;border:none" href="${proposalEventsHref(p)}">Se relevante hendelser →</a>
+            </div>
+          </td>
           <td class="right">
             <button class="secondary" data-act="test" ${p.state==="REJECTED"?"disabled":""}>Test</button>
             <button class="ok" data-act="activate" ${p.state==="REJECTED"?"disabled":""}>Activate</button>
             <button class="danger" data-act="reject" ${p.state==="REJECTED"?"disabled":""}>Reject</button>
+          
+            <button class="secondary" data-fb="USEFUL">👍 Nyttig</button>
+            <button class="secondary" data-fb="NOT_USEFUL">👎 Ikke nyttig</button>
+            <div class="small muted" data-fb-status style="margin-top:6px;"></div>
           </td>
         `;
         tr.querySelectorAll("button[data-act]").forEach(btn => {
@@ -445,6 +604,23 @@ async function refreshMinerStatus() {
             }
           });
         });
+        
+        // Feedback buttons (operator loop)
+        tr.querySelectorAll("button[data-fb]").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const verdict = btn.getAttribute("data-fb");
+            const statusEl = tr.querySelector("[data-fb-status]");
+            if (statusEl) statusEl.textContent = "Sender…";
+            btn.disabled = true;
+            try {
+              const out = await sendProposalFeedback(p.proposal_id, verdict, null);
+              if (statusEl) statusEl.textContent = out.ok ? ("Registrert: " + verdict) : ("Feil: " + (out.error || "ukjent"));
+            } finally {
+              btn.disabled = false;
+            }
+          });
+        });
+
         body.appendChild(tr);
       }
     }

@@ -1,5 +1,5 @@
 # models/db_event.py
-from sqlalchemy import Column, Integer, String, DateTime, JSON, Index
+from sqlalchemy import Column, Integer, String, DateTime, JSON, Index, text
 from db import Base
 
 
@@ -20,3 +20,4 @@ class EventDB(Base):
     org_id = Column(String, nullable=False)
     home_id = Column(String, nullable=False)
     subject_id = Column(String, nullable=False)
+    stream_id = Column(String, nullable=False, server_default=text("'prod'"))

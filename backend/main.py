@@ -83,16 +83,18 @@ def health_detail(scope: "AuthScope" = Depends(require_scope)):
         out["reasons"].append(reason)
 
     # ---- ingest lag (events) ----
+    stream_id = os.getenv("AGINGOS_STREAM_ID", "prod")
     db = SessionLocal()
     try:
         row = (
             db.execute(
                 text("""
-                SELECT MAX("timestamp") AS max_ts, COUNT(*)::int AS n
+                SELECT MAX(\"timestamp\") AS max_ts, COUNT(*)::int AS n
                 FROM events
                 WHERE org_id = :org AND home_id = :home AND subject_id = :sub
-            """),
-                {"org": scope.org_id, "home": scope.home_id, "sub": scope.subject_id},
+                  AND stream_id = :stream_id
+                """),
+                {"org": scope.org_id, "home": scope.home_id, "sub": scope.subject_id, "stream_id": stream_id},
             )
             .mappings()
             .one()
@@ -584,7 +586,7 @@ def episodes_svc_build_once(
 
 
 @app.post("/event")
-def receive_event(event: Event, scope: AuthScope = Depends(require_scope)):
+def receive_event(event: Event, stream_id: str = Query(default="prod"), scope: AuthScope = Depends(require_scope)):
     db = SessionLocal()
     try:
         db_event = EventDB(
@@ -596,6 +598,9 @@ def receive_event(event: Event, scope: AuthScope = Depends(require_scope)):
             home_id=scope.home_id,
             subject_id=scope.subject_id,
         )
+        # P1-7: force stream_id onto row (robust even if constructor args change)
+        db_event.stream_id = stream_id
+
         db.add(db_event)
         try:
             db.commit()
@@ -603,7 +608,7 @@ def receive_event(event: Event, scope: AuthScope = Depends(require_scope)):
         except IntegrityError as e:
             db.rollback()
             constraint = getattr(getattr(e.orig, "diag", None), "constraint_name", None)
-            if constraint == "events_event_id_unique":
+            if constraint in ("events_event_id_unique","ux_events_scope_event_id","ux_events_scope_stream_event_id"):
                 return {"received": True, "deduped": True}
             raise HTTPException(
                 status_code=500, detail=f"db integrity error: {constraint or str(e)}"
@@ -1575,6 +1580,7 @@ def list_events(
     until: Optional[datetime] = Query(default=None),
     before: Optional[datetime] = Query(default=None),
     limit: int = Query(default=100, ge=1, le=1000),
+    stream_id: str = Query(default="prod"),
     scope: "AuthScope" = Depends(require_scope),
 ) -> list[Event]:
     db = SessionLocal()
@@ -1587,6 +1593,9 @@ def list_events(
             EventDB.home_id == scope.home_id,
             EventDB.subject_id == scope.subject_id,
         )
+
+        # Stream enforcement (P1-7): default 'prod' unless specified
+        query = query.filter(EventDB.stream_id == stream_id)
 
         if category:
             query = query.filter(EventDB.category == category)

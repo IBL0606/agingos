@@ -1,5 +1,6 @@
 # services/anomaly_scoring.py
 from __future__ import annotations
+import os
 
 import math
 from dataclasses import dataclass
@@ -75,6 +76,7 @@ def _get_latest_model_end(db: Session, scope: AuthScope) -> Optional[str]:
             SELECT model_end
             FROM baseline_model_status
             WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
+              AND stream_id = :stream_id
             ORDER BY model_end DESC
             LIMIT 1
             """
@@ -83,6 +85,7 @@ def _get_latest_model_end(db: Session, scope: AuthScope) -> Optional[str]:
                 "org_id": scope.org_id,
                 "home_id": scope.home_id,
                 "subject_id": scope.subject_id,
+                "stream_id": os.getenv("AGINGOS_STREAM_ID","prod"),
             },
         )
         .mappings()

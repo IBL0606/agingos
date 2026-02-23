@@ -249,7 +249,13 @@
         </div>
 
       <div>
-        <label>Limit:</label>
+        <label>Limit:
+      <span class="muted" style="margin-left:12px;">Stream:</span>
+      <select id="stream_id" style="max-width:110px;">
+        <option value="prod">prod</option>
+        <option value="test">test</option>
+      </select>
+</label>
         <select id="limit">
           <option>3</option>
           <option>200</option>
@@ -329,6 +335,21 @@
     </div>
 
   <script>
+  function getStreamId() {
+    try { return String(localStorage.getItem("agingos_stream_id") || "prod").trim() || "prod"; }
+    catch (e) { return "prod"; }
+  }
+  function setStreamId(v) {
+    v = String(v || "prod").trim() || "prod";
+    localStorage.setItem("agingos_stream_id", v);
+    return v;
+  }
+  function eventsUrl(qs) {
+    const s = encodeURIComponent(getStreamId());
+    const q = (qs || "").toString();
+    return "/events?" + q + (q.includes("stream_id=") ? "" : ("&stream_id=" + s));
+  }
+
       // TOPBAR_API_MINI v1
 
       // EVENTS_NOTICE_V1
@@ -720,7 +741,7 @@
       if (state.categories.length === 1) qs.set("category", state.categories[0]);
       if (state.before) qs.set("before", state.before);
 
-      const data = await apiGet("/events?" + qs.toString());
+      const data = await apiGet(eventsUrl(qs.toString()));
       return data;
     }
 
@@ -829,6 +850,19 @@ state.before = page[page.length - 1].timestamp;
     wireEventsUiPrefs();
     loadFresh();
     updateButtons();
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const el = document.getElementById("stream_id");
+    if (!el) return;
+    el.value = getStreamId();
+    el.addEventListener("change", () => {
+      setStreamId(el.value);
+      // trigger reload if function exists
+      try { if (typeof reload === "function") reload(); } catch (e) {}
+      try { if (typeof hent === "function") hent(); } catch (e) {}
+    });
+  });
+
 </script>
 </body>
 </html>
