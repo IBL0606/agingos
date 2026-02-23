@@ -4,6 +4,7 @@ import httpx
 
 # backend/main.py
 from fastapi import Body, Depends, FastAPI, HTTPException, Request
+from starlette.responses import Response
 
 from db import SessionLocal
 from models.event import Event
@@ -33,6 +34,33 @@ from typing import Optional
 from util.time import require_utc_aware
 
 app = FastAPI(title="AgingOS Backend")
+
+
+# P1-5: Deprecation headers for legacy (non-/v1) API paths.
+# - Additive: does not change behavior, only adds headers.
+# - Exempt ops endpoints: /health, /health/detail, /debug/*
+_DEPRECATION_SUNSET = os.getenv("AGINGOS_API_SUNSET_DATE", "2026-06-01")
+
+@app.middleware("http")
+async def add_deprecation_headers(request: Request, call_next):
+    path = request.url.path or ""
+    response: Response = await call_next(request)
+
+    # Only tag legacy backend API routes (not /v1, not ops/debug)
+    if not path.startswith("/v1"):
+        if path.startswith("/health") or path.startswith("/debug"):
+            return response
+
+        # Mark legacy
+        response.headers.setdefault("Deprecation", "true")
+        response.headers.setdefault("Sunset", _DEPRECATION_SUNSET)
+
+        # Simple successor mapping: prefix /v1 + same path
+        # (works for most endpoints; may not exist for some legacy-only paths)
+        successor = "/v1" + path
+        response.headers.setdefault("Link", f'<{successor}>; rel="successor-version"')
+    return response
+
 
 app.include_router(rules_router, dependencies=[Depends(require_scope)])
 app.include_router(deviations_router, dependencies=[Depends(require_scope)])
@@ -283,6 +311,11 @@ def health_detail(scope: "AuthScope" = Depends(require_scope)):
     return out
 
 
+@app.post("/v1/pattern_miner/run_once")
+def pattern_miner_run_once_v1(request: Request, scope: "AuthScope" = Depends(require_scope)):
+    # P1-5: /v1 stable alias; re-use legacy implementation
+    return pattern_miner_run_once(request)
+
 @app.post("/pattern_miner/run_once")
 def pattern_miner_run_once(request: Request):
     # manual trigger for testing (auth already enforced globally)
@@ -512,6 +545,11 @@ def _parse_iso_ts(s: Optional[str]) -> Optional[datetime]:
     return datetime.fromisoformat(s.replace("Z", "+00:00"))
 
 
+@app.post("/v1/episodes_svc/build_once")
+def episodes_svc_build_once_v1(body: EpisodesSvcBuildIn, scope: "AuthScope" = Depends(require_scope)):
+    # P1-5: /v1 stable alias; re-use legacy implementation
+    return episodes_svc_build_once(body=body, scope=scope)
+
 @app.post("/episodes_svc/build_once")
 def episodes_svc_build_once(
     body: EpisodesSvcBuildIn, scope: "AuthScope" = Depends(require_scope)
@@ -584,6 +622,11 @@ def episodes_svc_build_once(
         },
     }
 
+
+@app.post("/v1/event")
+def receive_event_v1(event: Event, stream_id: str = Query(default="prod"), scope: AuthScope = Depends(require_scope)):
+    # P1-5: /v1 stable alias; re-use legacy implementation
+    return receive_event(event=event, scope=scope, stream_id=stream_id)
 
 @app.post("/event")
 def receive_event(event: Event, stream_id: str = Query(default="prod"), scope: AuthScope = Depends(require_scope)):
@@ -769,6 +812,15 @@ def _upsert_monitor_mode(
         },
     )
 
+
+@app.get("/v1/proposals")
+def list_proposals_v1(
+    last: str | None = None,
+    limit: int = Query(default=200, ge=1, le=500),
+    scope: "AuthScope" = Depends(require_scope),
+):
+    # P1-5: /v1 stable alias; forward plain query values
+    return list_proposals(last=last, limit=int(limit), scope=scope)
 
 @app.get("/proposals")
 def list_proposals(
@@ -1573,6 +1625,19 @@ def undo_episode_label(
         db.close()
 
 
+@app.get("/v1/events")
+def list_events_v1(
+    category: Optional[str] = Query(default=None),
+    since: Optional[datetime] = Query(default=None),
+    until: Optional[datetime] = Query(default=None),
+    before: Optional[datetime] = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=1000),
+    stream_id: str = Query(default="prod"),
+    scope: "AuthScope" = Depends(require_scope),
+) -> list[Event]:
+    # P1-5: /v1 stable alias; re-use legacy implementation
+    return list_events(category=category, since=since, until=until, before=before, limit=limit, stream_id=stream_id, scope=scope)
+
 @app.get("/events")
 def list_events(
     category: Optional[str] = Query(default=None),
@@ -1632,6 +1697,11 @@ def list_events(
     finally:
         db.close()
 
+
+@app.get("/v1/subject_state")
+def get_subject_state_v1(scope: "AuthScope" = Depends(require_scope)) -> dict:
+    # P1-5: /v1 stable alias; re-use legacy implementation
+    return get_subject_state(scope=scope)
 
 @app.get("/subject_state")
 def get_subject_state(scope: "AuthScope" = Depends(require_scope)) -> dict:
@@ -1741,6 +1811,11 @@ def on_shutdown():
 # -------------------------
 
 
+@app.post("/v1/proposals/expire_once")
+def proposals_expire_once_v1(scope: "AuthScope" = Depends(require_scope)):
+    # P1-5: /v1 stable alias; re-use legacy implementation
+    return proposals_expire_once()
+
 @app.post("/proposals/expire_once")
 def proposals_expire_once():
     db = SessionLocal()
@@ -1756,6 +1831,11 @@ def proposals_expire_once():
 # Monitor modes (read-back)
 # -------------------------
 
+
+@app.post("/v1/proposals/mine_once")
+def mine_once_v1(scope: "AuthScope" = Depends(require_scope)) -> dict:
+    # P1-5: /v1 stable alias; re-use legacy implementation
+    return mine_once(scope=scope)
 
 @app.post("/proposals/mine_once")
 def mine_once(scope: AuthScope = Depends(require_scope)) -> dict:
@@ -1795,6 +1875,11 @@ def mine_once(scope: AuthScope = Depends(require_scope)) -> dict:
         db.close()
 
 
+@app.get("/v1/proposals/miner_status")
+def proposals_miner_status_v1(scope: "AuthScope" = Depends(require_scope)) -> dict:
+    # P1-5: /v1 stable alias; re-use legacy implementation
+    return proposals_miner_status()
+
 @app.get("/proposals/miner_status")
 def proposals_miner_status() -> dict:
     from db import SessionLocal
@@ -1815,6 +1900,16 @@ def proposals_miner_status() -> dict:
     finally:
         db.close()
 
+
+@app.get("/v1/monitor_modes")
+def list_monitor_modes_v1(
+    monitor_key: str | None = None,
+    room_id: str | None = None,
+    limit: int = Query(default=500, ge=1, le=5000),
+    scope: "AuthScope" = Depends(require_scope),
+):
+    # P1-5: /v1 stable alias; forward plain query values
+    return list_monitor_modes(monitor_key=monitor_key, room_id=room_id, limit=int(limit), scope=scope)
 
 @app.get("/monitor_modes")
 def list_monitor_modes(
