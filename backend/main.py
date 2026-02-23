@@ -23,6 +23,7 @@ from routes.rules import router as rules_router
 from routes.deviations import router as deviations_router
 from routes.baseline import router as baseline_router
 from routes.anomalies import router as anomalies_router
+from routes.notification_policy import router as notification_router
 
 from fastapi import Query
 from sqlalchemy import text
@@ -66,6 +67,14 @@ app.include_router(rules_router, dependencies=[Depends(require_scope)])
 app.include_router(deviations_router, dependencies=[Depends(require_scope)])
 app.include_router(baseline_router, dependencies=[Depends(require_scope)])
 app.include_router(anomalies_router, dependencies=[Depends(require_scope)])
+app.include_router(notification_router, dependencies=[Depends(require_scope)])
+
+# P1-5: /v1 stable contract (additive). Keep legacy paths working.
+app.include_router(rules_router, prefix="/v1", dependencies=[Depends(require_scope)])
+app.include_router(deviations_router, prefix="/v1", dependencies=[Depends(require_scope)])
+app.include_router(baseline_router, prefix="/v1", dependencies=[Depends(require_scope)])
+app.include_router(anomalies_router, prefix="/v1", dependencies=[Depends(require_scope)])
+app.include_router(notification_router, prefix="/v1", dependencies=[Depends(require_scope)])
 
 
 @app.get("/health")
@@ -184,10 +193,28 @@ def health_detail(scope: "AuthScope" = Depends(require_scope)):
                         "home": scope.home_id,
                         "sub": scope.subject_id,
                     },
+
                 )
                 .mappings()
                 .one_or_none()
             )
+
+        except Exception as e:
+            # Fail-soft if table does not exist yet (e.g. migrations not applied)
+            msg = str(e)
+            if "subject_state" in msg and ("does not exist" in msg or "UndefinedTable" in msg):
+                return {
+                    "available": False,
+                    "org_id": scope.org_id,
+                    "home_id": scope.home_id,
+                    "subject_id": scope.subject_id,
+                    "state": "unknown",
+                    "state_since": None,
+                    "last_event_ts": None,
+                    "updated_at": None,
+                    "note": "subject_state table missing (migrations not applied yet)",
+                }
+            raise
         except Exception as e:
             from sqlalchemy.exc import ProgrammingError
 
@@ -1489,6 +1516,12 @@ def set_episode_label(
     Persist a user label for an episode (audit trail in episode_labels).
     """
     from sqlalchemy import text
+    from uuid import UUID
+    try:
+        UUID(str(episode_id))
+    except Exception:
+        raise HTTPException(status_code=400, detail="episode_id must be a UUID")
+
 
     lbl = (body.label or "").strip().lower()
     if lbl not in ("human", "pet", "unknown"):
@@ -1550,6 +1583,12 @@ def undo_episode_label(
     Undo a previous label by inserting an undo record that targets label_id.
     """
     from sqlalchemy import text
+    from uuid import UUID
+    try:
+        UUID(str(episode_id))
+    except Exception:
+        raise HTTPException(status_code=400, detail="episode_id must be a UUID")
+
 
     actor = (body.actor or "").strip()
     if not actor:
@@ -1711,6 +1750,21 @@ def get_subject_state(scope: "AuthScope" = Depends(require_scope)) -> dict:
     """
     db = SessionLocal()
     try:
+        # Fail-soft if table is missing (migrations not applied yet)
+        chk = db.execute(text("SELECT to_regclass(\x27public.subject_state\x27) AS t")).mappings().one()
+        if not chk.get("t"):
+            return {
+                "available": False,
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+                "state": "unknown",
+                "state_since": None,
+                "last_event_ts": None,
+                "updated_at": None,
+                "note": "subject_state table missing (migrations not applied yet)",
+            }
+
         row = (
             db.execute(
                 text(
