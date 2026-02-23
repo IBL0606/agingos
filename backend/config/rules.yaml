@@ -15,19 +15,19 @@ rules:
     lookback_minutes: 240
     expire_after_minutes: 720
   R-004:
-    enabled_in_scheduler: false
+    enabled_in_scheduler: true
   R-005:
-    enabled_in_scheduler: false
+    enabled_in_scheduler: true
   R-006:
-    enabled_in_scheduler: false
+    enabled_in_scheduler: true
   R-007:
-    enabled_in_scheduler: false
+    enabled_in_scheduler: true
   R-008:
-    enabled_in_scheduler: false
+    enabled_in_scheduler: true
   R-009:
-    enabled_in_scheduler: false
+    enabled_in_scheduler: true
   R-010:
-    enabled_in_scheduler: false
+    enabled_in_scheduler: true
 scheduler:
   interval_minutes: 5
   default_subject_key: default

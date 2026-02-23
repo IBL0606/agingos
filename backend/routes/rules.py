@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from db import get_db
+from config.rule_config import load_rule_config
 from models.rule import Rule
 from models.rule import RuleType
 
@@ -54,7 +55,55 @@ def _apply_proposal_timestamps(params: dict) -> dict:
 
 @router.get("")
 def list_rules(db: Session = Depends(get_db)):
-    return db.query(Rule).order_by(Rule.id.desc()).all()
+    # YAML is source of truth for which rules exist / are scheduler-enabled.
+    cfg = load_rule_config()
+    yaml_rules = (cfg.raw.get("rules", {}) if isinstance(cfg.raw, dict) else {}) or {}
+
+    # DB holds metadata (id/created_at/severity/is_enabled/params used elsewhere).
+    db_rows = db.query(Rule).all()
+    by_name = {r.name: r for r in db_rows if getattr(r, "name", None)}
+
+    out = []
+    for name in sorted(yaml_rules.keys()):
+        y = dict(yaml_rules.get(name) or {})
+        enabled_in_scheduler = bool(y.get("enabled_in_scheduler", False))
+        lookback_minutes = y.get("lookback_minutes")
+        expire_after_minutes = y.get("expire_after_minutes")
+        params = dict(y.get("params", {}) or {})
+
+        r = by_name.get(name)
+        out.append({
+            "name": name,
+            "enabled_in_scheduler": enabled_in_scheduler,
+            "lookback_minutes": lookback_minutes,
+            "expire_after_minutes": expire_after_minutes,
+            "params": (r.params if r is not None else params) or {},
+            "severity": (r.severity if r is not None else 2),
+            "is_enabled": (r.is_enabled if r is not None else True),
+            "id": (r.id if r is not None else None),
+            "created_at": (r.created_at.isoformat() if (r is not None and r.created_at is not None) else None),
+            "rule_type": (str(r.rule_type) if r is not None else None),
+        })
+
+    # Include DB-only rules too (if any exist that are not in YAML)
+    for name, r in sorted(by_name.items()):
+        if name in yaml_rules:
+            continue
+        out.append({
+            "name": name,
+            "enabled_in_scheduler": False,
+            "lookback_minutes": None,
+            "expire_after_minutes": None,
+            "params": r.params or {},
+            "severity": r.severity,
+            "is_enabled": r.is_enabled,
+            "id": r.id,
+            "created_at": (r.created_at.isoformat() if r.created_at is not None else None),
+            "rule_type": str(r.rule_type),
+            "note": "db_only",
+        })
+
+    return out
 
 
 @router.post("")
