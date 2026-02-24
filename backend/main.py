@@ -332,8 +332,14 @@ def health_detail(scope: "AuthScope" = Depends(require_scope)):
         out["components"]["anomalies_runner"]["status"] = "DEGRADED"
         degrade("DEGRADED", "anomalies runner has last_error_at set")
     elif not rs.get("last_ok_at") and not rs.get("last_run_at"):
-        out["components"]["anomalies_runner"]["status"] = "DEGRADED"
-        degrade("DEGRADED", "anomalies runner has never run in this process")
+        # MVP: after restart, runner status is process-local; don't degrade if scheduler is configured.
+        job_ids = set(j.get("id") for j in out["components"]["scheduler"].get("jobs", []))
+        if out["components"]["scheduler"].get("running") and "anomalies_job" in job_ids:
+            rs["note"] = "runner status is process-local and not yet populated after restart; anomalies_job is scheduled"
+            out["components"]["anomalies_runner"]["status"] = "OK"
+        else:
+            out["components"]["anomalies_runner"]["status"] = "DEGRADED"
+            degrade("DEGRADED", "anomalies runner has never run in this process")
 
     return out
 
