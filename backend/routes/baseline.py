@@ -56,7 +56,7 @@ def _get_instance_user_id(db) -> str:
 def baseline_status(scope: AuthScope = Depends(require_scope)) -> dict[str, Any]:
     db = SessionLocal()
     try:
-        uid = _resolve_user_id_for_scope(db, scope)
+        uid = (scope.user_id or _resolve_user_id_for_scope(db, scope))
 
         row = (
             db.execute(
@@ -81,7 +81,7 @@ def baseline_status(scope: AuthScope = Depends(require_scope)) -> dict[str, Any]
                 FROM baseline_model_status
                 WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
                   AND user_id = CAST(:uid AS uuid)
-                ORDER BY model_end DESC
+                ORDER BY computed_at DESC
                 LIMIT 1
                 """
                 ),
@@ -138,7 +138,7 @@ def baseline_dev(
 ) -> dict[str, Any]:
     db = SessionLocal()
     try:
-        uid = _resolve_user_id_for_scope(db, scope)
+        uid = (scope.user_id or _resolve_user_id_for_scope(db, scope))
 
         status = (
             db.execute(

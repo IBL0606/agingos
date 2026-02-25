@@ -9,6 +9,17 @@ from services.rules.context import RuleContext
 
 RULE_ID = "R-009"
 
+def _params(ctx: RuleContext) -> Dict[str, Any]:
+    p = ctx.params or {}
+    if not isinstance(p, dict):
+        return {}
+    nested = p.get("params")
+    if isinstance(nested, dict):
+        return dict(nested)
+    return dict(p)
+
+
+
 
 def _get_int(p: Dict[str, Any], key: str, default: int) -> int:
     try:
@@ -29,7 +40,7 @@ def _last_event_ts(ctx: RuleContext, categories: Optional[List[str]] = None) -> 
 
 
 def eval_r009_ingest_stopped(ctx: RuleContext) -> List[DeviationV1]:
-    p = dict(ctx.params or {})
+    p = _params(ctx)
     max_age_min = _get_int(p, "max_age_minutes", 15)
 
     cats = p.get("liveness_categories")

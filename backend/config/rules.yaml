@@ -31,3 +31,16 @@ rules:
 scheduler:
   interval_minutes: 5
   default_subject_key: default
+R-002:
+  params:
+    allowed_entity_ids:
+    - binary_sensor.inngangsdor_contact
+R-001:
+  params:
+    motion_categories:
+    - presence
+    - motion
+    motion_on_value: 'on'
+R-009:
+  params:
+    stream_id: prod

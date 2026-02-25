@@ -151,6 +151,7 @@
     <div>
       <div class="topbar-title">AgingOS Console</div>
       <div class="nav">
+        <a class="navlink" href="./alarms.html">Alarmer</a>
         <a class="navlink active" href="./index.html">Status</a>
         <a class="navlink" href="./events.html">Events</a>
         <a class="navlink" href="./anomalies.html">Anomalier</a>
@@ -183,6 +184,7 @@
 <div class="statusbar" id="statusbar">
   
     <span class="statuschip"><span class="dot" id="dotSystem"></span><span>SYSTEM</span><span class="pill" id="stSystem">ukjent</span></span>
+  <a class="statuschip" href="./alarms.html" title="Åpne alarmer (regler/deviations)"><span class="dot" id="dotAlarms"></span><span>ALARMS</span><span class="pill" id="stAlarms">—</span></a>
 <span class="statuschip"><span class="dot" id="dotBackend"></span><span>Backend</span><span class="pill" id="stBackend">ukjent</span></span>
   <span class="statuschip"><span class="dot" id="dotAI"></span><span>AI</span><span class="pill" id="stAI">ukjent</span></span>
   <span class="statuschip"><span class="dot" id="dotScheduler"></span><span>Scheduler</span><span class="pill" id="stScheduler">ukjent</span></span>
@@ -1536,7 +1538,35 @@ if ($("refreshStatusBtn")) $("refreshStatusBtn").onclick = () => refreshSystemSt
       try { await refreshSystemStatus(); } catch (_) {}
     };
 
-window.addEventListener("load", () => { try { refreshSystemStatus(); } catch (_) {} });
+
+  async function refreshAlarmsChip(){
+    const dot = document.getElementById("dotAlarms");
+    const pill = document.getElementById("stAlarms");
+    if(!dot || !pill) return;
+
+    try{
+      const key = (localStorage.getItem("apiKey") || localStorage.getItem("agingos_api_key") || "").trim();
+      const headers = key ? {"X-API-Key": key} : {};
+      const res = await fetch("/api/v1/deviations?limit=200", {headers});
+      const txt = await res.text();
+      let arr = [];
+      try{ arr = JSON.parse(txt); }catch{ arr = []; }
+
+      const active = arr.filter(r => String(r.status||"").toUpperCase() !== "CLOSED");
+      const open = active.filter(r => String(r.status||"").toUpperCase() === "OPEN");
+      const highOpen = open.filter(r => String(r.severity||"").toUpperCase() === "HIGH");
+
+      dot.className = "dot";
+      if(highOpen.length>0){ dot.classList.add("err"); pill.textContent = `${highOpen.length} HIGH OPEN`; }
+      else if(open.length>0){ dot.classList.add("deg"); pill.textContent = `${open.length} OPEN`; }
+      else if(active.length>0){ dot.classList.add("ok"); pill.textContent = `${active.length} aktive`; }
+      else { pill.textContent = "ingen"; }
+    }catch(e){
+      pill.textContent = "ukjent";
+    }
+  }
+
+window.addEventListener("load", () => { try { refreshSystemStatus(); refreshAlarmsChip(); } catch (_) {} });
 
 
 
@@ -1550,8 +1580,7 @@ window.addEventListener("load", () => { try { refreshSystemStatus(); } catch (_)
       if (el) obs.observe(el, { characterData:true, childList:true, subtree:true });
     });
     // Also re-apply after refresh button clicks
-    const btn = document.getElementById("refreshStatusBtn");
-    if (btn) btn.addEventListener("click", () => { setTimeout(() => { try { _indexApplyColors(); } catch(e) {} }, 0); });
+    if (btn) btn.addEventListener("click", () => { try { refreshAlarmsChip(); } catch(e) {} setTimeout(() => { try { _indexApplyColors(); } catch(e) {} }, 0); });
   })();
 
 </script>

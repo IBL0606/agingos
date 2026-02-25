@@ -8,6 +8,17 @@ from services.rules.context import RuleContext
 
 RULE_ID = "R-001"
 
+def _params(ctx: RuleContext) -> dict:
+    # ctx.params can be either params dict OR full rule config dict with nested "params"
+    p = ctx.params or {}
+    if not isinstance(p, dict):
+        return {}
+    nested = p.get("params")
+    if isinstance(nested, dict):
+        return nested
+    return p
+
+
 
 def _motion_categories(ctx: RuleContext) -> list[str]:
     """
@@ -15,7 +26,7 @@ def _motion_categories(ctx: RuleContext) -> list[str]:
     Back-compat: motion_category: "motion"
     Default: ["motion"]
     """
-    p = ctx.params or {}
+    p = _params(ctx)
     cats = p.get("motion_categories")
     if isinstance(cats, list) and cats:
         return [str(x) for x in cats]
@@ -26,7 +37,7 @@ def _motion_categories(ctx: RuleContext) -> list[str]:
 
 
 def _payload_state_keys(ctx: RuleContext) -> list[str]:
-    p = ctx.params or {}
+    p = _params(ctx)
     keys = p.get("payload_state_keys")
     if isinstance(keys, list) and keys:
         return [str(x) for x in keys]
@@ -34,7 +45,7 @@ def _payload_state_keys(ctx: RuleContext) -> list[str]:
 
 
 def _motion_on_value(ctx: RuleContext) -> str:
-    p = ctx.params or {}
+    p = _params(ctx)
     v = p.get("motion_on_value")
     if isinstance(v, str) and v.strip():
         return v.strip()

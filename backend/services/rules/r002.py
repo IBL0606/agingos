@@ -11,8 +11,16 @@ RULE_ID = "R-002"
 
 
 def _params(ctx: RuleContext) -> dict:
+    # ctx.params can be either:
+    #  A) the params dict itself, OR
+    #  B) the full rule config dict that contains a nested "params" dict.
     p = ctx.params or {}
-    return p if isinstance(p, dict) else {}
+    if not isinstance(p, dict):
+        return {}
+    nested = p.get("params")
+    if isinstance(nested, dict):
+        return nested
+    return p
 
 
 def _category(ctx: RuleContext) -> str:
@@ -33,6 +41,28 @@ def _trigger_value(ctx: RuleContext) -> str:
     p = _params(ctx)
     v = p.get("trigger_value")
     return str(v).strip() if isinstance(v, str) and v.strip() else "open"
+
+
+def _allowed_entity_ids(ctx: RuleContext) -> set[str]:
+    """
+    Optional allowlist for which door entity_ids count as 'ytterdør' for this rule.
+    Configure in backend/config/rules.yaml:
+
+      R-002:
+        params:
+          allowed_entity_ids:
+            - binary_sensor.inngangsdor_contact
+    """
+    p = _params(ctx)
+    v = p.get("allowed_entity_ids")
+    if isinstance(v, list) and v:
+        out: set[str] = set()
+        for x in v:
+            sx = str(x).strip()
+            if sx:
+                out.add(sx)
+        return out
+    return set()
 
 
 def _night_window(ctx: RuleContext) -> tuple[time, time]:
@@ -77,6 +107,7 @@ def _event_state(payload: object, ctx: RuleContext) -> str | None:
 def eval_r002_front_door_open_at_night(ctx: RuleContext) -> List[DeviationV1]:
     cat = _category(ctx)
     tv = _trigger_value(ctx)
+    allowed = _allowed_entity_ids(ctx)
 
     rows = (
         ctx.session.query(EventDB)
@@ -89,6 +120,14 @@ def eval_r002_front_door_open_at_night(ctx: RuleContext) -> List[DeviationV1]:
 
     evidence: List[str] = []
     for r in rows:
+        # Allowlist: only treat selected door entity_ids as "ytterdør" for this rule.
+        if allowed:
+            ent = None
+            if isinstance(r.payload, dict):
+                ent = r.payload.get("entity_id")
+            if not ent or str(ent) not in allowed:
+                continue
+
         state = _event_state(r.payload, ctx)
         if state == tv and _is_night(r.timestamp, ctx):
             evidence.append(str(r.id))
