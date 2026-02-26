@@ -14,6 +14,7 @@ services:
       AGINGOS_API_KEYS: ${AGINGOS_API_KEYS:-}
       AI_BOT_ENABLED: ${AI_BOT_ENABLED:-false}
       AI_BOT_BASE_URL: ${AI_BOT_BASE_URL:-http://ai-bot:8010}
+      AGINGOS_STREAM_ID: ${AGINGOS_STREAM_ID:-prod}
     depends_on:
       - db
 

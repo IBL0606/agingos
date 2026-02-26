@@ -10,6 +10,9 @@ rules:
     enabled_in_scheduler: true
     lookback_minutes: 240
     expire_after_minutes: 720
+    params:
+      allowed_entity_ids:
+        - binary_sensor.inngangsdor_contact
   R-003:
     enabled_in_scheduler: true
     lookback_minutes: 240
@@ -26,6 +29,10 @@ rules:
     enabled_in_scheduler: true
   R-009:
     enabled_in_scheduler: true
+    params:
+      stream_id: prod
+      liveness_categories: ["ha_snapshot"]
+      max_age_minutes: 75
   R-010:
     enabled_in_scheduler: true
 scheduler:
@@ -41,6 +48,3 @@ R-001:
     - presence
     - motion
     motion_on_value: 'on'
-R-009:
-  params:
-    stream_id: prod

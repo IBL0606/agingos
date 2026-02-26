@@ -28,11 +28,13 @@ def _get_int(p: Dict[str, Any], key: str, default: int) -> int:
         return default
 
 
-def _last_event_ts(ctx: RuleContext, categories: Optional[List[str]] = None) -> Optional[datetime]:
+def _last_event_ts(ctx: RuleContext, categories: Optional[List[str]] = None, stream_id: Optional[str] = None) -> Optional[datetime]:
     q = ctx.session.query(EventDB).order_by(EventDB.timestamp.desc())
     q = q.filter(EventDB.org_id == ctx.org_id)
     q = q.filter(EventDB.home_id == ctx.home_id)
     q = q.filter(EventDB.subject_id == ctx.subject_id)
+    if stream_id:
+        q = q.filter(EventDB.stream_id == stream_id)
     if categories:
         q = q.filter(EventDB.category.in_(categories))
     row = q.first()
@@ -49,7 +51,7 @@ def eval_r009_ingest_stopped(ctx: RuleContext) -> List[DeviationV1]:
     else:
         categories = ["presence", "motion", "door", "heartbeat"]
 
-    last_ts = _last_event_ts(ctx, categories=categories)
+    last_ts = _last_event_ts(ctx, categories=categories, stream_id=str(p.get('stream_id') or '').strip() or None)
     lag_min = None if not last_ts else int((ctx.now - last_ts).total_seconds() // 60)
 
     if last_ts and lag_min is not None and lag_min <= max_age_min:

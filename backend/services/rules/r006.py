@@ -10,6 +10,19 @@ from services.rules.context import RuleContext
 RULE_ID = "R-006"
 
 
+def _params(ctx: RuleContext) -> dict:
+    # ctx.params can be either:
+    #  A) the params dict itself, OR
+    #  B) the full rule config dict that contains a nested "params" dict.
+    p = ctx.params or {}
+    if not isinstance(p, dict):
+        return {}
+    nested = p.get("params")
+    if isinstance(nested, dict):
+        return nested
+    return p
+
+
 def _get_str(p: Dict[str, Any], key: str, default: str) -> str:
     v = p.get(key)
     return str(v) if isinstance(v, (str, int, float)) and str(v) else default
@@ -56,7 +69,7 @@ def _has_presence_on(rows: List[EventDB], room_id: str) -> bool:
 
 
 def eval_r006_no_livingroom_daytime_activity(ctx: RuleContext) -> List[DeviationV1]:
-    p = dict(ctx.params or {})
+    p = _params(ctx)
     tz_name = _get_str(p, "tz", "Europe/Oslo")
     day_start = _get_int(p, "day_start_hour", 8)
     day_end = _get_int(p, "day_end_hour", 20)
@@ -66,6 +79,11 @@ def eval_r006_no_livingroom_daytime_activity(ctx: RuleContext) -> List[Deviation
 
     w_since, w_until = _day_window_utc(ctx.until, tz_name, day_start, day_end)
 
+    # Guard: only evaluate *within* the day window.
+    # Otherwise this rule can incorrectly trigger at night.
+    if ctx.now < w_since or ctx.now >= w_until:
+        return []
+
     # Query presence + door in window (single pass)
     rows = (
         ctx.session.query(EventDB)
@@ -74,7 +92,7 @@ def eval_r006_no_livingroom_daytime_activity(ctx: RuleContext) -> List[Deviation
         .filter(EventDB.subject_id == ctx.subject_id)
         .filter(EventDB.timestamp >= w_since)
         .filter(EventDB.timestamp < w_until)
-        .filter(EventDB.category.in_(["presence", "door"]))
+        .filter(EventDB.category.in_(["presence", "motion", "door"]))
         .order_by(EventDB.timestamp.asc())
         .all()
     )
@@ -112,7 +130,7 @@ def eval_r006_no_livingroom_daytime_activity(ctx: RuleContext) -> List[Deviation
         "front_door_room_id": front_door_room,
         "door_seen": door_seen,
         "other_presence": other_presence,
-        "event_ids": [str(r.event_id) for r in rows[:50]],  # cap
+        "event_ids": [str(r.id) for r in rows[:50]],  # cap
     }
 
     return [
