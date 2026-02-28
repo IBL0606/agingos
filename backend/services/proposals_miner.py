@@ -68,7 +68,7 @@ def _upsert_proposal(
     action_payload: dict[str, Any],
     window_start: datetime | None,
     window_end: datetime | None,
-) -> None:
+) -> int:
     """
     Upsert only against "open" proposals (NEW/TESTING/ACTIVE).
     If the only historical row is REJECTED, we insert a new row (no conflict).
@@ -104,11 +104,11 @@ def _upsert_proposal(
           action_payload = EXCLUDED.action_payload,
           window_start = EXCLUDED.window_start,
           window_end = EXCLUDED.window_end
-        ;
+        RETURNING proposal_id;
         """
     )
 
-    db.execute(
+    res = db.execute(
         q,
         dict(
             org_id=org_id,
@@ -126,6 +126,68 @@ def _upsert_proposal(
             window_end=window_end,
         ),
     )
+    return int(res.scalar_one())
+
+
+def _link_proposal(
+    db: Session,
+    *,
+    org_id: str,
+    home_id: str,
+    subject_id: str,
+    proposal_id: int,
+    anomaly_episode_id: int | None = None,
+    deviation_id: int | None = None,
+    episode_id: str | None = None,
+    link_type: str = "DERIVED",
+) -> tuple[bool, str | None]:
+    # Fail-soft + idempotent: do not duplicate links.
+    try:
+        q = text(
+            """
+            INSERT INTO proposal_links (
+              org_id, home_id, subject_id,
+              proposal_id,
+              deviation_id, episode_id, anomaly_episode_id,
+              link_type
+            )
+            SELECT
+              :org_id, :home_id, :subject_id,
+              :proposal_id,
+              :deviation_id, :episode_id, :anomaly_episode_id,
+              :link_type
+            WHERE NOT EXISTS (
+              SELECT 1 FROM proposal_links pl
+              WHERE pl.org_id=:org_id AND pl.home_id=:home_id AND pl.subject_id=:subject_id
+                AND pl.proposal_id=:proposal_id
+                AND pl.deviation_id IS NOT DISTINCT FROM :deviation_id
+                AND pl.anomaly_episode_id IS NOT DISTINCT FROM :anomaly_episode_id
+                AND pl.episode_id IS NOT DISTINCT FROM :episode_id
+            );
+            """
+        )
+        db.execute(
+            q,
+            {
+                "org_id": org_id,
+                "home_id": home_id,
+                "subject_id": subject_id,
+                "proposal_id": proposal_id,
+                "deviation_id": deviation_id,
+                "episode_id": episode_id,
+                "anomaly_episode_id": anomaly_episode_id,
+                "link_type": link_type,
+            },
+        )
+    except Exception as e:
+        # Do not break miner if linking fails, but MUST rollback to clear aborted tx
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return (False, f"{type(e).__name__}: {e}")
+
+    return (True, None)
 
 
 def mine_proposals(
@@ -142,12 +204,17 @@ def mine_proposals(
     """
     now = now or utcnow()
 
+    links_ok = 0
+    links_failed = 0
+    links_errors: list[str] = []
+
     # 1) NIGHT_ACTIVITY_EARLY_SIGNAL_1_OF_7
     # Define "night" using Europe/Oslo local hour: hour>=22 OR hour<7
     night_q = text(
         """
         WITH ae AS (
           SELECT
+            id,
             start_ts,
             (start_ts AT TIME ZONE 'Europe/Oslo') AS local_ts
           FROM anomaly_episodes
@@ -174,7 +241,8 @@ def mine_proposals(
         )
         SELECT
           nights_over_threshold,
-          per_night
+          per_night,
+          (SELECT MAX(id) FROM ae) AS any_episode_id
         FROM windowed
         WHERE nights_over_threshold >= 1
         ;
@@ -211,7 +279,7 @@ def mine_proposals(
                 "data": {"nights_over_threshold": evidence["nights_over_threshold"]},
             }
         ]
-        _upsert_proposal(
+        pid = _upsert_proposal(
             db,
             org_id=scope.org_id,
             home_id=scope.home_id,
@@ -232,6 +300,23 @@ def mine_proposals(
             window_start=now - timedelta(days=7),
             window_end=now,
         )
+        any_id = r.get('any_episode_id')
+        if any_id is not None:
+            ok, err = _link_proposal(
+                db,
+                org_id=scope.org_id,
+                home_id=scope.home_id,
+                subject_id=subject_id,
+                proposal_id=pid,
+                anomaly_episode_id=int(any_id),
+                link_type='DERIVED_FROM_ANOMALY_EPISODE',
+            )
+            if ok:
+                links_ok += 1
+            else:
+                links_failed += 1
+                if err:
+                    links_errors.append(err)
         night_upserts += 1
 
     # 2) DOOR_ANOMALY_BURST_3_OF_14
@@ -240,6 +325,7 @@ def mine_proposals(
         """
         WITH ae AS (
           SELECT
+            id,
             start_ts,
             reasons,
             reasons_last,
@@ -266,14 +352,15 @@ def mine_proposals(
         agg AS (
           SELECT
             COALESCE(SUM(cnt), 0)::int AS door_anomaly_count,
+            (SELECT MAX(id) FROM ae) AS any_episode_id,
             ARRAY_AGG(
               jsonb_build_object('date', local_date::text, 'count', cnt)
               ORDER BY local_date DESC
             ) AS per_day
           FROM door
         )
-        SELECT door_anomaly_count, per_day
-        FROM agg
+        SELECT door_anomaly_count, per_day, any_episode_id
+          FROM agg
         WHERE door_anomaly_count >= 3
         ;
         """
@@ -310,7 +397,7 @@ def mine_proposals(
                 "data": {"door_anomaly_count": door_anomaly_count},
             }
         ]
-        _upsert_proposal(
+        pid = _upsert_proposal(
             db,
             org_id=scope.org_id,
             home_id=scope.home_id,
@@ -332,6 +419,23 @@ def mine_proposals(
             window_start=now - timedelta(days=14),
             window_end=now,
         )
+        any_id = r.get('any_episode_id')
+        if any_id is not None:
+            ok, err = _link_proposal(
+                db,
+                org_id=scope.org_id,
+                home_id=scope.home_id,
+                subject_id=subject_id,
+                proposal_id=pid,
+                anomaly_episode_id=int(any_id),
+                link_type='DERIVED_FROM_ANOMALY_EPISODE',
+            )
+            if ok:
+                links_ok += 1
+            else:
+                links_failed += 1
+                if err:
+                    links_errors.append(err)
         door_upserts += 1
 
     # 3) MVP_BOOTSTRAP_ANY_L2_1_OF_7
@@ -340,7 +444,8 @@ def mine_proposals(
         """
         SELECT
           COUNT(*)::int AS anomaly_count,
-          MAX(start_ts) AS last_ts
+            MAX(start_ts) AS last_ts,
+            MAX(id)::bigint AS any_episode_id
         FROM anomaly_episodes
         WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
             AND start_ts >= (now() - interval '7 days')
@@ -381,7 +486,7 @@ def mine_proposals(
                 "data": {"anomaly_count": anomaly_count},
             }
         ]
-        _upsert_proposal(
+        pid = _upsert_proposal(
             db,
             org_id=scope.org_id,
             home_id=scope.home_id,
@@ -401,6 +506,23 @@ def mine_proposals(
             window_start=now - timedelta(days=7),
             window_end=now,
         )
+        any_id = r.get('any_episode_id')
+        if any_id is not None:
+            ok, err = _link_proposal(
+                db,
+                org_id=scope.org_id,
+                home_id=scope.home_id,
+                subject_id=subject_id,
+                proposal_id=pid,
+                anomaly_episode_id=int(any_id),
+                link_type='DERIVED_FROM_ANOMALY_EPISODE',
+            )
+            if ok:
+                links_ok += 1
+            else:
+                links_failed += 1
+                if err:
+                    links_errors.append(err)
         bs_upserts += 1
 
     # 4) NIGHT_ACTIVITY_FREQUENT_4_OF_7 (per room)
@@ -491,8 +613,7 @@ def mine_proposals(
                 "data": {"count_7d": nights_hit, "room_id": room_id},
             }
         ]
-
-        _upsert_proposal(
+        pid = _upsert_proposal(
             db,
             org_id=scope.org_id,
             home_id=scope.home_id,
@@ -513,11 +634,30 @@ def mine_proposals(
             window_start=now - timedelta(days=7),
             window_end=now,
         )
+        if episode_ids:
+            ok, err = _link_proposal(
+                db,
+                org_id=scope.org_id,
+                home_id=scope.home_id,
+                subject_id=subject_id,
+                proposal_id=pid,
+                anomaly_episode_id=int(episode_ids[0]),
+                link_type='DERIVED_FROM_ANOMALY_EPISODE',
+            )
+            if ok:
+                links_ok += 1
+            else:
+                links_failed += 1
+                if err:
+                    links_errors.append(err)
         night_room_upserts += 1
 
     return {
         "ts": _utc_iso(now),
         "counts": {
+            "links_ok": links_ok,
+            "links_failed": links_failed,
+            "links_errors": links_errors[:5],
             "night_proposals_upserted": night_upserts,
             "door_proposals_upserted": door_upserts,
             "bootstrap_proposals_upserted": bs_upserts,
