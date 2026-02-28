@@ -56,7 +56,7 @@ def _get_instance_user_id(db) -> str:
 def baseline_status(scope: AuthScope = Depends(require_scope)) -> dict[str, Any]:
     db = SessionLocal()
     try:
-        uid = (scope.user_id or _resolve_user_id_for_scope(db, scope))
+        uid = scope.user_id or _resolve_user_id_for_scope(db, scope)
 
         row = (
             db.execute(
@@ -138,7 +138,7 @@ def baseline_dev(
 ) -> dict[str, Any]:
     db = SessionLocal()
     try:
-        uid = (scope.user_id or _resolve_user_id_for_scope(db, scope))
+        uid = scope.user_id or _resolve_user_id_for_scope(db, scope)
 
         status = (
             db.execute(

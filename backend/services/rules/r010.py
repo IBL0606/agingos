@@ -68,7 +68,9 @@ def _max_sev(a: str, b: str) -> str:
     return a if ra >= rb else b
 
 
-def _iter_presence_events(rows: List[Any], *, since_ts: datetime, until_ts: datetime) -> List[Any]:
+def _iter_presence_events(
+    rows: List[Any], *, since_ts: datetime, until_ts: datetime
+) -> List[Any]:
     """Defensive filtering for test stubs that do not apply SQLAlchemy filters/order_by."""
     out = []
     for r in rows:
@@ -82,7 +84,9 @@ def _iter_presence_events(rows: List[Any], *, since_ts: datetime, until_ts: date
     return out
 
 
-def _find_last_presence_on_per_room(ctx: RuleContext, since_ts: datetime) -> Dict[str, Any]:
+def _find_last_presence_on_per_room(
+    ctx: RuleContext, since_ts: datetime
+) -> Dict[str, Any]:
     # Query presence events (since_ts..until), scan latest->earliest for last "on" per room.
     rows = (
         ctx.session.query(EventDB)
@@ -204,7 +208,7 @@ def eval_r010_sensor_stuck_room_stuck(ctx: RuleContext) -> List[DeviationV1]:
             timestamp=ctx.now,
             severity=overall_sev,
             title="Sensor kan ha hengt seg",
-            explanation="Hvis en sensor står på \"tilstede\" lenge uten å slå av, kan sensoren eller tolkningen være feil. Sjekk rommene som er listet og vurder tiltak.",
+            explanation='Hvis en sensor står på "tilstede" lenge uten å slå av, kan sensoren eller tolkningen være feil. Sjekk rommene som er listet og vurder tiltak.',
             evidence=evidence,
             window=Window(since=since_ts, until=ctx.until),
         )

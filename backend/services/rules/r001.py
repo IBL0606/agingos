@@ -8,6 +8,7 @@ from services.rules.context import RuleContext
 
 RULE_ID = "R-001"
 
+
 def _params(ctx: RuleContext) -> dict:
     # ctx.params can be either params dict OR full rule config dict with nested "params"
     p = ctx.params or {}
@@ -17,7 +18,6 @@ def _params(ctx: RuleContext) -> dict:
     if isinstance(nested, dict):
         return nested
     return p
-
 
 
 def _motion_categories(ctx: RuleContext) -> list[str]:

@@ -99,7 +99,9 @@ def get_policy(scope: AuthScope = Depends(require_scope)) -> PolicyOut:
 
 
 @router.post("/policy/partner_override", response_model=PolicyOut)
-def set_partner_override(body: PartnerOverrideIn, scope: AuthScope = Depends(require_scope)) -> PolicyOut:
+def set_partner_override(
+    body: PartnerOverrideIn, scope: AuthScope = Depends(require_scope)
+) -> PolicyOut:
     require_utc_aware(body.override_until_utc, "override_until_utc")
 
     db = SessionLocal()
@@ -141,7 +143,9 @@ def set_partner_override(body: PartnerOverrideIn, scope: AuthScope = Depends(req
             .one_or_none()
         )
         if not row:
-            raise RuntimeError("partner_override failed: notification_policy row missing after upsert")
+            raise RuntimeError(
+                "partner_override failed: notification_policy row missing after upsert"
+            )
 
         db.commit()
 
@@ -191,7 +195,12 @@ def get_policy_audit(
                     LIMIT :lim
                     """
                 ),
-                {"org": scope.org_id, "home": scope.home_id, "sub": scope.subject_id, "lim": limit},
+                {
+                    "org": scope.org_id,
+                    "home": scope.home_id,
+                    "sub": scope.subject_id,
+                    "lim": limit,
+                },
             )
             .mappings()
             .all()

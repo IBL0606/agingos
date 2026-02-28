@@ -149,7 +149,14 @@ def fetch_events(
               AND category IN ('presence','motion','door')
             ORDER BY "timestamp" ASC, id ASC
             """,
-            (since, until, org_id, home_id, subject_id, os.getenv("AGINGOS_STREAM_ID", "prod")),
+            (
+                since,
+                until,
+                org_id,
+                home_id,
+                subject_id,
+                os.getenv("AGINGOS_STREAM_ID", "prod"),
+            ),
         )
         rows = cur.fetchall()
     out: List[RawEvent] = []

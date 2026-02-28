@@ -30,12 +30,12 @@ class AnomalyEpisodePersisted(BaseModel):
     reasons_last: list[dict] | None = Field(default=None, exclude=True)
     reasons_peak: list[dict] | None = Field(default=None, exclude=True)
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def _mvp_fill_reasons_from_last(self):
         # If persisted 'reasons' is empty, fall back to last/peak reasons.
-        if not getattr(self, 'reasons', None):
-            rl = getattr(self, 'reasons_last', None)
-            rp = getattr(self, 'reasons_peak', None)
+        if not getattr(self, "reasons", None):
+            rl = getattr(self, "reasons_last", None)
+            rp = getattr(self, "reasons_peak", None)
             if rl:
                 self.reasons = rl
             elif rp:

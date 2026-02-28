@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 from models.db_event import EventDB
 from schemas.deviation_v1 import DeviationV1, Window
@@ -22,10 +22,13 @@ def _get_int(p: Dict[str, Any], key: str, default: int) -> int:
         return default
 
 
-def _night_window_utc(until_utc: datetime, tz_name: str, night_start: int, night_end: int) -> tuple[datetime, datetime]:
+def _night_window_utc(
+    until_utc: datetime, tz_name: str, night_start: int, night_end: int
+) -> tuple[datetime, datetime]:
     # Night window anchored to the local date of until_utc.
     try:
         from zoneinfo import ZoneInfo
+
         tz = ZoneInfo(tz_name)
         local = until_utc.astimezone(tz)
         d = local.date()
@@ -34,6 +37,7 @@ def _night_window_utc(until_utc: datetime, tz_name: str, night_start: int, night
         # end is on next day if spans midnight
         if night_start > night_end:
             from datetime import timedelta
+
             d2 = d + timedelta(days=1)
             end_local = datetime(d2.year, d2.month, d2.day, night_end, 0, 0, tzinfo=tz)
         else:
@@ -42,13 +46,20 @@ def _night_window_utc(until_utc: datetime, tz_name: str, night_start: int, night
     except Exception:
         # fallback: treat as UTC, night_start > night_end => crosses midnight
         d = until_utc.date()
-        start_utc = datetime(d.year, d.month, d.day, night_start, 0, 0, tzinfo=timezone.utc)
+        start_utc = datetime(
+            d.year, d.month, d.day, night_start, 0, 0, tzinfo=timezone.utc
+        )
         if night_start > night_end:
             from datetime import timedelta
+
             d2 = d + timedelta(days=1)
-            end_utc = datetime(d2.year, d2.month, d2.day, night_end, 0, 0, tzinfo=timezone.utc)
+            end_utc = datetime(
+                d2.year, d2.month, d2.day, night_end, 0, 0, tzinfo=timezone.utc
+            )
         else:
-            end_utc = datetime(d.year, d.month, d.day, night_end, 0, 0, tzinfo=timezone.utc)
+            end_utc = datetime(
+                d.year, d.month, d.day, night_end, 0, 0, tzinfo=timezone.utc
+            )
         return start_utc, end_utc
 
 
@@ -98,7 +109,9 @@ def eval_r007_night_wandering_room_switches(ctx: RuleContext) -> List[DeviationV
     )
 
     # detect door involvement
-    door_involved = any(r.category == "door" and _room(r.payload) == front_door_room for r in rows)
+    door_involved = any(
+        r.category == "door" and _room(r.payload) == front_door_room for r in rows
+    )
 
     # Build ordered room activity timeline (active signals only)
     timeline: List[Tuple[datetime, str, str]] = []
@@ -118,15 +131,15 @@ def eval_r007_night_wandering_room_switches(ctx: RuleContext) -> List[DeviationV
     # Count room switches within gap
     switches = 0
     switch_ids: List[str] = []
-    last_ts, last_room, last_eid = timeline[0]
+    last_ts, last_room, _ = timeline[0]
     for ts, room, eid in timeline[1:]:
         dt_min = int((ts - last_ts).total_seconds() // 60)
         if dt_min <= switch_gap_max and room != last_room:
             switches += 1
             switch_ids.append(eid)
-            last_ts, last_room, last_eid = ts, room, eid
+            last_ts, last_room = ts, room
         else:
-            last_ts, last_room, last_eid = ts, room, eid
+            last_ts, last_room = ts, room
 
     if switches < switch_threshold:
         return []

@@ -427,8 +427,16 @@ def run_rule_engine_job():
                 with db.begin_nested():
                     spec = RULE_REGISTRY[rid]
                     rule_devs = _call_rule(
-                        spec, db, since=r_since, until=r_until, now=now, rule_id=rid,
-                        org_id=org_id, home_id=home_id, subject_id=subject_id, subject_key=subject_key,
+                        spec,
+                        db,
+                        since=r_since,
+                        until=r_until,
+                        now=now,
+                        rule_id=rid,
+                        org_id=org_id,
+                        home_id=home_id,
+                        subject_id=subject_id,
+                        subject_key=subject_key,
                     )
 
                     mode = _get_monitor_mode(

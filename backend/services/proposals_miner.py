@@ -300,7 +300,7 @@ def mine_proposals(
             window_start=now - timedelta(days=7),
             window_end=now,
         )
-        any_id = r.get('any_episode_id')
+        any_id = r.get("any_episode_id")
         if any_id is not None:
             ok, err = _link_proposal(
                 db,
@@ -309,7 +309,7 @@ def mine_proposals(
                 subject_id=subject_id,
                 proposal_id=pid,
                 anomaly_episode_id=int(any_id),
-                link_type='DERIVED_FROM_ANOMALY_EPISODE',
+                link_type="DERIVED_FROM_ANOMALY_EPISODE",
             )
             if ok:
                 links_ok += 1
@@ -419,7 +419,7 @@ def mine_proposals(
             window_start=now - timedelta(days=14),
             window_end=now,
         )
-        any_id = r.get('any_episode_id')
+        any_id = r.get("any_episode_id")
         if any_id is not None:
             ok, err = _link_proposal(
                 db,
@@ -428,7 +428,7 @@ def mine_proposals(
                 subject_id=subject_id,
                 proposal_id=pid,
                 anomaly_episode_id=int(any_id),
-                link_type='DERIVED_FROM_ANOMALY_EPISODE',
+                link_type="DERIVED_FROM_ANOMALY_EPISODE",
             )
             if ok:
                 links_ok += 1
@@ -506,7 +506,7 @@ def mine_proposals(
             window_start=now - timedelta(days=7),
             window_end=now,
         )
-        any_id = r.get('any_episode_id')
+        any_id = r.get("any_episode_id")
         if any_id is not None:
             ok, err = _link_proposal(
                 db,
@@ -515,7 +515,7 @@ def mine_proposals(
                 subject_id=subject_id,
                 proposal_id=pid,
                 anomaly_episode_id=int(any_id),
-                link_type='DERIVED_FROM_ANOMALY_EPISODE',
+                link_type="DERIVED_FROM_ANOMALY_EPISODE",
             )
             if ok:
                 links_ok += 1
@@ -642,7 +642,7 @@ def mine_proposals(
                 subject_id=subject_id,
                 proposal_id=pid,
                 anomaly_episode_id=int(episode_ids[0]),
-                link_type='DERIVED_FROM_ANOMALY_EPISODE',
+                link_type="DERIVED_FROM_ANOMALY_EPISODE",
             )
             if ok:
                 links_ok += 1

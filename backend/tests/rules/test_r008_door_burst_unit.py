@@ -39,7 +39,9 @@ class _DB:
 def _ctx(rows, now, params=None):
     since = now - timedelta(hours=12)
     until = now
-    return RuleContext(session=_DB(rows), since=since, until=until, now=now, params=params or {})
+    return RuleContext(
+        session=_DB(rows), since=since, until=until, now=now, params=params or {}
+    )
 
 
 def test_r008_no_trigger_below_threshold():
@@ -48,9 +50,17 @@ def test_r008_no_trigger_below_threshold():
     rows = []
     # 5 door events in inngang (threshold default is 6)
     for i in range(5):
-        rows.append(_Event(base + timedelta(minutes=i), f"d{i}", "door", {"room_id": "inngang"}))
+        rows.append(
+            _Event(base + timedelta(minutes=i), f"d{i}", "door", {"room_id": "inngang"})
+        )
 
-    devs = eval_r008_door_burst(_ctx(rows, now, params={"tz": "UTC", "lookback_minutes": 30, "burst_threshold": 6}))
+    devs = eval_r008_door_burst(
+        _ctx(
+            rows,
+            now,
+            params={"tz": "UTC", "lookback_minutes": 30, "burst_threshold": 6},
+        )
+    )
     assert devs == []
 
 
@@ -59,9 +69,17 @@ def test_r008_triggers_medium_on_burst_daytime():
     base = now - timedelta(minutes=20)
     rows = []
     for i in range(6):
-        rows.append(_Event(base + timedelta(minutes=i), f"d{i}", "door", {"room_id": "inngang"}))
+        rows.append(
+            _Event(base + timedelta(minutes=i), f"d{i}", "door", {"room_id": "inngang"})
+        )
 
-    devs = eval_r008_door_burst(_ctx(rows, now, params={"tz": "UTC", "lookback_minutes": 30, "burst_threshold": 6}))
+    devs = eval_r008_door_burst(
+        _ctx(
+            rows,
+            now,
+            params={"tz": "UTC", "lookback_minutes": 30, "burst_threshold": 6},
+        )
+    )
     assert len(devs) == 1
     assert devs[0].rule_id == "R-008"
     assert devs[0].severity == "MEDIUM"
@@ -69,11 +87,15 @@ def test_r008_triggers_medium_on_burst_daytime():
 
 
 def test_r008_night_boost_to_high():
-    now = datetime(2026, 2, 22, 23, 30, tzinfo=timezone.utc)  # night in UTC with 22->7 window
+    now = datetime(
+        2026, 2, 22, 23, 30, tzinfo=timezone.utc
+    )  # night in UTC with 22->7 window
     base = now - timedelta(minutes=20)
     rows = []
     for i in range(6):
-        rows.append(_Event(base + timedelta(minutes=i), f"d{i}", "door", {"room_id": "inngang"}))
+        rows.append(
+            _Event(base + timedelta(minutes=i), f"d{i}", "door", {"room_id": "inngang"})
+        )
 
     devs = eval_r008_door_burst(
         _ctx(
@@ -100,7 +122,9 @@ def test_r008_quiet_after_boost_bumps_severity():
     rows = []
     # door burst
     for i in range(6):
-        rows.append(_Event(base + timedelta(minutes=i), f"d{i}", "door", {"room_id": "inngang"}))
+        rows.append(
+            _Event(base + timedelta(minutes=i), f"d{i}", "door", {"room_id": "inngang"})
+        )
     # No presence/motion rows at all after last door -> quiet_after=True
 
     devs = eval_r008_door_burst(

@@ -85,7 +85,7 @@ def _get_latest_model_end(db: Session, scope: AuthScope) -> Optional[str]:
                 "org_id": scope.org_id,
                 "home_id": scope.home_id,
                 "subject_id": scope.subject_id,
-                "stream_id": os.getenv("AGINGOS_STREAM_ID","prod"),
+                "stream_id": os.getenv("AGINGOS_STREAM_ID", "prod"),
             },
         )
         .mappings()
@@ -229,8 +229,13 @@ AND (
     return int(row["n"] or 0) if row else 0
 
 
-
-def _observed_activity_events(db: 'Session', scope: 'AuthScope', room: str, bucket_start: 'datetime', bucket_end: 'datetime') -> float:
+def _observed_activity_events(
+    db: "Session",
+    scope: "AuthScope",
+    room: str,
+    bucket_start: "datetime",
+    bucket_end: "datetime",
+) -> float:
     """MVP: observed activity from raw events (presence+motion) inside bucket.
     Uses events.room_id when present; falls back to payload room/area for backward-compat.
     Returns a float count (so it can be used like intensity)."""
@@ -248,12 +253,23 @@ def _observed_activity_events(db: 'Session', scope: 'AuthScope', room: str, buck
             OR ((payload->>'area') = :room)
           )
     """)
-    row = db.execute(q, {
-        "org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id,
-        "t0": bucket_start, "t1": bucket_end,
-        "room": room,
-    }).mappings().first()
+    row = (
+        db.execute(
+            q,
+            {
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+                "t0": bucket_start,
+                "t1": bucket_end,
+                "room": room,
+            },
+        )
+        .mappings()
+        .first()
+    )
     return float(row["n"] if row else 0.0)
+
 
 def score_room_bucket(
     db: Session,
@@ -348,16 +364,18 @@ def score_room_bucket(
     # MVP_EVENT_FALLBACK_V2: if episode-based observation yields 0 and no episodes were used,
     # fall back to counting raw presence/motion events in the bucket.
     try:
-        obs = details.get('observed') or {}
-        if float(obs.get('activity_obs') or 0.0) <= 0.0 and int(obs.get('episodes_used') or 0) == 0:
+        obs = details.get("observed") or {}
+        if (
+            float(obs.get("activity_obs") or 0.0) <= 0.0
+            and int(obs.get("episodes_used") or 0) == 0
+        ):
             ao = _observed_activity_events(db, scope, room, bucket_start, bucket_end)
-            obs['activity_obs'] = float(ao)
-            details['observed'] = obs
+            obs["activity_obs"] = float(ao)
+            details["observed"] = obs
             # also update local variable so scoring below uses the fallback value
             activity_obs = float(ao)
     except Exception:
         pass
-
 
     # Defaults (robust)
     score_intensity = 0.0

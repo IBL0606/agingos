@@ -38,6 +38,7 @@ class _DB:
       - R-009 liveness: query(...).order_by(...).filter(...).first()
       - R-005 bathroom scan: query(...).filter(...).order_by(...).all()
     """
+
     def __init__(self, rows_for_all, last_event_ts=None):
         self._rows_for_all = rows_for_all
         self._last_event_ts = last_event_ts
@@ -45,12 +46,19 @@ class _DB:
     def query(self, *a, **k):
         first_row = None
         if self._last_event_ts is not None:
-            first_row = _Event(self._last_event_ts, "presence", {"room_id": "stue", "state": "on"}, event_id="last")
+            first_row = _Event(
+                self._last_event_ts,
+                "presence",
+                {"room_id": "stue", "state": "on"},
+                event_id="last",
+            )
         return _Q(self._rows_for_all, first_row=first_row)
 
 
 def _ctx(db, since, until, now, params=None):
-    return RuleContext(session=db, since=since, until=until, now=now, params=params or {})
+    return RuleContext(
+        session=db, since=since, until=until, now=now, params=params or {}
+    )
 
 
 def test_r005_triggers_when_no_bathroom_activity_and_ingest_ok():
@@ -59,7 +67,9 @@ def test_r005_triggers_when_no_bathroom_activity_and_ingest_ok():
     until = now
 
     db = _DB(rows_for_all=[], last_event_ts=now - timedelta(minutes=5))  # ingest ok
-    devs = eval_r005_no_bathroom_activity_24h(_ctx(db, since, until, now, params={"lookback_hours": 24}))
+    devs = eval_r005_no_bathroom_activity_24h(
+        _ctx(db, since, until, now, params={"lookback_hours": 24})
+    )
     assert len(devs) == 1
     assert devs[0].rule_id == "R-005"
     assert devs[0].severity == "LOW"
@@ -71,11 +81,18 @@ def test_r005_no_trigger_when_bathroom_presence_on_exists():
     until = now
 
     rows = [
-        _Event(now - timedelta(hours=2), "presence", {"room_id": "baderom", "state": "on"}, event_id="b1")
+        _Event(
+            now - timedelta(hours=2),
+            "presence",
+            {"room_id": "baderom", "state": "on"},
+            event_id="b1",
+        )
     ]
     db = _DB(rows_for_all=rows, last_event_ts=now - timedelta(minutes=5))  # ingest ok
 
-    devs = eval_r005_no_bathroom_activity_24h(_ctx(db, since, until, now, params={"lookback_hours": 24}))
+    devs = eval_r005_no_bathroom_activity_24h(
+        _ctx(db, since, until, now, params={"lookback_hours": 24})
+    )
     assert devs == []
 
 
@@ -84,8 +101,16 @@ def test_r005_suppressed_when_ingest_stopped():
     since = now - timedelta(hours=1)
     until = now
 
-    db = _DB(rows_for_all=[], last_event_ts=now - timedelta(minutes=40))  # ingest stopped
+    db = _DB(
+        rows_for_all=[], last_event_ts=now - timedelta(minutes=40)
+    )  # ingest stopped
     devs = eval_r005_no_bathroom_activity_24h(
-        _ctx(db, since, until, now, params={"lookback_hours": 24, "liveness_max_age_minutes": 15})
+        _ctx(
+            db,
+            since,
+            until,
+            now,
+            params={"lookback_hours": 24, "liveness_max_age_minutes": 15},
+        )
     )
     assert devs == []

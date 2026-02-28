@@ -34,7 +34,9 @@ class _DB:
 
 
 def _ctx(rows, since, until, now, params=None):
-    return RuleContext(session=_DB(rows), since=since, until=until, now=now, params=params or {})
+    return RuleContext(
+        session=_DB(rows), since=since, until=until, now=now, params=params or {}
+    )
 
 
 def test_r009_no_events_triggers():
@@ -52,7 +54,9 @@ def test_r009_recent_event_no_trigger():
     since = now - timedelta(minutes=30)
     until = now
     last = now - timedelta(minutes=5)
-    devs = eval_r009_ingest_stopped(_ctx([_Event(last)], since, until, now, params={"max_age_minutes": 15}))
+    devs = eval_r009_ingest_stopped(
+        _ctx([_Event(last)], since, until, now, params={"max_age_minutes": 15})
+    )
     assert devs == []
 
 
@@ -61,5 +65,7 @@ def test_r009_old_event_triggers():
     since = now - timedelta(minutes=30)
     until = now
     last = now - timedelta(minutes=40)
-    devs = eval_r009_ingest_stopped(_ctx([_Event(last)], since, until, now, params={"max_age_minutes": 15}))
+    devs = eval_r009_ingest_stopped(
+        _ctx([_Event(last)], since, until, now, params={"max_age_minutes": 15})
+    )
     assert len(devs) == 1

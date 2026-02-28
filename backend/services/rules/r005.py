@@ -23,7 +23,9 @@ def _get_int(p: Dict[str, Any], key: str, default: int) -> int:
         return default
 
 
-def _last_bathroom_presence_on_ts(ctx: RuleContext, room_id: str, since_ts: datetime) -> Optional[datetime]:
+def _last_bathroom_presence_on_ts(
+    ctx: RuleContext, room_id: str, since_ts: datetime
+) -> Optional[datetime]:
     # Find latest presence "on" event in bathroom since since_ts
     rows = (
         ctx.session.query(EventDB)

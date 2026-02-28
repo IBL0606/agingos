@@ -50,8 +50,19 @@ def _serialize(ep: AnomalyEpisode) -> dict:
         "peak_bucket_score": float(ep.peak_bucket_score)
         if ep.peak_bucket_score is not None
         else None,
-        "reasons": (ep.reasons if isinstance(ep.reasons, list) else (ep.reasons_last if isinstance(getattr(ep,"reasons_last", None), list) else (ep.reasons_peak if isinstance(getattr(ep,"reasons_peak", None), list) else []))),
-
+        "reasons": (
+            ep.reasons
+            if isinstance(ep.reasons, list)
+            else (
+                ep.reasons_last
+                if isinstance(getattr(ep, "reasons_last", None), list)
+                else (
+                    ep.reasons_peak
+                    if isinstance(getattr(ep, "reasons_peak", None), list)
+                    else []
+                )
+            )
+        ),
         "human_weight_mode": ep.human_weight_mode,
         "pet_weight": float(ep.pet_weight or 0.0),
         "baseline_ref": ep.baseline_ref or {},
@@ -239,7 +250,11 @@ def anomalies_runner_status():
     from datetime import datetime, timezone
 
     rs = ANOMALIES_RUNNER_STATUS
-    if (not rs.get("last_run_at")) and (not rs.get("last_ok_at")) and (not rs.get("last_error_at")):
+    if (
+        (not rs.get("last_run_at"))
+        and (not rs.get("last_ok_at"))
+        and (not rs.get("last_error_at"))
+    ):
         try:
             out = run_anomalies_job()
             rs["last_run_at"] = datetime.now(timezone.utc).isoformat()
@@ -256,7 +271,6 @@ def anomalies_runner_status():
             rs["last_error_msg"] = str(e)
 
     return rs
-
 
 
 @router.post("/run_latest")

@@ -116,6 +116,7 @@ def list_deviations(
 
     return [_serialize_persisted(d) for d in devs]
 
+
 @router.get("/evaluate", response_model=List[DeviationV1])
 def evaluate_deviations(
     since: datetime = Query(..., description="ISO 8601"),
@@ -150,8 +151,6 @@ def patch_deviation(deviation_id: int, payload: dict, db: Session = Depends(get_
     db.commit()
     db.refresh(dev)
     return _serialize_persisted(dev)
-
-
 
 
 #

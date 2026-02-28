@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, List
 
 from models.db_event import EventDB
 from schemas.deviation_v1 import DeviationV1, Window
@@ -35,20 +35,35 @@ def _get_int(p: Dict[str, Any], key: str, default: int) -> int:
         return default
 
 
-def _day_window_utc(until_utc: datetime, tz_name: str, day_start: int, day_end: int) -> tuple[datetime, datetime]:
+def _day_window_utc(
+    until_utc: datetime, tz_name: str, day_start: int, day_end: int
+) -> tuple[datetime, datetime]:
     # Convert local day window to UTC bounds deterministically.
     try:
         from zoneinfo import ZoneInfo
+
         tz = ZoneInfo(tz_name)
         local = until_utc.astimezone(tz)
         local_date = local.date()
-        start_local = datetime(local_date.year, local_date.month, local_date.day, day_start, 0, 0, tzinfo=tz)
-        end_local = datetime(local_date.year, local_date.month, local_date.day, day_end, 0, 0, tzinfo=tz)
+        start_local = datetime(
+            local_date.year,
+            local_date.month,
+            local_date.day,
+            day_start,
+            0,
+            0,
+            tzinfo=tz,
+        )
+        end_local = datetime(
+            local_date.year, local_date.month, local_date.day, day_end, 0, 0, tzinfo=tz
+        )
         return start_local.astimezone(timezone.utc), end_local.astimezone(timezone.utc)
     except Exception:
         # Fallback: treat as UTC
         d = until_utc.date()
-        start_utc = datetime(d.year, d.month, d.day, day_start, 0, 0, tzinfo=timezone.utc)
+        start_utc = datetime(
+            d.year, d.month, d.day, day_start, 0, 0, tzinfo=timezone.utc
+        )
         end_utc = datetime(d.year, d.month, d.day, day_end, 0, 0, tzinfo=timezone.utc)
         return start_utc, end_utc
 

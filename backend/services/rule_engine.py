@@ -18,7 +18,12 @@ logger = logging.getLogger("rule_engine")
 
 
 def _call_rule(
-    spec, db: Session, since: datetime, until: datetime, now: datetime, rule_id: str,
+    spec,
+    db: Session,
+    since: datetime,
+    until: datetime,
+    now: datetime,
+    rule_id: str,
     *,
     org_id: str = "default",
     home_id: str = "default",
@@ -28,7 +33,17 @@ def _call_rule(
     """Adapter: supports both legacy rule signatures and RuleContext-based rules."""
     cfg = load_rule_config()
     params = cfg.rule_params(rule_id)
-    ctx = RuleContext(session=db, since=since, until=until, now=now, params=params, org_id=org_id, home_id=home_id, subject_id=subject_id, subject_key=subject_key)
+    ctx = RuleContext(
+        session=db,
+        since=since,
+        until=until,
+        now=now,
+        params=params,
+        org_id=org_id,
+        home_id=home_id,
+        subject_id=subject_id,
+        subject_key=subject_key,
+    )
     fn = spec.eval_fn
     try:
         # New style: fn(ctx)

@@ -30,6 +30,7 @@ def _get_tz_name(p: Dict[str, Any]) -> str:
 def _local_hour(dt_utc: datetime, tz_name: str) -> int:
     try:
         from zoneinfo import ZoneInfo
+
         return dt_utc.astimezone(ZoneInfo(tz_name)).hour
     except Exception:
         return dt_utc.hour
@@ -45,7 +46,9 @@ def _is_night(dt_utc: datetime, tz_name: str, night_start: int, night_end: int) 
 def _state(payload: object, ctx: RuleContext) -> Optional[str]:
     if not isinstance(payload, dict):
         return None
-    keys = ctx.params.get("payload_state_keys") if isinstance(ctx.params, dict) else None
+    keys = (
+        ctx.params.get("payload_state_keys") if isinstance(ctx.params, dict) else None
+    )
     if not (isinstance(keys, list) and keys):
         keys = ["state", "value"]
     for k in keys:
@@ -54,7 +57,9 @@ def _state(payload: object, ctx: RuleContext) -> Optional[str]:
     return None
 
 
-def _segments_on_off(rows: List[EventDB], ctx: RuleContext) -> List[Tuple[datetime, Optional[datetime], List[str]]]:
+def _segments_on_off(
+    rows: List[EventDB], ctx: RuleContext
+) -> List[Tuple[datetime, Optional[datetime], List[str]]]:
     segs: List[Tuple[datetime, Optional[datetime], List[str]]] = []
     on_start: Optional[datetime] = None
     ev_ids: List[str] = []
@@ -79,11 +84,15 @@ def _segments_on_off(rows: List[EventDB], ctx: RuleContext) -> List[Tuple[dateti
     return segs
 
 
-def _any_activity_after(ctx: RuleContext, after_ts: datetime, silence_minutes: int, exclude_room: str) -> bool:
+def _any_activity_after(
+    ctx: RuleContext, after_ts: datetime, silence_minutes: int, exclude_room: str
+) -> bool:
     until2 = min(ctx.until, after_ts + timedelta(minutes=silence_minutes))
     if until2 <= after_ts:
         return False
-    cats = ctx.params.get("activity_categories") if isinstance(ctx.params, dict) else None
+    cats = (
+        ctx.params.get("activity_categories") if isinstance(ctx.params, dict) else None
+    )
     if not (isinstance(cats, list) and cats):
         cats = ["presence", "motion"]
     rows = (
@@ -165,7 +174,9 @@ def eval_r004_prolonged_bathroom_presence(ctx: RuleContext) -> List[DeviationV1]
                 sev = "HIGH"
 
             if end is not None:
-                has_activity = _any_activity_after(ctx, end, silence_after, exclude_room=room_id)
+                has_activity = _any_activity_after(
+                    ctx, end, silence_after, exclude_room=room_id
+                )
                 if not has_activity and sev == "MEDIUM":
                     sev = "HIGH"
 
@@ -183,7 +194,10 @@ def eval_r004_prolonged_bathroom_presence(ctx: RuleContext) -> List[DeviationV1]
         else:
             if order[cand["severity"]] > order[best["severity"]]:
                 best = cand
-            elif order[cand["severity"]] == order[best["severity"]] and cand["dur_min"] > best["dur_min"]:
+            elif (
+                order[cand["severity"]] == order[best["severity"]]
+                and cand["dur_min"] > best["dur_min"]
+            ):
                 best = cand
 
     if not best:
@@ -196,7 +210,9 @@ def eval_r004_prolonged_bathroom_presence(ctx: RuleContext) -> List[DeviationV1]
         "sensor_stuck_min": stuck_min,
         "silence_after_min": silence_after,
         "start_ts": best["start"].isoformat(),
-        "end_ts": best["end"].isoformat() if isinstance(best["end"], datetime) else None,
+        "end_ts": best["end"].isoformat()
+        if isinstance(best["end"], datetime)
+        else None,
         "observed_minutes": int(best["dur_min"]),
         "event_ids": best["event_ids"],
         "sensor_fault": bool(best["sensor_fault"]),

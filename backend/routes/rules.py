@@ -72,36 +72,46 @@ def list_rules(db: Session = Depends(get_db)):
         params = dict(y.get("params", {}) or {})
 
         r = by_name.get(name)
-        out.append({
-            "name": name,
-            "enabled_in_scheduler": enabled_in_scheduler,
-            "lookback_minutes": lookback_minutes,
-            "expire_after_minutes": expire_after_minutes,
-            "params": (r.params if r is not None else params) or {},
-            "severity": (r.severity if r is not None else 2),
-            "is_enabled": (r.is_enabled if r is not None else True),
-            "id": (r.id if r is not None else None),
-            "created_at": (r.created_at.isoformat() if (r is not None and r.created_at is not None) else None),
-            "rule_type": (str(r.rule_type) if r is not None else None),
-        })
+        out.append(
+            {
+                "name": name,
+                "enabled_in_scheduler": enabled_in_scheduler,
+                "lookback_minutes": lookback_minutes,
+                "expire_after_minutes": expire_after_minutes,
+                "params": (r.params if r is not None else params) or {},
+                "severity": (r.severity if r is not None else 2),
+                "is_enabled": (r.is_enabled if r is not None else True),
+                "id": (r.id if r is not None else None),
+                "created_at": (
+                    r.created_at.isoformat()
+                    if (r is not None and r.created_at is not None)
+                    else None
+                ),
+                "rule_type": (str(r.rule_type) if r is not None else None),
+            }
+        )
 
     # Include DB-only rules too (if any exist that are not in YAML)
     for name, r in sorted(by_name.items()):
         if name in yaml_rules:
             continue
-        out.append({
-            "name": name,
-            "enabled_in_scheduler": False,
-            "lookback_minutes": None,
-            "expire_after_minutes": None,
-            "params": r.params or {},
-            "severity": r.severity,
-            "is_enabled": r.is_enabled,
-            "id": r.id,
-            "created_at": (r.created_at.isoformat() if r.created_at is not None else None),
-            "rule_type": str(r.rule_type),
-            "note": "db_only",
-        })
+        out.append(
+            {
+                "name": name,
+                "enabled_in_scheduler": False,
+                "lookback_minutes": None,
+                "expire_after_minutes": None,
+                "params": r.params or {},
+                "severity": r.severity,
+                "is_enabled": r.is_enabled,
+                "id": r.id,
+                "created_at": (
+                    r.created_at.isoformat() if r.created_at is not None else None
+                ),
+                "rule_type": str(r.rule_type),
+                "note": "db_only",
+            }
+        )
 
     return out
 

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 class RuleContext:
     """
     Immutable context passed to rules.
-    
+
     Contract:
     - Deterministic: rules must not call implicit "now"; use ctx.now.
     - Side-effect free: rules may read DB via ctx.session, but must not write.

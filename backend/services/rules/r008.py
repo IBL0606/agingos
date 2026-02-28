@@ -28,7 +28,9 @@ def _room(payload: object) -> str:
     return str(payload.get("room_id") or payload.get("room") or "")
 
 
-def _is_night(until_utc: datetime, tz_name: str, night_start: int, night_end: int) -> bool:
+def _is_night(
+    until_utc: datetime, tz_name: str, night_start: int, night_end: int
+) -> bool:
     """
     True if until_utc falls within the configured local night window.
     Supports windows that span midnight (e.g. 22 -> 7).
@@ -160,7 +162,9 @@ def eval_r008_door_burst(ctx: RuleContext) -> List[DeviationV1]:
     quiet_window_until = None
     if last_door_ts is not None and quiet_after_min > 0:
         quiet_window_since = last_door_ts
-        quiet_window_until = min(ctx.until, last_door_ts + timedelta(minutes=quiet_after_min))
+        quiet_window_until = min(
+            ctx.until, last_door_ts + timedelta(minutes=quiet_after_min)
+        )
         has_activity = _has_any_activity_after(
             ctx,
             after_ts=quiet_window_since,
