@@ -232,8 +232,8 @@
     <p>
       <label>X-API-Key:</label>
       <input id="apiKey" placeholder="sett X-API-Key" />
-      <button id="saveBtn" type="button">Lagre</button>
-    </p>
+        <button class="smallbtn" id="btnSaveKey" type="button">Lagre</button>
+      </p>
     <div class="muted">localStorage: <code>agingos_api_base</code>, <code>agingos_api_key</code></div>
     <div class="muted" id="authLine">Auth: —</div>
   </div>
@@ -423,6 +423,51 @@
   })();
 
   const $ = (id) => document.getElementById(id);
+
+/* P1: save-key binder v2 (top-level) */
+(function bindSaveKeyNow(){
+  function safeGet(id) { try { return document.getElementById(id); } catch(e) { return null; } }
+  function safeVal(id) { const el = safeGet(id); return el && el.value != null ? String(el.value) : ""; }
+  function setAuthLine() {
+    const key = safeVal("apiKey").trim();
+    const el = safeGet("authLine");
+    if (el) el.textContent = "Auth: X-API-Key " + (key ? "SET" : "NOT SET");
+  }
+
+  function bindOnce() {
+    const btn = safeGet("btnSaveKey");
+    if (!btn) return;
+    if (btn.dataset.bound === "1") return;
+    btn.dataset.bound = "1";
+
+    btn.addEventListener("click", () => {
+      try {
+        const base = safeVal("apiBase").trim().replace(/\/+$/, "") || "/api";
+        const key  = safeVal("apiKey").trim();
+        localStorage.setItem("agingos_api_base", base);
+        localStorage.setItem("agingos_api_key",  key);
+        // kompat
+        localStorage.setItem("apiBase", base);
+        localStorage.setItem("apiKey",  key);
+      } catch(e) {
+        try { console.error("btnSaveKey: save failed", e); } catch(_) {}
+      }
+      try { setAuthLine(); } catch(_) {}
+      try { if (typeof _topbarUpdateApiMini === "function") _topbarUpdateApiMini(); } catch(_) {}
+      try { if (typeof _reportUpdateNotice === "function") _reportUpdateNotice(); } catch(_) {}
+      setTimeout(() => { try { location.reload(); } catch(_) {} }, 50);
+    });
+
+    // On load, ensure auth line reflects current input/localStorage
+    try { setAuthLine(); } catch(_) {}
+  }
+
+  // Bind ASAP (document is already 'complete' in your screenshot)
+  try { bindOnce(); } catch(_) {}
+  // Also try again on DOMContentLoaded just in case (safe due to dataset guard)
+  document.addEventListener("DOMContentLoaded", () => { try { bindOnce(); } catch(_) {} }, { once:true });
+})();
+/* /P1: save-key binder v2 */
 
   function fmtUtc(iso) {
     if (!iso) return "—";
@@ -636,22 +681,29 @@
   }
 
   function calcCoverageOk(cov, thr, expected) {
-    if (!cov) return { ok:false, degraded:true, reason:"coverage_missing" };
-    if (!expected.length) return { ok:false, degraded:true, reason:"expected_rooms_not_set" };
+  if (!cov) return { ok:false, degraded:true, reason:"coverage_missing" };
 
-    // For each expected: must have last_seen not stale and c24h >= min_events_24h
-    const staleMs = thr.stale_event_minutes * 60000;
-    const now = Date.now();
-    for (const room of expected) {
-      const r = cov.per_room[room];
-      if (!r) return { ok:false, degraded:true, reason:"missing_expected_room_events" };
-      const t = r.last_seen ? Date.parse(r.last_seen) : NaN;
-      if (!Number.isFinite(t)) return { ok:false, degraded:true, reason:"expected_room_last_seen_unknown" };
-      if ((now - t) > staleMs) return { ok:false, degraded:true, reason:"expected_room_stale" };
-      if ((r.c24h ?? 0) < thr.min_events_24h) return { ok:false, degraded:true, reason:"expected_room_low_24h" };
-    }
-    return { ok:true, degraded:false, reason:null };
+  // MVP: if expected rooms not set, fall back to rooms_seen
+  const exp = (Array.isArray(expected) && expected.length) ? expected : (cov.rooms_seen || []);
+  if (!exp.length) return { ok:false, degraded:true, reason:"expected_rooms_not_set" };
+
+  // Global ingest liveness only
+  const staleMs = Number(thr.stale_event_minutes || 60) * 60000;
+  const now = Date.now();
+  const tMax = cov.max_event_ts ? Date.parse(cov.max_event_ts) : NaN;
+  // MVP: do not DEGRADED on max_event_ts; keep as warning if needed later
+  // MVP: do not DEGRADED on max_event_ts; keep as warning if needed later
+
+  // Keep minimum volume per room over 24h (optional but useful)
+  for (const room of exp) {
+    const r = cov.per_room ? cov.per_room[room] : null;
+    if (!r) return { ok:false, degraded:true, reason:"missing_expected_room_events" };
+    if ((r.c24h ?? 0) < (thr.min_events_24h ?? 5)) return { ok:false, degraded:true, reason:"expected_room_low_24h" };
   }
+
+  return { ok:true, degraded:false, reason:null };
+}
+
 
   function calcBaselineOk(bs, br, thr, expected) {
     // bs: baseline/status, br: baseline details (per-room)
@@ -808,6 +860,8 @@
     }
 
     // Events coverage
+    let maxSeen = -Infinity;
+
     let events = [];
     try {
       const ev = await apiGet(eventsUrl("/events?limit=" + encodeURIComponent(String(thr.events_limit))));
@@ -833,36 +887,35 @@
         if ((now - ts) <= 5*60*1000) per_room[room].c5m += 1;
         if ((now - ts) <= 60*60*1000) per_room[room].c60m += 1;
         if ((now - ts) <= 24*60*60*1000) per_room[room].c24h += 1;
-        // last seen
-        const cur = per_room[room].last_seen ? Date.parse(per_room[room].last_seen) : NaN;
       }
     }
-    // Fix last_seen handling without python NaN
+
+    // last_seen + max_event_ts
     for (const ev of events) {
       const room = parseRoomFromEvent(ev);
       const ts = parseEventTs(ev);
       if (ts == null) continue;
+
+      if (ts > maxSeen) maxSeen = ts;
+
       const prev = per_room[room].last_seen ? Date.parse(per_room[room].last_seen) : NaN;
       if (!Number.isFinite(prev) || ts > prev) per_room[room].last_seen = new Date(ts).toISOString();
     }
 
     const roomsSeen = Object.keys(per_room).filter(r => r !== "(ukjent rom)").sort();
     const missingExpected = expected.filter(r => !per_room[r]);
+    const max_event_ts = Number.isFinite(maxSeen) ? new Date(maxSeen).toISOString() : null;
 
     ctx.coverage = {
       rooms_seen: roomsSeen,
       rooms_expected: expected,
       missing_expected: missingExpected,
       unknown_room_events: unknown,
+      max_event_ts: max_event_ts,
       per_room: per_room
     };
 
-    $("covRoomsSeen").textContent = roomsSeen.length ? roomsSeen.join(", ") : "—";
-    $("covRoomsExpected").textContent = expected.length ? expected.join(", ") : "—";
-    $("covRoomsMissing").textContent = missingExpected.length ? missingExpected.join(", ") : "(ingen)";
-    $("covUnknown").textContent = String(unknown);
-
-    renderCoverageTable(per_room);
+      renderCoverageTable(per_room);
 
     const covEval = calcCoverageOk(ctx.coverage, thr, expected);
     if (covEval.ok) setChip("Coverage", "ok", "OK");
@@ -1089,7 +1142,7 @@
 
   window.addEventListener("DOMContentLoaded", () => {
     loadSettings();
-    $("saveBtn").addEventListener("click", saveSettings);
+    const _saveBtn = $("saveBtn"); if (_saveBtn) _saveBtn.addEventListener("click", saveSettings);
     $("saveThrBtn").addEventListener("click", saveThresholds);
     $("refreshBtn").addEventListener("click", () => refreshAll().catch(e => {
       $("warningsBox").textContent = "ERROR: " + String(e.message || e);
@@ -1102,8 +1155,7 @@
       setChip("Backend","err","ERROR");
       setChip("System","err","ERROR");
     });
-  });
-</script>
+  });</script>
 
 </body>
 </html>
