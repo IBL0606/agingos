@@ -85,29 +85,33 @@ jobs:
           docker compose exec -T backend bash -lc 'cd backend && alembic -c alembic.ini upgrade head'
 
 
-      - name: Bootstrap DB schema (api_key_scopes + events scope columns)
+      - name: Bootstrap DB schema (events scope columns + room_id, stream_id)
         shell: bash
         run: |
           set -euo pipefail
-
-          # 1) Create api_key_scopes if missing (additive)
+      
+          # 1) Ensure events has room_id and stream_id
           docker compose exec -T db psql -U agingos -d agingos -v ON_ERROR_STOP=1 <<'SQL'
-          CREATE TABLE IF NOT EXISTS public.api_key_scopes (
-            api_key_hash text PRIMARY KEY,
-            org_id       text NOT NULL,
-            home_id      text NOT NULL,
-            subject_id   text NOT NULL,
-            role         text NOT NULL,
-            active       boolean NOT NULL DEFAULT true,
-            created_at   timestamptz NOT NULL DEFAULT now(),
-            updated_at   timestamptz NOT NULL DEFAULT now(),
-            user_id      text NULL,
-            CONSTRAINT api_key_scopes_role_check CHECK (role IN ('operator','service','readonly'))
-          );
-
-          CREATE INDEX IF NOT EXISTS ix_api_key_scopes_active
-          ON public.api_key_scopes (org_id, home_id, subject_id)
-          WHERE active = true;
+          DO $$
+          BEGIN
+            IF to_regclass('public.events') IS NOT NULL THEN
+              -- Legg til room_id og stream_id hvis de ikke eksisterer
+              EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS room_id text';
+              EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS stream_id text';
+      
+              -- Sett standardverdier for eksisterende rader
+              EXECUTE 'UPDATE public.events SET room_id=''default'' WHERE room_id IS NULL';
+              EXECUTE 'UPDATE public.events SET stream_id=''prod'' WHERE stream_id IS NULL';
+      
+              -- Sett standardverdier på kolonnene
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN room_id SET DEFAULT ''default''';
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN stream_id SET DEFAULT ''prod''';
+      
+              -- Gjør kolonnene NOT NULL
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN room_id SET NOT NULL';
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN stream_id SET NOT NULL';
+            END IF;
+          END $$;
           SQL
 
           # 2) Ensure events has org/home/subject columns (additive + backfill + safe indexes)
