@@ -656,6 +656,95 @@ def episodes_svc_build_once(
     }
 
 
+
+@app.get("/v1/episodes_svc")
+def list_episodes_svc_v1(
+    room_id: Optional[str] = Query(default=None),
+    episode_type: Optional[str] = Query(default=None),
+    since: Optional[datetime] = Query(default=None),
+    until: Optional[datetime] = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=5000),
+    scope: "AuthScope" = Depends(require_scope),
+) -> dict:
+    # P1-5: /v1 stable alias; re-use legacy implementation
+    return list_episodes_svc(
+        room_id=room_id,
+        episode_type=episode_type,
+        since=since,
+        until=until,
+        limit=limit,
+        scope=scope,
+    )
+
+@app.get("/episodes_svc")
+def list_episodes_svc(
+    room_id: Optional[str] = Query(default=None),
+    episode_type: Optional[str] = Query(default=None),
+    since: Optional[datetime] = Query(default=None),
+    until: Optional[datetime] = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=5000),
+    scope: "AuthScope" = Depends(require_scope),
+) -> dict:
+    """
+    Read episodes built by episodes_svc builder (episodes_svc table).
+    Scope enforced (P0-2). Intended for Console/ops visibility.
+    """
+    db = SessionLocal()
+    try:
+        where = ["org_id = :org_id", "home_id = :home_id", "subject_id = :subject_id"]
+        params = {
+            "limit": limit,
+            "org_id": scope.org_id,
+            "home_id": scope.home_id,
+            "subject_id": scope.subject_id,
+        }
+
+        if room_id:
+            where.append("room_id = :room_id")
+            params["room_id"] = room_id
+
+        if episode_type:
+            where.append("episode_type = :episode_type")
+            params["episode_type"] = episode_type
+
+        if since:
+            try:
+                since_utc = require_utc_aware(since, "since")
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=str(e))
+            where.append("start_ts >= :since")
+            params["since"] = since_utc
+
+        if until:
+            try:
+                until_utc = require_utc_aware(until, "until")
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=str(e))
+            where.append("start_ts < :until")
+            params["until"] = until_utc
+
+        where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+        q = text(
+            f"""
+            SELECT
+              org_id, home_id, subject_id,
+              episode_type, room_id,
+              start_ts, end_ts,
+              start_event_row_id, end_event_row_id,
+              start_event_id, end_event_id,
+              event_n, is_open, meta
+            FROM episodes_svc
+            {where_sql}
+            ORDER BY start_ts DESC, room_id ASC, episode_type ASC
+            LIMIT :limit
+            """
+        )
+        rows = db.execute(q, params).mappings().all()
+        return {"status": "ok", "rows": [dict(r) for r in rows]}
+    finally:
+        db.close()
+
+
 @app.post("/v1/event")
 def receive_event_v1(event: Event, stream_id: str = Query(default="prod"), scope: AuthScope = Depends(require_scope)):
     # P1-5: /v1 stable alias; re-use legacy implementation
@@ -854,6 +943,173 @@ def list_proposals_v1(
 ):
     # P1-5: /v1 stable alias; forward plain query values
     return list_proposals(last=last, limit=int(limit), scope=scope)
+
+
+# -------------------------
+# Proposal feedback (P1-3)
+# -------------------------
+
+def _proposal_exists(db, *, scope: "AuthScope", proposal_id: int) -> bool:
+    row = db.execute(
+        text(
+            """
+            SELECT 1
+            FROM proposals
+            WHERE org_id=:org_id AND home_id=:home_id AND subject_id=:subject_id
+              AND proposal_id=:pid
+            LIMIT 1
+            """
+        ),
+        {"org_id": scope.org_id, "home_id": scope.home_id, "subject_id": scope.subject_id, "pid": proposal_id},
+    ).first()
+    return bool(row)
+
+def _insert_proposal_feedback(
+    db,
+    *,
+    scope: "AuthScope",
+    proposal_id: int,
+    verdict: str,
+    note: str | None,
+    actor: str | None,
+    source: str,
+) -> None:
+    db.execute(
+        text(
+            """
+            INSERT INTO proposal_feedback
+              (org_id, home_id, subject_id, proposal_id, verdict, note, actor, source, created_at)
+            VALUES
+              (:org_id, :home_id, :subject_id, :proposal_id, :verdict, :note, :actor, :source, now())
+            """
+        ),
+        {
+            "org_id": scope.org_id,
+            "home_id": scope.home_id,
+            "subject_id": scope.subject_id,
+            "proposal_id": proposal_id,
+            "verdict": verdict,
+            "note": note,
+            "actor": actor,
+            "source": source,
+        },
+    )
+
+def _list_proposal_feedback(db, *, scope: "AuthScope", proposal_id: int, limit: int):
+    rows = (
+        db.execute(
+            text(
+                """
+                SELECT
+                  feedback_id, proposal_id, org_id, home_id, subject_id,
+                  verdict, note, actor, source, created_at
+                FROM proposal_feedback
+                WHERE org_id=:org_id AND home_id=:home_id AND subject_id=:subject_id
+                  AND proposal_id=:proposal_id
+                ORDER BY created_at DESC, feedback_id DESC
+                LIMIT :limit
+                """
+            ),
+            {
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+                "proposal_id": proposal_id,
+                "limit": limit,
+            },
+        )
+        .mappings()
+        .all()
+    )
+    return [dict(r) for r in rows]
+
+
+@app.get("/v1/proposals/{proposal_id}/feedback")
+def get_proposal_feedback_v1(
+    proposal_id: int,
+    limit: int = Query(default=20, ge=1, le=200),
+    scope: "AuthScope" = Depends(require_scope),
+):
+    db = SessionLocal()
+    try:
+        if not _proposal_exists(db, scope=scope, proposal_id=proposal_id):
+            raise HTTPException(status_code=404, detail="Not Found")
+        return _list_proposal_feedback(db, scope=scope, proposal_id=proposal_id, limit=int(limit))
+    finally:
+        db.close()
+
+
+@app.post("/v1/proposals/{proposal_id}/feedback")
+def post_proposal_feedback_v1(
+    proposal_id: int,
+    payload: dict,
+    scope: "AuthScope" = Depends(require_scope),
+):
+    verdict = (payload.get("feedback") or payload.get("verdict") or "").strip().upper()
+    note = payload.get("note")
+    actor = payload.get("actor")
+    source = (payload.get("source") or "console").strip()
+
+    if verdict not in ("USEFUL", "NOT_USEFUL"):
+        raise HTTPException(status_code=422, detail="feedback/verdict must be USEFUL or NOT_USEFUL")
+
+    db = SessionLocal()
+    try:
+        if not _proposal_exists(db, scope=scope, proposal_id=proposal_id):
+            raise HTTPException(status_code=404, detail="Not Found")
+        _insert_proposal_feedback(
+            db,
+            scope=scope,
+            proposal_id=proposal_id,
+            verdict=verdict,
+            note=note,
+            actor=actor,
+            source=source,
+        )
+        db.commit()
+        return {"ok": True}
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+# Legacy alias with deprecation headers
+@app.get("/proposals/{proposal_id}/feedback")
+def get_proposal_feedback_legacy(
+    proposal_id: int,
+    limit: int = Query(default=20, ge=1, le=200),
+    scope: "AuthScope" = Depends(require_scope),
+    response: "Response" = None,
+):
+    # Add deprecation headers if Response is available in scope
+    try:
+        if response is not None:
+            response.headers["deprecation"] = "true"
+            response.headers["sunset"] = "2026-06-01"
+            response.headers["link"] = f'</v1/proposals/{proposal_id}/feedback>; rel="successor-version"'
+    except Exception:
+        pass
+    return get_proposal_feedback_v1(proposal_id=proposal_id, limit=limit, scope=scope)
+
+
+@app.post("/proposals/{proposal_id}/feedback")
+def post_proposal_feedback_legacy(
+    proposal_id: int,
+    payload: dict,
+    scope: "AuthScope" = Depends(require_scope),
+    response: "Response" = None,
+):
+    try:
+        if response is not None:
+            response.headers["deprecation"] = "true"
+            response.headers["sunset"] = "2026-06-01"
+            response.headers["link"] = f'</v1/proposals/{proposal_id}/feedback>; rel="successor-version"'
+    except Exception:
+        pass
+    return post_proposal_feedback_v1(proposal_id=proposal_id, payload=payload, scope=scope)
+
 
 @app.get("/proposals")
 def list_proposals(
