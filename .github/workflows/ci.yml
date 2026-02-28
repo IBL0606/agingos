@@ -14,7 +14,7 @@ jobs:
       AGINGOS_AUTH_MODE: "api_key"
       # Use Secrets if set, otherwise fallback (CI should still run)
       AGINGOS_API_KEYS: ${{ secrets.AGINGOS_API_KEYS || 'dev-key-2,dev-key-3' }}
-      AGINGOS_API_KEY:  ${{ secrets.AGINGOS_API_KEY  || 'dev-key-2' }}
+      AGINGOS_API_KEY: ${{ secrets.AGINGOS_API_KEY || 'dev-key-2' }}
 
     steps:
       - name: Checkout
@@ -84,8 +84,7 @@ jobs:
           docker compose exec -T backend bash -lc 'alembic -c alembic.ini upgrade head' || \
           docker compose exec -T backend bash -lc 'cd backend && alembic -c alembic.ini upgrade head'
 
-
-      - name: Bootstrap DB schema (api_key_scopes + events scope columns)
+      - name: Bootstrap DB schema (api_key_scopes + events scope columns + room_id + stream_id)
         shell: bash
         run: |
           set -euo pipefail
@@ -110,30 +109,43 @@ jobs:
           WHERE active = true;
           SQL
 
-          # 2) Ensure events has org/home/subject columns (additive + backfill + safe indexes)
+          # 2) Ensure events has org/home/subject + room_id + stream_id (additive + backfill + safe indexes)
           docker compose exec -T db psql -U agingos -d agingos -v ON_ERROR_STOP=1 <<'SQL'
           DO $$
           BEGIN
             IF to_regclass('public.events') IS NOT NULL THEN
+              -- existing scope columns
               EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS org_id text';
               EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS home_id text';
               EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS subject_id text';
 
+              -- NEW: room_id + stream_id for CI (backend inserts these)
+              EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS room_id text';
+              EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS stream_id text';
+
+              -- backfill scope
               EXECUTE 'UPDATE public.events SET org_id=''default'' WHERE org_id IS NULL';
               EXECUTE 'UPDATE public.events SET home_id=''default'' WHERE home_id IS NULL';
               EXECUTE 'UPDATE public.events SET subject_id=''default'' WHERE subject_id IS NULL';
 
+              -- backfill stream_id (room_id may be NULL; do NOT force NOT NULL)
+              EXECUTE 'UPDATE public.events SET stream_id=''prod'' WHERE stream_id IS NULL';
+
+              -- defaults + NOT NULL for scope + stream_id
               EXECUTE 'ALTER TABLE public.events ALTER COLUMN org_id SET DEFAULT ''default''';
               EXECUTE 'ALTER TABLE public.events ALTER COLUMN home_id SET DEFAULT ''default''';
               EXECUTE 'ALTER TABLE public.events ALTER COLUMN subject_id SET DEFAULT ''default''';
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN stream_id SET DEFAULT ''prod''';
 
               EXECUTE 'ALTER TABLE public.events ALTER COLUMN org_id SET NOT NULL';
               EXECUTE 'ALTER TABLE public.events ALTER COLUMN home_id SET NOT NULL';
               EXECUTE 'ALTER TABLE public.events ALTER COLUMN subject_id SET NOT NULL';
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN stream_id SET NOT NULL';
 
+              -- indexes
               EXECUTE 'CREATE INDEX IF NOT EXISTS ix_events_scope_ts ON public.events (org_id, home_id, subject_id, "timestamp")';
 
-              -- Create UNIQUE only if no duplicates exist
+              -- Create UNIQUE only if no duplicates exist (legacy index, keep as-is for now)
               IF NOT EXISTS (
                 SELECT 1 FROM (
                   SELECT org_id, home_id, event_id
