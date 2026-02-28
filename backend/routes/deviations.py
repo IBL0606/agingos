@@ -116,6 +116,24 @@ def list_deviations(
 
     return [_serialize_persisted(d) for d in devs]
 
+@router.get("/evaluate", response_model=List[DeviationV1])
+def evaluate_deviations(
+    since: datetime = Query(..., description="ISO 8601"),
+    until: datetime = Query(..., description="ISO 8601"),
+    db: Session = Depends(get_db),
+):
+    try:
+        since = require_utc_aware(since, "since")
+        until = require_utc_aware(until, "until")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    now = utcnow()
+
+    devs = evaluate_rules(db, since=since, until=until, now=now)
+
+    return devs
+
 
 @router.patch("/{deviation_id}", response_model=DeviationPersisted)
 def patch_deviation(deviation_id: int, payload: dict, db: Session = Depends(get_db)):
@@ -134,23 +152,8 @@ def patch_deviation(deviation_id: int, payload: dict, db: Session = Depends(get_
     return _serialize_persisted(dev)
 
 
+
+
 #
 # --- Thin-slice, beregnede avvik (Avvik v1) ---
 #
-@router.get("/evaluate", response_model=List[DeviationV1])
-def evaluate_deviations(
-    since: datetime = Query(..., description="ISO 8601"),
-    until: datetime = Query(..., description="ISO 8601"),
-    db: Session = Depends(get_db),
-):
-    try:
-        since = require_utc_aware(since, "since")
-        until = require_utc_aware(until, "until")
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    now = utcnow()
-
-    devs = evaluate_rules(db, since=since, until=until, now=now)
-
-    return devs
