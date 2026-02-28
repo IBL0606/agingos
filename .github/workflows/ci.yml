@@ -85,7 +85,7 @@ jobs:
           docker compose exec -T backend bash -lc 'cd backend && alembic -c alembic.ini upgrade head'
 
 
-      - name: Bootstrap DB schema (api_key_scopes + events scope columns)
+        - name: Bootstrap DB schema (api_key_scopes + events scope columns + room_id + stream_id)
         shell: bash
         run: |
           set -euo pipefail
@@ -110,7 +110,7 @@ jobs:
           WHERE active = true;
           SQL
 
-          # 2) Ensure events has org/home/subject columns (additive + backfill + safe indexes)
+          # 2) Ensure events has org/home/subject + room_id + stream_id (additive + backfill + safe indexes)
           docker compose exec -T db psql -U agingos -d agingos -v ON_ERROR_STOP=1 <<'SQL'
           DO $$
           BEGIN
@@ -118,34 +118,26 @@ jobs:
               EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS org_id text';
               EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS home_id text';
               EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS subject_id text';
+              EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS room_id text';
+              EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS stream_id text';
 
               EXECUTE 'UPDATE public.events SET org_id=''default'' WHERE org_id IS NULL';
               EXECUTE 'UPDATE public.events SET home_id=''default'' WHERE home_id IS NULL';
               EXECUTE 'UPDATE public.events SET subject_id=''default'' WHERE subject_id IS NULL';
+              -- room_id kan være NULL i praksis (backend kan sende None). Ikke gjør NOT NULL her.
+              EXECUTE 'UPDATE public.events SET stream_id=''prod'' WHERE stream_id IS NULL';
 
               EXECUTE 'ALTER TABLE public.events ALTER COLUMN org_id SET DEFAULT ''default''';
               EXECUTE 'ALTER TABLE public.events ALTER COLUMN home_id SET DEFAULT ''default''';
               EXECUTE 'ALTER TABLE public.events ALTER COLUMN subject_id SET DEFAULT ''default''';
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN stream_id SET DEFAULT ''prod''';
 
               EXECUTE 'ALTER TABLE public.events ALTER COLUMN org_id SET NOT NULL';
               EXECUTE 'ALTER TABLE public.events ALTER COLUMN home_id SET NOT NULL';
               EXECUTE 'ALTER TABLE public.events ALTER COLUMN subject_id SET NOT NULL';
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN stream_id SET NOT NULL';
 
               EXECUTE 'CREATE INDEX IF NOT EXISTS ix_events_scope_ts ON public.events (org_id, home_id, subject_id, "timestamp")';
-
-              -- Create UNIQUE only if no duplicates exist
-              IF NOT EXISTS (
-                SELECT 1 FROM (
-                  SELECT org_id, home_id, event_id
-                  FROM public.events
-                  GROUP BY 1,2,3
-                  HAVING COUNT(*) > 1
-                ) d
-              ) THEN
-                EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS ux_events_scope_event_id ON public.events (org_id, home_id, event_id)';
-              ELSE
-                EXECUTE 'CREATE INDEX IF NOT EXISTS ix_events_scope_event_id ON public.events (org_id, home_id, event_id)';
-              END IF;
             END IF;
           END $$;
           SQL
