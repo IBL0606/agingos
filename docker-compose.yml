@@ -5,6 +5,7 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - ./tools:/tools:ro
     command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
     environment:
       PYTHONDONTWRITEBYTECODE: "1"
@@ -17,6 +18,24 @@ services:
       AGINGOS_STREAM_ID: ${AGINGOS_STREAM_ID:-prod}
     depends_on:
       - db
+
+  notification-worker:
+    build: ./backend
+    volumes:
+      - ./backend:/app
+      - ./tools:/tools:ro
+    command: ["sh", "-lc", "while true; do python3 /tools/notification_worker.py 50 || true; sleep 5; done"]
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
+      DATABASE_URL: postgresql://agingos:agingos@db:5432/agingos
+      AGINGOS_AUTH_MODE: ${AGINGOS_AUTH_MODE:-off}
+      AGINGOS_API_KEY: ${AGINGOS_API_KEY:-}
+      AGINGOS_API_KEYS: ${AGINGOS_API_KEYS:-}
+      AGINGOS_STREAM_ID: ${AGINGOS_STREAM_ID:-prod}
+    depends_on:
+      - db
+    restart: unless-stopped
+
 
   db:
     image: postgres:16
