@@ -243,6 +243,11 @@ jobs:
             -d "{\"id\":\"$EVENT_ID\",\"timestamp\":\"$TS\",\"category\":\"motion\",\"payload\":{\"entity_id\":\"binary_sensor.ci_motion\",\"room\":\"default\",\"state\":\"on\"}}" \
             | head -c 8000 || true
           echo
+          echo "== FAILURE DEBUG: /deviations/evaluate window for R-002 check =="
+          curl -sS -i "$BASE_URL/deviations/evaluate?since=2025-12-15T01:00:00Z&until=2025-12-15T03:00:00Z" \
+           -H "X-API-Key: $AGINGOS_API_KEY" \
+          | head -c 12000 || true
+          echo
           echo "== FAILURE DEBUG: backend logs (tail 200) =="
           docker compose logs backend --tail 200 || true
           echo
