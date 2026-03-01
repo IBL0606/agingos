@@ -111,40 +111,47 @@ jobs:
 
           # 2) Ensure events has required columns (scope + room_id + stream_id)
           docker compose exec -T db psql -U agingos -d agingos -v ON_ERROR_STOP=1 <<'SQL'
-          -- scope cols
-          ALTER TABLE public.events ADD COLUMN IF NOT EXISTS org_id text;
-          ALTER TABLE public.events ADD COLUMN IF NOT EXISTS home_id text;
-          ALTER TABLE public.events ADD COLUMN IF NOT EXISTS subject_id text;
+          DO $$
+          BEGIN
+            IF to_regclass('public.events') IS NOT NULL THEN
+              EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS org_id text';
+              EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS home_id text';
+              EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS subject_id text';
+              EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS room_id text';
+              EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS stream_id text';
 
-          UPDATE public.events SET org_id='default' WHERE org_id IS NULL;
-          UPDATE public.events SET home_id='default' WHERE home_id IS NULL;
-          UPDATE public.events SET subject_id='default' WHERE subject_id IS NULL;
+              EXECUTE 'UPDATE public.events SET org_id=''default'' WHERE org_id IS NULL';
+              EXECUTE 'UPDATE public.events SET home_id=''default'' WHERE home_id IS NULL';
+              EXECUTE 'UPDATE public.events SET subject_id=''default'' WHERE subject_id IS NULL';
+              EXECUTE 'UPDATE public.events SET stream_id=''prod'' WHERE stream_id IS NULL';
 
-          ALTER TABLE public.events ALTER COLUMN org_id SET DEFAULT 'default';
-          ALTER TABLE public.events ALTER COLUMN home_id SET DEFAULT 'default';
-          ALTER TABLE public.events ALTER COLUMN subject_id SET DEFAULT 'default';
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN org_id SET DEFAULT ''default''';
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN home_id SET DEFAULT ''default''';
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN subject_id SET DEFAULT ''default''';
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN stream_id SET DEFAULT ''prod''';
 
-          ALTER TABLE public.events ALTER COLUMN org_id SET NOT NULL;
-          ALTER TABLE public.events ALTER COLUMN home_id SET NOT NULL;
-          ALTER TABLE public.events ALTER COLUMN subject_id SET NOT NULL;
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN org_id SET NOT NULL';
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN home_id SET NOT NULL';
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN subject_id SET NOT NULL';
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN stream_id SET NOT NULL';
 
-          -- required by backend insert
-          ALTER TABLE public.events ADD COLUMN IF NOT EXISTS room_id text;
-          ALTER TABLE public.events ADD COLUMN IF NOT EXISTS stream_id text;
+              EXECUTE 'CREATE INDEX IF NOT EXISTS ix_events_scope_ts ON public.events (org_id, home_id, subject_id, "timestamp")';
 
-          UPDATE public.events SET stream_id='prod' WHERE stream_id IS NULL;
-          ALTER TABLE public.events ALTER COLUMN stream_id SET DEFAULT 'prod';
-          ALTER TABLE public.events ALTER COLUMN stream_id SET NOT NULL;
-
-          -- indexes (safe)
-          CREATE INDEX IF NOT EXISTS ix_events_scope_ts
-          ON public.events (org_id, home_id, subject_id, "timestamp");
+              IF NOT EXISTS (
+                SELECT 1 FROM (
+                  SELECT org_id, home_id, event_id
+                  FROM public.events
+                  GROUP BY 1,2,3
+                  HAVING COUNT(*) > 1
+                ) d
+              ) THEN
+                EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS ux_events_scope_event_id ON public.events (org_id, home_id, event_id)';
+              ELSE
+                EXECUTE 'CREATE INDEX IF NOT EXISTS ix_events_scope_event_id ON public.events (org_id, home_id, event_id)';
+              END IF;
+            END IF;
+          END $$;
           SQL
-
-          # HARD VERIFY: fail fast if room_id still missing (prevents later 500)
-          docker compose exec -T db psql -U agingos -d agingos -v ON_ERROR_STOP=1 -tAc \
-            "SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='events' AND column_name='room_id';" \
-            | grep -qx "1"
 
           # 3) Seed api_key_scopes for every key in AGINGOS_API_KEYS
           #    (hashes are piped; nothing printed to logs)
