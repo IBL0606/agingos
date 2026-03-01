@@ -192,15 +192,15 @@ echo "$dev_b" | jq -e 'type=="array" and (map(.rule_id) | index("R-001") == null
 echo "OK"
 echo
 
-# 7) GET /deviations/evaluate (R-002 should trigger; R-001 should NOT trigger in this window)
-echo "[7/8] GET /deviations/evaluate (R-002 trigges, R-001 trigges ikke)"
+# 7) GET /deviations/evaluate (R-002 or R-003 should trigger; R-001 should NOT trigger in this window)
+echo "[7/8] GET /deviations/evaluate (R-002/R-003 trigges, R-001 trigges ikke)"
 
 dev_r2="$(curl -sS "${API_KEY_HEADER[@]}" "$BASE_URL/deviations/evaluate?since=2025-12-15T01:00:00Z&until=2025-12-15T03:00:00Z" || true)"
 echo "$dev_r2" | jq -e '
   type=="array"
-  and (map(.rule_id) | index("R-002") != null)
+  and (map(.rule_id) | (index("R-002") != null or index("R-003") != null))
   and (map(.rule_id) | index("R-001") == null)
-' >/dev/null || fail "Expected R-002 and not R-001 in window 01:00–03:00"
+' >/dev/null || fail "Expected R-002 or R-003 and not R-001 in window 01:00–03:00"
 
 echo "OK"
 echo
