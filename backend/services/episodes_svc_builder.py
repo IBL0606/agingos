@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -85,11 +86,17 @@ def fetch_events(
     until: Optional[datetime],
     batch: int,
 ) -> List[Dict[str, Any]]:
-    params: list[Any] = [org_id, home_id, subject_id]
+    params: list[Any] = [
+        org_id,
+        home_id,
+        subject_id,
+        os.getenv("AGINGOS_STREAM_ID", "prod"),
+    ]
     where = [
         "org_id=%s",
         "home_id=%s",
         "subject_id=%s",
+        "stream_id=%s",
         "category='presence'",
     ]
 

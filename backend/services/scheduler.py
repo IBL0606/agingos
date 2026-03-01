@@ -19,7 +19,8 @@ from sqlalchemy import text
 
 from util.time import utcnow
 from db import SessionLocal
-from services.rule_engine import RULE_REGISTRY
+from services.rules.registry import RULE_REGISTRY
+from services.rule_engine import _call_rule
 from services.proposals_miner import run_proposals_miner_job
 from services.proposals_expiry import run_proposals_expiry_job
 from config.rule_config import load_rule_config
@@ -332,7 +333,13 @@ def _get_monitor_mode(
         row = (
             db.execute(
                 q,
-                {"org": org_id, "home": home_id, "sub": subject_id, "k": monitor_key, "r": room_id},
+                {
+                    "org": org_id,
+                    "home": home_id,
+                    "sub": subject_id,
+                    "k": monitor_key,
+                    "r": room_id,
+                },
             )
             .mappings()
             .one_or_none()
@@ -341,7 +348,13 @@ def _get_monitor_mode(
             row = (
                 db.execute(
                     q,
-                    {"org": org_id, "home": home_id, "sub": subject_id, "k": monitor_key, "r": "__GLOBAL__"},
+                    {
+                        "org": org_id,
+                        "home": home_id,
+                        "sub": subject_id,
+                        "k": monitor_key,
+                        "r": "__GLOBAL__",
+                    },
                 )
                 .mappings()
                 .one_or_none()
@@ -413,9 +426,27 @@ def run_rule_engine_job():
 
                 with db.begin_nested():
                     spec = RULE_REGISTRY[rid]
-                    rule_devs = spec.eval_fn(db, since=r_since, until=r_until, now=now)
+                    rule_devs = _call_rule(
+                        spec,
+                        db,
+                        since=r_since,
+                        until=r_until,
+                        now=now,
+                        rule_id=rid,
+                        org_id=org_id,
+                        home_id=home_id,
+                        subject_id=subject_id,
+                        subject_key=subject_key,
+                    )
 
-                    mode = _get_monitor_mode(db, monitor_key=rid, room_id="__GLOBAL__", org_id=org_id, home_id=home_id, subject_id=subject_id)
+                    mode = _get_monitor_mode(
+                        db,
+                        monitor_key=rid,
+                        room_id="__GLOBAL__",
+                        org_id=org_id,
+                        home_id=home_id,
+                        subject_id=subject_id,
+                    )
                     if mode == "OFF":
                         rule_devs = []
 
@@ -519,7 +550,7 @@ def run_rule_engine_job():
         )
 
     except Exception as e:
-        db.rollback()
+        pass  # no db handle here; ignore
         duration_ms = int((time.monotonic() - t0) * 1000)
         _log_event(
             level="ERROR",
@@ -572,7 +603,7 @@ def run_anomalies_job_safe():
     except ProgrammingError:
         # baseline not installed; skipping anomalies job (rules-only mode)
         try:
-            db.rollback()
+            pass  # no db handle here; ignore
         except Exception:
             pass
         ANOMALIES_RUNNER_STATUS["last_ok_at"] = None
@@ -675,7 +706,7 @@ def _anomaly_pick_one_scope(db) -> AuthScope:
     except ProgrammingError:
         # Missing table / bad schema: clear aborted transaction then run in "rules-only" mode
         try:
-            db.rollback()
+            pass  # no db handle here; ignore
         except Exception:
             pass
         # Missing table / bad schema: run in "rules-only" mode
@@ -708,6 +739,8 @@ def _anomaly_pick_one_scope(db) -> AuthScope:
         role="system",
         api_key_hash="scheduler",
     )
+
+
 def run_anomalies_job_one(
     db,
     *,
@@ -804,7 +837,7 @@ def run_anomalies_job_deterministic() -> dict:
         db.commit()
         return {"ok": True, "result": res}
     except Exception as e:
-        db.rollback()
+        pass  # no db handle here; ignore
         return {"ok": False, "error": str(e)}
     finally:
         db.close()
@@ -884,7 +917,7 @@ def run_anomalies_job_latest_one() -> dict:
         db.commit()
         return {"ok": True, "room": room_id, "bucket_start": bs, "result": res}
     except Exception as e:
-        db.rollback()
+        pass  # no db handle here; ignore
         return {"ok": False, "error": str(e)}
     finally:
         db.close()
@@ -976,7 +1009,7 @@ def run_anomalies_job() -> dict:
                 # keep going; one room must not crash whole run
         db.commit()
     except Exception:
-        db.rollback()
+        pass  # no db handle here; ignore
         raise
     finally:
         db.close()

@@ -6,8 +6,6 @@ Scenario navn: "status_flow_open_ack_close_reopen"
 Given/When/Then er skrevet eksplisitt i testen for å gjøre livssyklusreglene etterprøvbare.
 """
 
-from datetime import timedelta
-
 try:
     # Repo/host layout
     from backend.db import SessionLocal  # type: ignore
@@ -46,13 +44,14 @@ def _ensure_rule(db, rule_key: str) -> Rule:
 def test_status_flow_open_ack_stale_close_trigger_reopens():
     db = SessionLocal()
     try:
-        subject_key = "default"
+        subject_key = "test"
         rule_key = "R-002"
 
         # Given: regel finnes
         rule_row = _ensure_rule(db, rule_key)
 
         from util.time import utcnow
+
         now = utcnow()
 
         # Cleanup: gjør testen idempotent ift unique active constraint
@@ -60,9 +59,9 @@ def test_status_flow_open_ack_stale_close_trigger_reopens():
             db.query(Deviation)
             .filter(Deviation.rule_id == rule_row.id)
             .filter(Deviation.subject_key == subject_key)
-            .filter(Deviation.org_id == "default")
-            .filter(Deviation.home_id == "default")
-            .filter(Deviation.subject_id == "default")
+            .filter(Deviation.org_id == "test")
+            .filter(Deviation.home_id == "test")
+            .filter(Deviation.subject_id == "test")
             .delete(synchronize_session=False)
         )
         db.commit()
@@ -75,9 +74,9 @@ def test_status_flow_open_ack_stale_close_trigger_reopens():
             started_at=now,
             last_seen_at=now,
             subject_key=subject_key,
-            org_id="default",
-            home_id="default",
-            subject_id="default",
+            org_id="test",
+            home_id="test",
+            subject_id="test",
             context={
                 "rule_key": rule_key,
                 "title": "x",
@@ -117,9 +116,9 @@ def test_status_flow_open_ack_stale_close_trigger_reopens():
             started_at=now2,
             last_seen_at=now2,
             subject_key=subject_key,
-            org_id="default",
-            home_id="default",
-            subject_id="default",
+            org_id="test",
+            home_id="test",
+            subject_id="test",
             context={
                 "rule_key": rule_key,
                 "title": "x2",
@@ -139,9 +138,9 @@ def test_status_flow_open_ack_stale_close_trigger_reopens():
             db.query(Deviation)
             .filter(Deviation.rule_id == rule_row.id)
             .filter(Deviation.subject_key == subject_key)
-            .filter(Deviation.org_id == "default")
-            .filter(Deviation.home_id == "default")
-            .filter(Deviation.subject_id == "default")
+            .filter(Deviation.org_id == "test")
+            .filter(Deviation.home_id == "test")
+            .filter(Deviation.subject_id == "test")
             .order_by(Deviation.id.asc())
             .all()
         )

@@ -63,3 +63,18 @@ agingos_env/
 *.bak
 *.bak_*
 _handoff_*
+
+# local backups / exports (do not commit)
+_backup/
+_backup_*.sql
+_backup_*.jsonl
+backend/_backup_*
+backend/models/_backup_*
+backend/services/_backup_*
+services/console/_backup_*
+tools/_backup_*
+
+# driftpakke / ops scripts (decide later)
+tools/driftpakke_*.py
+tools/patch_driftpakke_*.py
+tools/pilot_weekly_export.sh

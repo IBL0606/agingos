@@ -1,5 +1,6 @@
 # services/anomaly_scoring.py
 from __future__ import annotations
+import os
 
 import math
 from dataclasses import dataclass
@@ -75,6 +76,7 @@ def _get_latest_model_end(db: Session, scope: AuthScope) -> Optional[str]:
             SELECT model_end
             FROM baseline_model_status
             WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
+              AND stream_id = :stream_id
             ORDER BY model_end DESC
             LIMIT 1
             """
@@ -83,6 +85,7 @@ def _get_latest_model_end(db: Session, scope: AuthScope) -> Optional[str]:
                 "org_id": scope.org_id,
                 "home_id": scope.home_id,
                 "subject_id": scope.subject_id,
+                "stream_id": os.getenv("AGINGOS_STREAM_ID", "prod"),
             },
         )
         .mappings()
@@ -201,11 +204,14 @@ def _observed_door_events(
             FROM events
             WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
               AND "timestamp" >= :start AND "timestamp" < :end
-              AND category = 'door'
-              AND (
-                (payload->>'room') = :room
-                OR (payload->>'area') = :room
-              )
+              
+AND category = 'door'
+AND (
+  (room_id = :room)
+  OR ((payload->>'room') = :room)
+  OR ((payload->>'area') = :room)
+)
+
             """
             ),
             {
@@ -221,6 +227,48 @@ def _observed_door_events(
         .first()
     )
     return int(row["n"] or 0) if row else 0
+
+
+def _observed_activity_events(
+    db: "Session",
+    scope: "AuthScope",
+    room: str,
+    bucket_start: "datetime",
+    bucket_end: "datetime",
+) -> float:
+    """MVP: observed activity from raw events (presence+motion) inside bucket.
+    Uses events.room_id when present; falls back to payload room/area for backward-compat.
+    Returns a float count (so it can be used like intensity)."""
+    from sqlalchemy import text
+
+    q = text("""
+        SELECT COALESCE(COUNT(*),0)::float AS n
+        FROM events
+        WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
+          AND timestamp >= :t0 AND timestamp < :t1
+          AND category IN ('presence','motion')
+          AND (
+            (room_id = :room)
+            OR ((payload->>'room') = :room)
+            OR ((payload->>'area') = :room)
+          )
+    """)
+    row = (
+        db.execute(
+            q,
+            {
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+                "t0": bucket_start,
+                "t1": bucket_end,
+                "room": room,
+            },
+        )
+        .mappings()
+        .first()
+    )
+    return float(row["n"] if row else 0.0)
 
 
 def score_room_bucket(
@@ -312,6 +360,22 @@ def score_room_bucket(
         "door_obs": door_obs,
         **act_meta,
     }
+
+    # MVP_EVENT_FALLBACK_V2: if episode-based observation yields 0 and no episodes were used,
+    # fall back to counting raw presence/motion events in the bucket.
+    try:
+        obs = details.get("observed") or {}
+        if (
+            float(obs.get("activity_obs") or 0.0) <= 0.0
+            and int(obs.get("episodes_used") or 0) == 0
+        ):
+            ao = _observed_activity_events(db, scope, room, bucket_start, bucket_end)
+            obs["activity_obs"] = float(ao)
+            details["observed"] = obs
+            # also update local variable so scoring below uses the fallback value
+            activity_obs = float(ao)
+    except Exception:
+        pass
 
     # Defaults (robust)
     score_intensity = 0.0

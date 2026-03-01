@@ -2,14 +2,17 @@ from __future__ import annotations
 
 from datetime import datetime, timezone, timedelta
 
+from services.rules.context import RuleContext
 from services.rules.r001 import eval_r001_no_motion
 
 
 class _FakeQuery:
     def filter(self, *args, **kwargs):
         return self
+
     def order_by(self, *args, **kwargs):
         return self
+
     def all(self):
         return []
 
@@ -24,7 +27,10 @@ def test_r001_no_motion_returns_deviation_when_no_rows():
     since = now - timedelta(hours=3)
     until = now
 
-    devs = eval_r001_no_motion(_FakeSession(), since=since, until=until, now=now)
+    ctx = RuleContext(
+        session=_FakeSession(), since=since, until=until, now=now, params={}
+    )
+    devs = eval_r001_no_motion(ctx)
 
     assert len(devs) == 1
     d = devs[0]
@@ -35,21 +41,27 @@ def test_r001_no_motion_returns_deviation_when_no_rows():
     assert d.window.until == until
     assert d.evidence == []
 
+
 class _Row:
     def __init__(self, payload):
         self.payload = payload
 
+
 class _FakeQueryRows(_FakeQuery):
     def __init__(self, rows):
         self._rows = rows
+
     def all(self):
         return self._rows
+
 
 class _FakeSessionRows(_FakeSession):
     def __init__(self, rows):
         self._rows = rows
+
     def query(self, *args, **kwargs):
         return _FakeQueryRows(self._rows)
+
 
 def test_r001_ignores_inactive_motion_payload():
     # One event in window, but payload indicates inactive (state != "on") -> should still trigger deviation
@@ -58,7 +70,10 @@ def test_r001_ignores_inactive_motion_payload():
     until = now
 
     rows = [_Row({"state": "off"})]
-    devs = eval_r001_no_motion(_FakeSessionRows(rows), since=since, until=until, now=now)
+    ctx = RuleContext(
+        session=_FakeSessionRows(rows), since=since, until=until, now=now, params={}
+    )
+    devs = eval_r001_no_motion(ctx)
 
     assert len(devs) == 1
     assert devs[0].rule_id == "R-001"

@@ -10,24 +10,42 @@ rules:
     enabled_in_scheduler: true
     lookback_minutes: 240
     expire_after_minutes: 720
+    params:
+      allowed_entity_ids:
+      - binary_sensor.inngangsdor_contact
   R-003:
     enabled_in_scheduler: true
     lookback_minutes: 240
     expire_after_minutes: 720
   R-004:
-    enabled_in_scheduler: false
+    enabled_in_scheduler: true
   R-005:
-    enabled_in_scheduler: false
+    enabled_in_scheduler: true
   R-006:
-    enabled_in_scheduler: false
+    enabled_in_scheduler: true
   R-007:
-    enabled_in_scheduler: false
+    enabled_in_scheduler: true
   R-008:
-    enabled_in_scheduler: false
+    enabled_in_scheduler: true
   R-009:
-    enabled_in_scheduler: false
+    enabled_in_scheduler: true
+    params:
+      stream_id: prod
+      liveness_categories:
+      - ha_snapshot
+      max_age_minutes: 75
   R-010:
-    enabled_in_scheduler: false
+    enabled_in_scheduler: true
 scheduler:
   interval_minutes: 5
   default_subject_key: default
+R-002:
+  params:
+    allowed_entity_ids:
+    - binary_sensor.inngangsdor_contact
+R-001:
+  params:
+    motion_categories:
+    - presence
+    - motion
+    motion_on_value: 'on'

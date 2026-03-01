@@ -14,7 +14,7 @@ jobs:
       AGINGOS_AUTH_MODE: "api_key"
       # Use Secrets if set, otherwise fallback (CI should still run)
       AGINGOS_API_KEYS: ${{ secrets.AGINGOS_API_KEYS || 'dev-key-2,dev-key-3' }}
-      AGINGOS_API_KEY:  ${{ secrets.AGINGOS_API_KEY  || 'dev-key-2' }}
+      AGINGOS_API_KEY: ${{ secrets.AGINGOS_API_KEY || 'dev-key-2' }}
 
     steps:
       - name: Checkout
@@ -84,8 +84,7 @@ jobs:
           docker compose exec -T backend bash -lc 'alembic -c alembic.ini upgrade head' || \
           docker compose exec -T backend bash -lc 'cd backend && alembic -c alembic.ini upgrade head'
 
-
-      - name: Bootstrap DB schema (api_key_scopes + events scope columns)
+      - name: Bootstrap DB schema (api_key_scopes + events scope columns + room_id + stream_id)
         shell: bash
         run: |
           set -euo pipefail
@@ -110,7 +109,7 @@ jobs:
           WHERE active = true;
           SQL
 
-          # 2) Ensure events has org/home/subject columns (additive + backfill + safe indexes)
+          # 2) Ensure events has required columns (scope + room_id + stream_id)
           docker compose exec -T db psql -U agingos -d agingos -v ON_ERROR_STOP=1 <<'SQL'
           DO $$
           BEGIN
@@ -118,22 +117,26 @@ jobs:
               EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS org_id text';
               EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS home_id text';
               EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS subject_id text';
+              EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS room_id text';
+              EXECUTE 'ALTER TABLE public.events ADD COLUMN IF NOT EXISTS stream_id text';
 
               EXECUTE 'UPDATE public.events SET org_id=''default'' WHERE org_id IS NULL';
               EXECUTE 'UPDATE public.events SET home_id=''default'' WHERE home_id IS NULL';
               EXECUTE 'UPDATE public.events SET subject_id=''default'' WHERE subject_id IS NULL';
+              EXECUTE 'UPDATE public.events SET stream_id=''prod'' WHERE stream_id IS NULL';
 
               EXECUTE 'ALTER TABLE public.events ALTER COLUMN org_id SET DEFAULT ''default''';
               EXECUTE 'ALTER TABLE public.events ALTER COLUMN home_id SET DEFAULT ''default''';
               EXECUTE 'ALTER TABLE public.events ALTER COLUMN subject_id SET DEFAULT ''default''';
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN stream_id SET DEFAULT ''prod''';
 
               EXECUTE 'ALTER TABLE public.events ALTER COLUMN org_id SET NOT NULL';
               EXECUTE 'ALTER TABLE public.events ALTER COLUMN home_id SET NOT NULL';
               EXECUTE 'ALTER TABLE public.events ALTER COLUMN subject_id SET NOT NULL';
+              EXECUTE 'ALTER TABLE public.events ALTER COLUMN stream_id SET NOT NULL';
 
               EXECUTE 'CREATE INDEX IF NOT EXISTS ix_events_scope_ts ON public.events (org_id, home_id, subject_id, "timestamp")';
 
-              -- Create UNIQUE only if no duplicates exist
               IF NOT EXISTS (
                 SELECT 1 FROM (
                   SELECT org_id, home_id, event_id
@@ -239,6 +242,11 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{\"id\":\"$EVENT_ID\",\"timestamp\":\"$TS\",\"category\":\"motion\",\"payload\":{\"entity_id\":\"binary_sensor.ci_motion\",\"room\":\"default\",\"state\":\"on\"}}" \
             | head -c 8000 || true
+          echo
+          echo "== FAILURE DEBUG: /deviations/evaluate window for R-002 check =="
+          curl -sS -i "$BASE_URL/deviations/evaluate?since=2025-12-15T01:00:00Z&until=2025-12-15T03:00:00Z" \
+           -H "X-API-Key: $AGINGOS_API_KEY" \
+          | head -c 12000 || true
           echo
           echo "== FAILURE DEBUG: backend logs (tail 200) =="
           docker compose logs backend --tail 200 || true

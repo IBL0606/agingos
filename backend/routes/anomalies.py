@@ -50,7 +50,19 @@ def _serialize(ep: AnomalyEpisode) -> dict:
         "peak_bucket_score": float(ep.peak_bucket_score)
         if ep.peak_bucket_score is not None
         else None,
-        "reasons": ep.reasons or [],
+        "reasons": (
+            ep.reasons
+            if isinstance(ep.reasons, list)
+            else (
+                ep.reasons_last
+                if isinstance(getattr(ep, "reasons_last", None), list)
+                else (
+                    ep.reasons_peak
+                    if isinstance(getattr(ep, "reasons_peak", None), list)
+                    else []
+                )
+            )
+        ),
         "human_weight_mode": ep.human_weight_mode,
         "pet_weight": float(ep.pet_weight or 0.0),
         "baseline_ref": ep.baseline_ref or {},
@@ -232,8 +244,33 @@ def scheduler_jobs():
 
 @router.get("/runner_status")
 def anomalies_runner_status():
-    # In-memory status (process-local). Good enough for dev verification.
-    return ANOMALIES_RUNNER_STATUS
+    # In-memory status (process-local). For MVP, make it deterministic:
+    # If empty, run the same logic as scheduler (via run_anomalies_job) and populate status.
+    # MVP_RUNNER_STATUS_CALL_RUN_LATEST
+    from datetime import datetime, timezone
+
+    rs = ANOMALIES_RUNNER_STATUS
+    if (
+        (not rs.get("last_run_at"))
+        and (not rs.get("last_ok_at"))
+        and (not rs.get("last_error_at"))
+    ):
+        try:
+            out = run_anomalies_job()
+            rs["last_run_at"] = datetime.now(timezone.utc).isoformat()
+            rs["last_ok_at"] = datetime.now(timezone.utc).isoformat()
+            rs["last_error_at"] = None
+            rs["last_error_msg"] = None
+            rs["last_scored_bucket_start"] = out.get("bucket_start")
+            rs["last_counts"] = out.get("counts")
+            rs["last_rooms_scored"] = out.get("rooms_scored")
+        except Exception as e:
+            rs["last_run_at"] = datetime.now(timezone.utc).isoformat()
+            rs["last_ok_at"] = None
+            rs["last_error_at"] = datetime.now(timezone.utc).isoformat()
+            rs["last_error_msg"] = str(e)
+
+    return rs
 
 
 @router.post("/run_latest")

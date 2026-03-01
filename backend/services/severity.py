@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+
 def severity_from_score(score: int) -> str:
     """Deterministic mapping from numeric score to severity label."""
     if score >= 90:

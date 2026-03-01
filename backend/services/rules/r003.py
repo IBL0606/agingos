@@ -1,36 +1,35 @@
-from datetime import datetime, timedelta
+from __future__ import annotations
+
+from datetime import timedelta
 from typing import List
 
-from sqlalchemy.orm import Session
-
-from config.rule_config import load_rule_config
 from models.db_event import EventDB
 from schemas.deviation_v1 import DeviationV1, Window
+from services.rules.context import RuleContext
 
 RULE_ID = "R-003"
 
 
-def _params() -> dict:
-    cfg = load_rule_config()
-    p = cfg.rule_params(RULE_ID)
+def _params(ctx: RuleContext) -> dict:
+    p = ctx.params or {}
     return p if isinstance(p, dict) else {}
 
 
-def _followup_minutes() -> int:
-    return int(_params().get("followup_minutes", 10))
+def _followup_minutes(ctx: RuleContext) -> int:
+    return int(_params(ctx).get("followup_minutes", 10))
 
 
-def _door_category() -> str:
-    return str(_params().get("door_category", "door"))
+def _door_category(ctx: RuleContext) -> str:
+    return str(_params(ctx).get("door_category", "door"))
 
 
-def _motion_categories() -> list[str]:
+def _motion_categories(ctx: RuleContext) -> list[str]:
     """
     Prefer new param: motion_categories: ["motion","presence"]
     Back-compat: motion_category: "motion"
     Default: ["motion"]
     """
-    p = _params()
+    p = _params(ctx)
     cats = p.get("motion_categories")
     if isinstance(cats, list) and cats:
         return [str(x) for x in cats]
@@ -40,30 +39,30 @@ def _motion_categories() -> list[str]:
     return ["motion"]
 
 
-def _payload_state_keys() -> list[str]:
-    keys = _params().get("payload_state_keys", ["state", "value"])
+def _payload_state_keys(ctx: RuleContext) -> list[str]:
+    keys = _params(ctx).get("payload_state_keys", ["state", "value"])
     if isinstance(keys, list) and keys:
         return [str(x) for x in keys]
     return ["state", "value"]
 
 
-def _door_name_keys() -> list[str]:
-    keys = _params().get("door_name_keys", ["door", "name"])
+def _door_name_keys(ctx: RuleContext) -> list[str]:
+    keys = _params(ctx).get("door_name_keys", ["door", "name"])
     if isinstance(keys, list) and keys:
         return [str(x) for x in keys]
     return ["door", "name"]
 
 
-def _required_door_name() -> str:
-    return str(_params().get("required_door_name", "front"))
+def _required_door_name(ctx: RuleContext) -> str:
+    return str(_params(ctx).get("required_door_name", "front"))
 
 
-def _door_open_value() -> str:
-    return str(_params().get("door_open_value", "open"))
+def _door_open_value(ctx: RuleContext) -> str:
+    return str(_params(ctx).get("door_open_value", "open"))
 
 
-def _motion_on_value() -> str:
-    return str(_params().get("motion_on_value", "on"))
+def _motion_on_value(ctx: RuleContext) -> str:
+    return str(_params(ctx).get("motion_on_value", "on"))
 
 
 def _get_first(payload: object, keys: list[str]) -> str | None:
@@ -76,31 +75,29 @@ def _get_first(payload: object, keys: list[str]) -> str | None:
     return None
 
 
-def eval_r003_front_door_open_no_motion_after(
-    session: Session, since: datetime, until: datetime, now: datetime
-) -> List[DeviationV1]:
-    follow_minutes = _followup_minutes()
+def eval_r003_front_door_open_no_motion_after(ctx: RuleContext) -> List[DeviationV1]:
+    follow_minutes = _followup_minutes(ctx)
 
     door_rows = (
-        session.query(EventDB)
-        .filter(EventDB.timestamp >= since)
-        .filter(EventDB.timestamp < until)  # until eksklusiv
-        .filter(EventDB.category == _door_category())
+        ctx.session.query(EventDB)
+        .filter(EventDB.timestamp >= ctx.since)
+        .filter(EventDB.timestamp < ctx.until)  # until eksklusiv
+        .filter(EventDB.category == _door_category(ctx))
         .order_by(EventDB.timestamp.asc())
         .all()
     )
 
-    required_name = _required_door_name()
-    door_open = _door_open_value()
-    motion_on = _motion_on_value()
-    motion_cats = _motion_categories()
+    required_name = _required_door_name(ctx)
+    door_open = _door_open_value(ctx)
+    motion_on = _motion_on_value(ctx)
+    motion_cats = _motion_categories(ctx)
 
     triggered = False
     evidence: List[str] = []
 
     for d in door_rows:
-        state = _get_first(d.payload, _payload_state_keys())
-        door_name = _get_first(d.payload, _door_name_keys())
+        state = _get_first(d.payload, _payload_state_keys(ctx))
+        door_name = _get_first(d.payload, _door_name_keys(ctx))
 
         # Deterministisk match: configured door open
         if state != door_open or door_name != required_name:
@@ -109,7 +106,7 @@ def eval_r003_front_door_open_no_motion_after(
         follow_until = d.timestamp + timedelta(minutes=follow_minutes)
 
         motion_rows = (
-            session.query(EventDB)
+            ctx.session.query(EventDB)
             .filter(EventDB.timestamp >= d.timestamp)
             .filter(EventDB.timestamp < follow_until)  # follow_until eksklusiv
             .filter(EventDB.category.in_(motion_cats))
@@ -119,7 +116,7 @@ def eval_r003_front_door_open_no_motion_after(
 
         has_motion_on = False
         for m in motion_rows:
-            m_state = _get_first(m.payload, _payload_state_keys())
+            m_state = _get_first(m.payload, _payload_state_keys(ctx))
             # If motion/presence has explicit state/value, require it to be "on"
             if m_state is None:
                 has_motion_on = True
@@ -139,7 +136,7 @@ def eval_r003_front_door_open_no_motion_after(
     return [
         DeviationV1(
             rule_id=RULE_ID,
-            timestamp=now,
+            timestamp=ctx.now,
             severity="MEDIUM",
             title="Mulig uvanlig hendelse etter dør",
             explanation=(
@@ -147,6 +144,6 @@ def eval_r003_front_door_open_no_motion_after(
                 "Det kan være at personen gikk ut, falt, eller at sensorer ikke registrerte aktivitet."
             ),
             evidence=evidence,
-            window=Window(since=since, until=until),
+            window=Window(since=ctx.since, until=ctx.until),
         )
     ]

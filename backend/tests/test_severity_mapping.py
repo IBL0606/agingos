@@ -1,5 +1,6 @@
 from services.severity import severity_from_score
 
+
 def test_severity_mapping_thresholds():
     assert severity_from_score(0) == "LOW"
     assert severity_from_score(39) == "LOW"

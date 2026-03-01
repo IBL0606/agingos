@@ -4,6 +4,7 @@ import httpx
 
 # backend/main.py
 from fastapi import Body, Depends, FastAPI, HTTPException, Request
+from starlette.responses import Response
 
 from db import SessionLocal
 from models.event import Event
@@ -22,6 +23,7 @@ from routes.rules import router as rules_router
 from routes.deviations import router as deviations_router
 from routes.baseline import router as baseline_router
 from routes.anomalies import router as anomalies_router
+from routes.notification_policy import router as notification_router
 
 from fastapi import Query
 from sqlalchemy import text
@@ -34,10 +36,52 @@ from util.time import require_utc_aware
 
 app = FastAPI(title="AgingOS Backend")
 
+
+# P1-5: Deprecation headers for legacy (non-/v1) API paths.
+# - Additive: does not change behavior, only adds headers.
+# - Exempt ops endpoints: /health, /health/detail, /debug/*
+_DEPRECATION_SUNSET = os.getenv("AGINGOS_API_SUNSET_DATE", "2026-06-01")
+
+
+@app.middleware("http")
+async def add_deprecation_headers(request: Request, call_next):
+    path = request.url.path or ""
+    response: Response = await call_next(request)
+
+    # Only tag legacy backend API routes (not /v1, not ops/debug)
+    if not path.startswith("/v1"):
+        if path.startswith("/health") or path.startswith("/debug"):
+            return response
+
+        # Mark legacy
+        response.headers.setdefault("Deprecation", "true")
+        response.headers.setdefault("Sunset", _DEPRECATION_SUNSET)
+
+        # Simple successor mapping: prefix /v1 + same path
+        # (works for most endpoints; may not exist for some legacy-only paths)
+        successor = "/v1" + path
+        response.headers.setdefault("Link", f'<{successor}>; rel="successor-version"')
+    return response
+
+
 app.include_router(rules_router, dependencies=[Depends(require_scope)])
 app.include_router(deviations_router, dependencies=[Depends(require_scope)])
 app.include_router(baseline_router, dependencies=[Depends(require_scope)])
 app.include_router(anomalies_router, dependencies=[Depends(require_scope)])
+app.include_router(notification_router, dependencies=[Depends(require_scope)])
+
+# P1-5: /v1 stable contract (additive). Keep legacy paths working.
+app.include_router(rules_router, prefix="/v1", dependencies=[Depends(require_scope)])
+app.include_router(
+    deviations_router, prefix="/v1", dependencies=[Depends(require_scope)]
+)
+app.include_router(baseline_router, prefix="/v1", dependencies=[Depends(require_scope)])
+app.include_router(
+    anomalies_router, prefix="/v1", dependencies=[Depends(require_scope)]
+)
+app.include_router(
+    notification_router, prefix="/v1", dependencies=[Depends(require_scope)]
+)
 
 
 @app.get("/health")
@@ -83,16 +127,23 @@ def health_detail(scope: "AuthScope" = Depends(require_scope)):
         out["reasons"].append(reason)
 
     # ---- ingest lag (events) ----
+    stream_id = os.getenv("AGINGOS_STREAM_ID", "prod")
     db = SessionLocal()
     try:
         row = (
             db.execute(
                 text("""
-                SELECT MAX("timestamp") AS max_ts, COUNT(*)::int AS n
+                SELECT MAX(\"timestamp\") AS max_ts, COUNT(*)::int AS n
                 FROM events
                 WHERE org_id = :org AND home_id = :home AND subject_id = :sub
-            """),
-                {"org": scope.org_id, "home": scope.home_id, "sub": scope.subject_id},
+                  AND stream_id = :stream_id
+                """),
+                {
+                    "org": scope.org_id,
+                    "home": scope.home_id,
+                    "sub": scope.subject_id,
+                    "stream_id": stream_id,
+                },
             )
             .mappings()
             .one()
@@ -149,11 +200,37 @@ def health_detail(scope: "AuthScope" = Depends(require_scope)):
                     ORDER BY model_end DESC
                     LIMIT 1
                 """),
-                    {"org": scope.org_id, "home": scope.home_id, "sub": scope.subject_id},
-                ).mappings().one_or_none()
+                    {
+                        "org": scope.org_id,
+                        "home": scope.home_id,
+                        "sub": scope.subject_id,
+                    },
+                )
+                .mappings()
+                .one_or_none()
             )
+
+        except Exception as e:
+            # Fail-soft if table does not exist yet (e.g. migrations not applied)
+            msg = str(e)
+            if "subject_state" in msg and (
+                "does not exist" in msg or "UndefinedTable" in msg
+            ):
+                return {
+                    "available": False,
+                    "org_id": scope.org_id,
+                    "home_id": scope.home_id,
+                    "subject_id": scope.subject_id,
+                    "state": "unknown",
+                    "state_since": None,
+                    "last_event_ts": None,
+                    "updated_at": None,
+                    "note": "subject_state table missing (migrations not applied yet)",
+                }
+            raise
         except Exception as e:
             from sqlalchemy.exc import ProgrammingError
+
             if isinstance(e, ProgrammingError):
                 db.rollback()
                 baseline_table_missing = True
@@ -268,10 +345,28 @@ def health_detail(scope: "AuthScope" = Depends(require_scope)):
         out["components"]["anomalies_runner"]["status"] = "DEGRADED"
         degrade("DEGRADED", "anomalies runner has last_error_at set")
     elif not rs.get("last_ok_at") and not rs.get("last_run_at"):
-        out["components"]["anomalies_runner"]["status"] = "DEGRADED"
-        degrade("DEGRADED", "anomalies runner has never run in this process")
+        # MVP: after restart, runner status is process-local; don't degrade if scheduler is configured.
+        job_ids = set(
+            j.get("id") for j in out["components"]["scheduler"].get("jobs", [])
+        )
+        if out["components"]["scheduler"].get("running") and "anomalies_job" in job_ids:
+            rs["note"] = (
+                "runner status is process-local and not yet populated after restart; anomalies_job is scheduled"
+            )
+            out["components"]["anomalies_runner"]["status"] = "OK"
+        else:
+            out["components"]["anomalies_runner"]["status"] = "DEGRADED"
+            degrade("DEGRADED", "anomalies runner has never run in this process")
 
     return out
+
+
+@app.post("/v1/pattern_miner/run_once")
+def pattern_miner_run_once_v1(
+    request: Request, scope: "AuthScope" = Depends(require_scope)
+):
+    # P1-5: /v1 stable alias; re-use legacy implementation
+    return pattern_miner_run_once(request)
 
 
 @app.post("/pattern_miner/run_once")
@@ -503,6 +598,14 @@ def _parse_iso_ts(s: Optional[str]) -> Optional[datetime]:
     return datetime.fromisoformat(s.replace("Z", "+00:00"))
 
 
+@app.post("/v1/episodes_svc/build_once")
+def episodes_svc_build_once_v1(
+    body: EpisodesSvcBuildIn, scope: "AuthScope" = Depends(require_scope)
+):
+    # P1-5: /v1 stable alias; re-use legacy implementation
+    return episodes_svc_build_once(body=body, scope=scope)
+
+
 @app.post("/episodes_svc/build_once")
 def episodes_svc_build_once(
     body: EpisodesSvcBuildIn, scope: "AuthScope" = Depends(require_scope)
@@ -576,8 +679,111 @@ def episodes_svc_build_once(
     }
 
 
+@app.get("/v1/episodes_svc")
+def list_episodes_svc_v1(
+    room_id: Optional[str] = Query(default=None),
+    episode_type: Optional[str] = Query(default=None),
+    since: Optional[datetime] = Query(default=None),
+    until: Optional[datetime] = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=5000),
+    scope: "AuthScope" = Depends(require_scope),
+) -> dict:
+    # P1-5: /v1 stable alias; re-use legacy implementation
+    return list_episodes_svc(
+        room_id=room_id,
+        episode_type=episode_type,
+        since=since,
+        until=until,
+        limit=limit,
+        scope=scope,
+    )
+
+
+@app.get("/episodes_svc")
+def list_episodes_svc(
+    room_id: Optional[str] = Query(default=None),
+    episode_type: Optional[str] = Query(default=None),
+    since: Optional[datetime] = Query(default=None),
+    until: Optional[datetime] = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=5000),
+    scope: "AuthScope" = Depends(require_scope),
+) -> dict:
+    """
+    Read episodes built by episodes_svc builder (episodes_svc table).
+    Scope enforced (P0-2). Intended for Console/ops visibility.
+    """
+    db = SessionLocal()
+    try:
+        where = ["org_id = :org_id", "home_id = :home_id", "subject_id = :subject_id"]
+        params = {
+            "limit": limit,
+            "org_id": scope.org_id,
+            "home_id": scope.home_id,
+            "subject_id": scope.subject_id,
+        }
+
+        if room_id:
+            where.append("room_id = :room_id")
+            params["room_id"] = room_id
+
+        if episode_type:
+            where.append("episode_type = :episode_type")
+            params["episode_type"] = episode_type
+
+        if since:
+            try:
+                since_utc = require_utc_aware(since, "since")
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=str(e))
+            where.append("start_ts >= :since")
+            params["since"] = since_utc
+
+        if until:
+            try:
+                until_utc = require_utc_aware(until, "until")
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=str(e))
+            where.append("start_ts < :until")
+            params["until"] = until_utc
+
+        where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+        q = text(
+            f"""
+            SELECT
+              org_id, home_id, subject_id,
+              episode_type, room_id,
+              start_ts, end_ts,
+              start_event_row_id, end_event_row_id,
+              start_event_id, end_event_id,
+              event_n, is_open, meta
+            FROM episodes_svc
+            {where_sql}
+            ORDER BY start_ts DESC, room_id ASC, episode_type ASC
+            LIMIT :limit
+            """
+        )
+        rows = db.execute(q, params).mappings().all()
+        return {"status": "ok", "rows": [dict(r) for r in rows]}
+    finally:
+        db.close()
+
+
+@app.post("/v1/event")
+def receive_event_v1(
+    event: Event,
+    stream_id: str = Query(default="prod"),
+    scope: AuthScope = Depends(require_scope),
+):
+    # P1-5: /v1 stable alias; re-use legacy implementation
+    return receive_event(event=event, scope=scope, stream_id=stream_id)
+
+
 @app.post("/event")
-def receive_event(event: Event, scope: AuthScope = Depends(require_scope)):
+def receive_event(
+    event: Event,
+    stream_id: str = Query(default="prod"),
+    scope: AuthScope = Depends(require_scope),
+):
     db = SessionLocal()
     try:
         db_event = EventDB(
@@ -589,6 +795,9 @@ def receive_event(event: Event, scope: AuthScope = Depends(require_scope)):
             home_id=scope.home_id,
             subject_id=scope.subject_id,
         )
+        # P1-7: force stream_id onto row (robust even if constructor args change)
+        db_event.stream_id = stream_id
+
         db.add(db_event)
         try:
             db.commit()
@@ -596,7 +805,11 @@ def receive_event(event: Event, scope: AuthScope = Depends(require_scope)):
         except IntegrityError as e:
             db.rollback()
             constraint = getattr(getattr(e.orig, "diag", None), "constraint_name", None)
-            if constraint == "events_event_id_unique":
+            if constraint in (
+                "events_event_id_unique",
+                "ux_events_scope_event_id",
+                "ux_events_scope_stream_event_id",
+            ):
                 return {"received": True, "deduped": True}
             raise HTTPException(
                 status_code=500, detail=f"db integrity error: {constraint or str(e)}"
@@ -755,6 +968,200 @@ def _upsert_monitor_mode(
             "r": room_id,
             "m": mode,
         },
+    )
+
+
+@app.get("/v1/proposals")
+def list_proposals_v1(
+    last: str | None = None,
+    limit: int = Query(default=200, ge=1, le=500),
+    scope: "AuthScope" = Depends(require_scope),
+):
+    # P1-5: /v1 stable alias; forward plain query values
+    return list_proposals(last=last, limit=int(limit), scope=scope)
+
+
+# -------------------------
+# Proposal feedback (P1-3)
+# -------------------------
+
+
+def _proposal_exists(db, *, scope: "AuthScope", proposal_id: int) -> bool:
+    row = db.execute(
+        text(
+            """
+            SELECT 1
+            FROM proposals
+            WHERE org_id=:org_id AND home_id=:home_id AND subject_id=:subject_id
+              AND proposal_id=:pid
+            LIMIT 1
+            """
+        ),
+        {
+            "org_id": scope.org_id,
+            "home_id": scope.home_id,
+            "subject_id": scope.subject_id,
+            "pid": proposal_id,
+        },
+    ).first()
+    return bool(row)
+
+
+def _insert_proposal_feedback(
+    db,
+    *,
+    scope: "AuthScope",
+    proposal_id: int,
+    verdict: str,
+    note: str | None,
+    actor: str | None,
+    source: str,
+) -> None:
+    db.execute(
+        text(
+            """
+            INSERT INTO proposal_feedback
+              (org_id, home_id, subject_id, proposal_id, verdict, note, actor, source, created_at)
+            VALUES
+              (:org_id, :home_id, :subject_id, :proposal_id, :verdict, :note, :actor, :source, now())
+            """
+        ),
+        {
+            "org_id": scope.org_id,
+            "home_id": scope.home_id,
+            "subject_id": scope.subject_id,
+            "proposal_id": proposal_id,
+            "verdict": verdict,
+            "note": note,
+            "actor": actor,
+            "source": source,
+        },
+    )
+
+
+def _list_proposal_feedback(db, *, scope: "AuthScope", proposal_id: int, limit: int):
+    rows = (
+        db.execute(
+            text(
+                """
+                SELECT
+                  feedback_id, proposal_id, org_id, home_id, subject_id,
+                  verdict, note, actor, source, created_at
+                FROM proposal_feedback
+                WHERE org_id=:org_id AND home_id=:home_id AND subject_id=:subject_id
+                  AND proposal_id=:proposal_id
+                ORDER BY created_at DESC, feedback_id DESC
+                LIMIT :limit
+                """
+            ),
+            {
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+                "proposal_id": proposal_id,
+                "limit": limit,
+            },
+        )
+        .mappings()
+        .all()
+    )
+    return [dict(r) for r in rows]
+
+
+@app.get("/v1/proposals/{proposal_id}/feedback")
+def get_proposal_feedback_v1(
+    proposal_id: int,
+    limit: int = Query(default=20, ge=1, le=200),
+    scope: "AuthScope" = Depends(require_scope),
+):
+    db = SessionLocal()
+    try:
+        if not _proposal_exists(db, scope=scope, proposal_id=proposal_id):
+            raise HTTPException(status_code=404, detail="Not Found")
+        return _list_proposal_feedback(
+            db, scope=scope, proposal_id=proposal_id, limit=int(limit)
+        )
+    finally:
+        db.close()
+
+
+@app.post("/v1/proposals/{proposal_id}/feedback")
+def post_proposal_feedback_v1(
+    proposal_id: int,
+    payload: dict,
+    scope: "AuthScope" = Depends(require_scope),
+):
+    verdict = (payload.get("feedback") or payload.get("verdict") or "").strip().upper()
+    note = payload.get("note")
+    actor = payload.get("actor")
+    source = (payload.get("source") or "console").strip()
+
+    if verdict not in ("USEFUL", "NOT_USEFUL"):
+        raise HTTPException(
+            status_code=422, detail="feedback/verdict must be USEFUL or NOT_USEFUL"
+        )
+
+    db = SessionLocal()
+    try:
+        if not _proposal_exists(db, scope=scope, proposal_id=proposal_id):
+            raise HTTPException(status_code=404, detail="Not Found")
+        _insert_proposal_feedback(
+            db,
+            scope=scope,
+            proposal_id=proposal_id,
+            verdict=verdict,
+            note=note,
+            actor=actor,
+            source=source,
+        )
+        db.commit()
+        return {"ok": True}
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+# Legacy alias with deprecation headers
+@app.get("/proposals/{proposal_id}/feedback")
+def get_proposal_feedback_legacy(
+    proposal_id: int,
+    limit: int = Query(default=20, ge=1, le=200),
+    scope: "AuthScope" = Depends(require_scope),
+    response: "Response" = None,
+):
+    # Add deprecation headers if Response is available in scope
+    try:
+        if response is not None:
+            response.headers["deprecation"] = "true"
+            response.headers["sunset"] = "2026-06-01"
+            response.headers["link"] = (
+                f'</v1/proposals/{proposal_id}/feedback>; rel="successor-version"'
+            )
+    except Exception:
+        pass
+    return get_proposal_feedback_v1(proposal_id=proposal_id, limit=limit, scope=scope)
+
+
+@app.post("/proposals/{proposal_id}/feedback")
+def post_proposal_feedback_legacy(
+    proposal_id: int,
+    payload: dict,
+    scope: "AuthScope" = Depends(require_scope),
+    response: "Response" = None,
+):
+    try:
+        if response is not None:
+            response.headers["deprecation"] = "true"
+            response.headers["sunset"] = "2026-06-01"
+            response.headers["link"] = (
+                f'</v1/proposals/{proposal_id}/feedback>; rel="successor-version"'
+            )
+    except Exception:
+        pass
+    return post_proposal_feedback_v1(
+        proposal_id=proposal_id, payload=payload, scope=scope
     )
 
 
@@ -1425,6 +1832,12 @@ def set_episode_label(
     Persist a user label for an episode (audit trail in episode_labels).
     """
     from sqlalchemy import text
+    from uuid import UUID
+
+    try:
+        UUID(str(episode_id))
+    except Exception:
+        raise HTTPException(status_code=400, detail="episode_id must be a UUID")
 
     lbl = (body.label or "").strip().lower()
     if lbl not in ("human", "pet", "unknown"):
@@ -1486,6 +1899,12 @@ def undo_episode_label(
     Undo a previous label by inserting an undo record that targets label_id.
     """
     from sqlalchemy import text
+    from uuid import UUID
+
+    try:
+        UUID(str(episode_id))
+    except Exception:
+        raise HTTPException(status_code=400, detail="episode_id must be a UUID")
 
     actor = (body.actor or "").strip()
     if not actor:
@@ -1561,6 +1980,28 @@ def undo_episode_label(
         db.close()
 
 
+@app.get("/v1/events")
+def list_events_v1(
+    category: Optional[str] = Query(default=None),
+    since: Optional[datetime] = Query(default=None),
+    until: Optional[datetime] = Query(default=None),
+    before: Optional[datetime] = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=1000),
+    stream_id: str = Query(default="prod"),
+    scope: "AuthScope" = Depends(require_scope),
+) -> list[Event]:
+    # P1-5: /v1 stable alias; re-use legacy implementation
+    return list_events(
+        category=category,
+        since=since,
+        until=until,
+        before=before,
+        limit=limit,
+        stream_id=stream_id,
+        scope=scope,
+    )
+
+
 @app.get("/events")
 def list_events(
     category: Optional[str] = Query(default=None),
@@ -1568,6 +2009,7 @@ def list_events(
     until: Optional[datetime] = Query(default=None),
     before: Optional[datetime] = Query(default=None),
     limit: int = Query(default=100, ge=1, le=1000),
+    stream_id: str = Query(default="prod"),
     scope: "AuthScope" = Depends(require_scope),
 ) -> list[Event]:
     db = SessionLocal()
@@ -1580,6 +2022,9 @@ def list_events(
             EventDB.home_id == scope.home_id,
             EventDB.subject_id == scope.subject_id,
         )
+
+        # Stream enforcement (P1-7): default 'prod' unless specified
+        query = query.filter(EventDB.stream_id == stream_id)
 
         if category:
             query = query.filter(EventDB.category == category)
@@ -1617,6 +2062,12 @@ def list_events(
         db.close()
 
 
+@app.get("/v1/subject_state")
+def get_subject_state_v1(scope: "AuthScope" = Depends(require_scope)) -> dict:
+    # P1-5: /v1 stable alias; re-use legacy implementation
+    return get_subject_state(scope=scope)
+
+
 @app.get("/subject_state")
 def get_subject_state(scope: "AuthScope" = Depends(require_scope)) -> dict:
     """
@@ -1625,6 +2076,25 @@ def get_subject_state(scope: "AuthScope" = Depends(require_scope)) -> dict:
     """
     db = SessionLocal()
     try:
+        # Fail-soft if table is missing (migrations not applied yet)
+        chk = (
+            db.execute(text("SELECT to_regclass(\x27public.subject_state\x27) AS t"))
+            .mappings()
+            .one()
+        )
+        if not chk.get("t"):
+            return {
+                "available": False,
+                "org_id": scope.org_id,
+                "home_id": scope.home_id,
+                "subject_id": scope.subject_id,
+                "state": "unknown",
+                "state_since": None,
+                "last_event_ts": None,
+                "updated_at": None,
+                "note": "subject_state table missing (migrations not applied yet)",
+            }
+
         row = (
             db.execute(
                 text(
@@ -1725,6 +2195,12 @@ def on_shutdown():
 # -------------------------
 
 
+@app.post("/v1/proposals/expire_once")
+def proposals_expire_once_v1(scope: "AuthScope" = Depends(require_scope)):
+    # P1-5: /v1 stable alias; re-use legacy implementation
+    return proposals_expire_once()
+
+
 @app.post("/proposals/expire_once")
 def proposals_expire_once():
     db = SessionLocal()
@@ -1739,6 +2215,12 @@ def proposals_expire_once():
 # -------------------------
 # Monitor modes (read-back)
 # -------------------------
+
+
+@app.post("/v1/proposals/mine_once")
+def mine_once_v1(scope: "AuthScope" = Depends(require_scope)) -> dict:
+    # P1-5: /v1 stable alias; re-use legacy implementation
+    return mine_once(scope=scope)
 
 
 @app.post("/proposals/mine_once")
@@ -1779,6 +2261,12 @@ def mine_once(scope: AuthScope = Depends(require_scope)) -> dict:
         db.close()
 
 
+@app.get("/v1/proposals/miner_status")
+def proposals_miner_status_v1(scope: "AuthScope" = Depends(require_scope)) -> dict:
+    # P1-5: /v1 stable alias; re-use legacy implementation
+    return proposals_miner_status()
+
+
 @app.get("/proposals/miner_status")
 def proposals_miner_status() -> dict:
     from db import SessionLocal
@@ -1798,6 +2286,19 @@ def proposals_miner_status() -> dict:
         return {"ok": True, "status": (dict(row) if row else None)}
     finally:
         db.close()
+
+
+@app.get("/v1/monitor_modes")
+def list_monitor_modes_v1(
+    monitor_key: str | None = None,
+    room_id: str | None = None,
+    limit: int = Query(default=500, ge=1, le=5000),
+    scope: "AuthScope" = Depends(require_scope),
+):
+    # P1-5: /v1 stable alias; forward plain query values
+    return list_monitor_modes(
+        monitor_key=monitor_key, room_id=room_id, limit=int(limit), scope=scope
+    )
 
 
 @app.get("/monitor_modes")
