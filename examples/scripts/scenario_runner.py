@@ -171,6 +171,15 @@ def _evaluate_expectations(
         return False, errors
 
     if pass_condition == "exact":
+        # Optional: allow specific extra deviations (by rule_id) even in exact mode
+        ignore_extra_rule_ids = set((exp_block.get('ignore_extra_rule_ids') or []))
+        if ignore_extra_rule_ids and unmatched_actual_idx:
+            # Remove extras whose rule_id is in ignore list
+            for ai in list(unmatched_actual_idx):
+                rid = str((actual[ai] or {}).get('rule_id'))
+                if rid in ignore_extra_rule_ids:
+                    unmatched_actual_idx.remove(ai)
+
         # No extra actual deviations allowed
         if unmatched_actual_idx:
             extras = [actual[i] for i in sorted(unmatched_actual_idx)]
