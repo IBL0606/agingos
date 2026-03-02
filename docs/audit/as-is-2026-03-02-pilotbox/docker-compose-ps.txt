@@ -1,0 +1,6 @@
+NAME                            IMAGE                         COMMAND                  SERVICE               CREATED        STATUS        PORTS
+agingos-ai-bot-1                agingos-ai-bot                "uvicorn app.main:ap…"   ai-bot                32 hours ago   Up 32 hours   0.0.0.0:8010->8010/tcp, [::]:8010->8010/tcp
+agingos-backend-1               agingos-backend               "uvicorn main:app --…"   backend               32 hours ago   Up 32 hours   0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp
+agingos-console-1               nginx:alpine                  "/docker-entrypoint.…"   console               32 hours ago   Up 32 hours   0.0.0.0:8080->80/tcp, [::]:8080->80/tcp
+agingos-db-1                    postgres:16                   "docker-entrypoint.s…"   db                    32 hours ago   Up 32 hours   0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp
+agingos-notification-worker-1   agingos-notification-worker   "sh -lc 'while true;…"   notification-worker   32 hours ago   Up 32 hours   8000/tcp
