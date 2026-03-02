@@ -100,7 +100,7 @@ jobs:
             active       boolean NOT NULL DEFAULT true,
             created_at   timestamptz NOT NULL DEFAULT now(),
             updated_at   timestamptz NOT NULL DEFAULT now(),
-            user_id      text NULL,
+            user_id      uuid NULL,
             CONSTRAINT api_key_scopes_role_check CHECK (role IN ('operator','service','readonly'))
           );
 
@@ -163,6 +163,7 @@ jobs:
               print(hashlib.sha256(k.encode("utf-8")).hexdigest())
           PY
             docker compose exec -T db psql -U agingos -d agingos -v ON_ERROR_STOP=1 --set=h="$H" <<'SQL' >/dev/null
+            ALTER TABLE public.api_key_scopes ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
           INSERT INTO public.api_key_scopes (api_key_hash, org_id, home_id, subject_id, role, active, user_id)
           VALUES (:'h','default','default','default','operator',true,NULL)
           ON CONFLICT (api_key_hash) DO UPDATE
