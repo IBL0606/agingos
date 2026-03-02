@@ -1,0 +1,200 @@
+backend-1  | {"ts":"2026-03-02T18:46:00.745226Z","level":"INFO","component":"scheduler","event":"scheduler_run_end","run_id":"30f06489-a952-41de-9057-3a327b52eb29","msg":"scheduler run finished","duration_ms":64,"counts":{"rules_total":10,"rules_ok":10,"rules_failed":0,"deviations_upserted":0,"deviations_closed":0}}
+backend-1  | INFO:     172.18.0.3:34624 - "GET /events?since=2026-02-27T18%3A46%3A19.860936Z&until=2026-03-02T18%3A46%3A19.860936Z&limit=1000&category=door HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:34632 - "GET /events?since=2026-02-27T18%3A46%3A19.860936Z&until=2026-03-02T18%3A46%3A19.860936Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:34632 - "GET /events?since=2026-02-27T22%3A44%3A30.000001Z&until=2026-03-02T18%3A46%3A19.860936Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:34644 - "GET /events?since=2026-03-02T06%3A46%3A19.860936Z&until=2026-03-02T18%3A46%3A19.860936Z&limit=1000&category=heartbeat HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:34652 - "GET /events?since=2026-03-02T06%3A46%3A19.860936Z&until=2026-03-02T18%3A46%3A19.860936Z&limit=1000&category=ha_snapshot HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.6:41186 - "GET /rules HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.6:41200 - "GET /rules HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:51054 - "GET /events?since=2026-02-27T18%3A46%3A49.766061Z&until=2026-03-02T18%3A46%3A49.766061Z&limit=1000&category=door HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:51068 - "GET /events?since=2026-02-27T18%3A46%3A49.766061Z&until=2026-03-02T18%3A46%3A49.766061Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:51068 - "GET /events?since=2026-02-27T22%3A44%3A30.000001Z&until=2026-03-02T18%3A46%3A49.766061Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:51082 - "GET /events?since=2026-03-02T06%3A46%3A49.766061Z&until=2026-03-02T18%3A46%3A49.766061Z&limit=1000&category=heartbeat HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:51090 - "GET /events?since=2026-03-02T06%3A46%3A49.766061Z&until=2026-03-02T18%3A46%3A49.766061Z&limit=1000&category=ha_snapshot HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:45100 - "GET /events?since=2026-02-27T18%3A47%3A19.868340Z&until=2026-03-02T18%3A47%3A19.868340Z&limit=1000&category=door HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:45112 - "GET /events?since=2026-02-27T18%3A47%3A19.868340Z&until=2026-03-02T18%3A47%3A19.868340Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:45112 - "GET /events?since=2026-02-27T22%3A44%3A30.000001Z&until=2026-03-02T18%3A47%3A19.868340Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:45116 - "GET /events?since=2026-03-02T06%3A47%3A19.868340Z&until=2026-03-02T18%3A47%3A19.868340Z&limit=1000&category=heartbeat HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:45122 - "GET /events?since=2026-03-02T06%3A47%3A19.868340Z&until=2026-03-02T18%3A47%3A19.868340Z&limit=1000&category=ha_snapshot HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.6:37486 - "GET /rules HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.6:37500 - "GET /rules HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:53612 - "GET /events?since=2026-02-27T18%3A47%3A49.773175Z&until=2026-03-02T18%3A47%3A49.773175Z&limit=1000&category=door HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:53616 - "GET /events?since=2026-02-27T18%3A47%3A49.773175Z&until=2026-03-02T18%3A47%3A49.773175Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:53616 - "GET /events?since=2026-02-27T22%3A44%3A30.000001Z&until=2026-03-02T18%3A47%3A49.773175Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:53632 - "GET /events?since=2026-03-02T06%3A47%3A49.773175Z&until=2026-03-02T18%3A47%3A49.773175Z&limit=1000&category=heartbeat HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:53640 - "GET /events?since=2026-03-02T06%3A47%3A49.773175Z&until=2026-03-02T18%3A47%3A49.773175Z&limit=1000&category=ha_snapshot HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:44594 - "GET /events?since=2026-02-27T18%3A48%3A19.875537Z&until=2026-03-02T18%3A48%3A19.875537Z&limit=1000&category=door HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:44602 - "GET /events?since=2026-02-27T18%3A48%3A19.875537Z&until=2026-03-02T18%3A48%3A19.875537Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:44602 - "GET /events?since=2026-02-27T22%3A44%3A30.000001Z&until=2026-03-02T18%3A48%3A19.875537Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:44618 - "GET /events?since=2026-03-02T06%3A48%3A19.875537Z&until=2026-03-02T18%3A48%3A19.875537Z&limit=1000&category=heartbeat HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:44622 - "GET /events?since=2026-03-02T06%3A48%3A19.875537Z&until=2026-03-02T18%3A48%3A19.875537Z&limit=1000&category=ha_snapshot HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.6:58992 - "GET /rules HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.6:58994 - "GET /rules HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:33446 - "GET /events?since=2026-02-27T18%3A48%3A49.783008Z&until=2026-03-02T18%3A48%3A49.783008Z&limit=1000&category=door HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:33456 - "GET /events?since=2026-02-27T18%3A48%3A49.783008Z&until=2026-03-02T18%3A48%3A49.783008Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:33456 - "GET /events?since=2026-02-27T22%3A44%3A30.000001Z&until=2026-03-02T18%3A48%3A49.783008Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:33468 - "GET /events?since=2026-03-02T06%3A48%3A49.783008Z&until=2026-03-02T18%3A48%3A49.783008Z&limit=1000&category=heartbeat HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:33478 - "GET /events?since=2026-03-02T06%3A48%3A49.783008Z&until=2026-03-02T18%3A48%3A49.783008Z&limit=1000&category=ha_snapshot HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:44560 - "GET /events?since=2026-02-27T18%3A49%3A19.784040Z&until=2026-03-02T18%3A49%3A19.784040Z&limit=1000&category=door HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:44572 - "GET /events?since=2026-02-27T18%3A49%3A19.784040Z&until=2026-03-02T18%3A49%3A19.784040Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:44572 - "GET /events?since=2026-02-27T22%3A44%3A30.000001Z&until=2026-03-02T18%3A49%3A19.784040Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:44576 - "GET /events?since=2026-03-02T06%3A49%3A19.784040Z&until=2026-03-02T18%3A49%3A19.784040Z&limit=1000&category=heartbeat HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:44592 - "GET /events?since=2026-03-02T06%3A49%3A19.784040Z&until=2026-03-02T18%3A49%3A19.784040Z&limit=1000&category=ha_snapshot HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.6:46702 - "GET /rules HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.6:46708 - "GET /rules HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:57836 - "GET /events?since=2026-02-27T18%3A49%3A49.708423Z&until=2026-03-02T18%3A49%3A49.708423Z&limit=1000&category=door HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:57848 - "GET /events?since=2026-02-27T18%3A49%3A49.708423Z&until=2026-03-02T18%3A49%3A49.708423Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:57848 - "GET /events?since=2026-02-27T22%3A44%3A30.000001Z&until=2026-03-02T18%3A49%3A49.708423Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:57858 - "GET /events?since=2026-03-02T06%3A49%3A49.708423Z&until=2026-03-02T18%3A49%3A49.708423Z&limit=1000&category=heartbeat HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:57864 - "GET /events?since=2026-03-02T06%3A49%3A49.708423Z&until=2026-03-02T18%3A49%3A49.708423Z&limit=1000&category=ha_snapshot HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:46372 - "GET /events?since=2026-02-27T18%3A50%3A19.793890Z&until=2026-03-02T18%3A50%3A19.793890Z&limit=1000&category=door HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:46380 - "GET /events?since=2026-02-27T18%3A50%3A19.793890Z&until=2026-03-02T18%3A50%3A19.793890Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:46380 - "GET /events?since=2026-02-27T22%3A44%3A30.000001Z&until=2026-03-02T18%3A50%3A19.793890Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:46386 - "GET /events?since=2026-03-02T06%3A50%3A19.793890Z&until=2026-03-02T18%3A50%3A19.793890Z&limit=1000&category=heartbeat HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:46398 - "GET /events?since=2026-03-02T06%3A50%3A19.793890Z&until=2026-03-02T18%3A50%3A19.793890Z&limit=1000&category=ha_snapshot HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.6:36640 - "GET /rules HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.6:36650 - "GET /rules HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:33256 - "GET /events?since=2026-02-27T18%3A50%3A49.698344Z&until=2026-03-02T18%3A50%3A49.698344Z&limit=1000&category=door HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:33272 - "GET /events?since=2026-02-27T18%3A50%3A49.698344Z&until=2026-03-02T18%3A50%3A49.698344Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:33272 - "GET /events?since=2026-02-27T22%3A44%3A30.000001Z&until=2026-03-02T18%3A50%3A49.698344Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:33282 - "GET /events?since=2026-03-02T06%3A50%3A49.698344Z&until=2026-03-02T18%3A50%3A49.698344Z&limit=1000&category=heartbeat HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:33286 - "GET /events?since=2026-03-02T06%3A50%3A49.698344Z&until=2026-03-02T18%3A50%3A49.698344Z&limit=1000&category=ha_snapshot HTTP/1.1" 200 OK
+backend-1  | {"ts":"2026-03-02T18:51:00.683524Z","level":"INFO","component":"scheduler","event":"scheduler_run_start","run_id":"8bb2b0bf-abbe-4adb-b4a3-69a14517b134","msg":"scheduler run started","interval_minutes":5,"since":"2026-03-02T18:46:00.683461Z","until":"2026-03-02T18:51:00.683461Z"}
+backend-1  | {"ts":"2026-03-02T18:51:00.683877Z","level":"INFO","component":"scheduler","event":"scheduler_rule_start","run_id":"8bb2b0bf-abbe-4adb-b4a3-69a14517b134","msg":"rule evaluation started","rule_id":"R-001","subject_key":"default","since":"2026-03-02T15:51:00.683461Z","until":"2026-03-02T18:51:00.683461Z"}
+backend-1  | {"ts":"2026-03-02T18:51:00.691800Z","level":"INFO","component":"scheduler","event":"scheduler_rule_result","run_id":"8bb2b0bf-abbe-4adb-b4a3-69a14517b134","msg":"rule evaluation finished","rule_id":"R-001","duration_ms":7,"counts":{"evaluated":1,"deviations_upserted":0,"deviations_closed":0}}
+backend-1  | {"ts":"2026-03-02T18:51:00.692043Z","level":"INFO","component":"scheduler","event":"scheduler_rule_start","run_id":"8bb2b0bf-abbe-4adb-b4a3-69a14517b134","msg":"rule evaluation started","rule_id":"R-002","subject_key":"default","since":"2026-03-02T14:51:00.683461Z","until":"2026-03-02T18:51:00.683461Z"}
+backend-1  | {"ts":"2026-03-02T18:51:00.700100Z","level":"INFO","component":"scheduler","event":"scheduler_rule_result","run_id":"8bb2b0bf-abbe-4adb-b4a3-69a14517b134","msg":"rule evaluation finished","rule_id":"R-002","duration_ms":8,"counts":{"evaluated":1,"deviations_upserted":0,"deviations_closed":0}}
+backend-1  | {"ts":"2026-03-02T18:51:00.700343Z","level":"INFO","component":"scheduler","event":"scheduler_rule_start","run_id":"8bb2b0bf-abbe-4adb-b4a3-69a14517b134","msg":"rule evaluation started","rule_id":"R-003","subject_key":"default","since":"2026-03-02T14:51:00.683461Z","until":"2026-03-02T18:51:00.683461Z"}
+backend-1  | {"ts":"2026-03-02T18:51:00.708161Z","level":"INFO","component":"scheduler","event":"scheduler_rule_result","run_id":"8bb2b0bf-abbe-4adb-b4a3-69a14517b134","msg":"rule evaluation finished","rule_id":"R-003","duration_ms":7,"counts":{"evaluated":1,"deviations_upserted":0,"deviations_closed":0}}
+backend-1  | {"ts":"2026-03-02T18:51:00.708388Z","level":"INFO","component":"scheduler","event":"scheduler_rule_start","run_id":"8bb2b0bf-abbe-4adb-b4a3-69a14517b134","msg":"rule evaluation started","rule_id":"R-004","subject_key":"default","since":"2026-03-02T17:51:00.683461Z","until":"2026-03-02T18:51:00.683461Z"}
+backend-1  | {"ts":"2026-03-02T18:51:00.715320Z","level":"INFO","component":"scheduler","event":"scheduler_rule_result","run_id":"8bb2b0bf-abbe-4adb-b4a3-69a14517b134","msg":"rule evaluation finished","rule_id":"R-004","duration_ms":6,"counts":{"evaluated":1,"deviations_upserted":0,"deviations_closed":0}}
+backend-1  | {"ts":"2026-03-02T18:51:00.715532Z","level":"INFO","component":"scheduler","event":"scheduler_rule_start","run_id":"8bb2b0bf-abbe-4adb-b4a3-69a14517b134","msg":"rule evaluation started","rule_id":"R-005","subject_key":"default","since":"2026-03-02T17:51:00.683461Z","until":"2026-03-02T18:51:00.683461Z"}
+backend-1  | {"ts":"2026-03-02T18:51:00.721220Z","level":"INFO","component":"scheduler","event":"scheduler_rule_result","run_id":"8bb2b0bf-abbe-4adb-b4a3-69a14517b134","msg":"rule evaluation finished","rule_id":"R-005","duration_ms":5,"counts":{"evaluated":1,"deviations_upserted":0,"deviations_closed":0}}
+backend-1  | {"ts":"2026-03-02T18:51:00.721411Z","level":"INFO","component":"scheduler","event":"scheduler_rule_start","run_id":"8bb2b0bf-abbe-4adb-b4a3-69a14517b134","msg":"rule evaluation started","rule_id":"R-006","subject_key":"default","since":"2026-03-02T17:51:00.683461Z","until":"2026-03-02T18:51:00.683461Z"}
+backend-1  | {"ts":"2026-03-02T18:51:00.729258Z","level":"INFO","component":"scheduler","event":"scheduler_rule_result","run_id":"8bb2b0bf-abbe-4adb-b4a3-69a14517b134","msg":"rule evaluation finished","rule_id":"R-006","duration_ms":7,"counts":{"evaluated":1,"deviations_upserted":0,"deviations_closed":0}}
+backend-1  | {"ts":"2026-03-02T18:51:00.729391Z","level":"INFO","component":"scheduler","event":"scheduler_rule_start","run_id":"8bb2b0bf-abbe-4adb-b4a3-69a14517b134","msg":"rule evaluation started","rule_id":"R-007","subject_key":"default","since":"2026-03-02T17:51:00.683461Z","until":"2026-03-02T18:51:00.683461Z"}
+backend-1  | {"ts":"2026-03-02T18:51:00.732703Z","level":"INFO","component":"scheduler","event":"scheduler_rule_result","run_id":"8bb2b0bf-abbe-4adb-b4a3-69a14517b134","msg":"rule evaluation finished","rule_id":"R-007","duration_ms":3,"counts":{"evaluated":1,"deviations_upserted":0,"deviations_closed":0}}
+backend-1  | {"ts":"2026-03-02T18:51:00.732826Z","level":"INFO","component":"scheduler","event":"scheduler_rule_start","run_id":"8bb2b0bf-abbe-4adb-b4a3-69a14517b134","msg":"rule evaluation started","rule_id":"R-008","subject_key":"default","since":"2026-03-02T17:51:00.683461Z","until":"2026-03-02T18:51:00.683461Z"}
+backend-1  | {"ts":"2026-03-02T18:51:00.735845Z","level":"INFO","component":"scheduler","event":"scheduler_rule_result","run_id":"8bb2b0bf-abbe-4adb-b4a3-69a14517b134","msg":"rule evaluation finished","rule_id":"R-008","duration_ms":3,"counts":{"evaluated":1,"deviations_upserted":0,"deviations_closed":0}}
+backend-1  | {"ts":"2026-03-02T18:51:00.736053Z","level":"INFO","component":"scheduler","event":"scheduler_rule_start","run_id":"8bb2b0bf-abbe-4adb-b4a3-69a14517b134","msg":"rule evaluation started","rule_id":"R-009","subject_key":"default","since":"2026-03-02T17:51:00.683461Z","until":"2026-03-02T18:51:00.683461Z"}
+backend-1  | 
+backend-1  | {"ts":"2026-03-02T18:51:00.737371Z","level":"INFO","component":"scheduler","event":"anomalies_runner_tick","run_id":"6c0f6ddd-0458-4840-8d77-29277469ad58","msg":"anomalies runner tick","bucket_start":"2026-03-02T18:30:00+00:00","rooms_scored":5,"counts":{"OPEN":0,"UPDATE":0,"CLOSE":0,"NOOP":5,"ERROR":0}}
+backend-1  | {"ts":"2026-03-02T18:51:00.738842Z","level":"INFO","component":"scheduler","event":"scheduler_rule_result","run_id":"8bb2b0bf-abbe-4adb-b4a3-69a14517b134","msg":"rule evaluation finished","rule_id":"R-009","duration_ms":2,"counts":{"evaluated":1,"deviations_upserted":0,"deviations_closed":0}}
+backend-1  | {"ts":"2026-03-02T18:51:00.738934Z","level":"INFO","component":"scheduler","event":"scheduler_rule_start","run_id":"8bb2b0bf-abbe-4adb-b4a3-69a14517b134","msg":"rule evaluation started","rule_id":"R-010","subject_key":"default","since":"2026-03-02T17:51:00.683461Z","until":"2026-03-02T18:51:00.683461Z"}
+backend-1  | {"ts":"2026-03-02T18:51:00.741108Z","level":"INFO","component":"scheduler","event":"scheduler_rule_result","run_id":"8bb2b0bf-abbe-4adb-b4a3-69a14517b134","msg":"rule evaluation finished","rule_id":"R-010","duration_ms":2,"counts":{"evaluated":1,"deviations_upserted":0,"deviations_closed":0}}
+backend-1  | {"ts":"2026-03-02T18:51:00.742751Z","level":"INFO","component":"scheduler","event":"scheduler_run_end","run_id":"8bb2b0bf-abbe-4adb-b4a3-69a14517b134","msg":"scheduler run finished","duration_ms":62,"counts":{"rules_total":10,"rules_ok":10,"rules_failed":0,"deviations_upserted":0,"deviations_closed":0}}
+backend-1  | INFO:     172.18.0.3:58914 - "GET /events?since=2026-02-27T18%3A51%3A19.593439Z&until=2026-03-02T18%3A51%3A19.593439Z&limit=1000&category=door HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:58930 - "GET /events?since=2026-02-27T18%3A51%3A19.593439Z&until=2026-03-02T18%3A51%3A19.593439Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:58930 - "GET /events?since=2026-02-27T22%3A44%3A30.000001Z&until=2026-03-02T18%3A51%3A19.593439Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:58942 - "GET /events?since=2026-03-02T06%3A51%3A19.593439Z&until=2026-03-02T18%3A51%3A19.593439Z&limit=1000&category=heartbeat HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:58950 - "GET /events?since=2026-03-02T06%3A51%3A19.593439Z&until=2026-03-02T18%3A51%3A19.593439Z&limit=1000&category=ha_snapshot HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.6:42118 - "GET /rules HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.6:42128 - "GET /rules HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:38802 - "GET /events?since=2026-02-27T18%3A51%3A49.714971Z&until=2026-03-02T18%3A51%3A49.714971Z&limit=1000&category=door HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:38816 - "GET /events?since=2026-02-27T18%3A51%3A49.714971Z&until=2026-03-02T18%3A51%3A49.714971Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:38816 - "GET /events?since=2026-02-27T22%3A44%3A30.000001Z&until=2026-03-02T18%3A51%3A49.714971Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:38828 - "GET /events?since=2026-03-02T06%3A51%3A49.714971Z&until=2026-03-02T18%3A51%3A49.714971Z&limit=1000&category=heartbeat HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:38838 - "GET /events?since=2026-03-02T06%3A51%3A49.714971Z&until=2026-03-02T18%3A51%3A49.714971Z&limit=1000&category=ha_snapshot HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:51192 - "GET /events?since=2026-02-27T18%3A52%3A19.600517Z&until=2026-03-02T18%3A52%3A19.600517Z&limit=1000&category=door HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:51194 - "GET /events?since=2026-02-27T18%3A52%3A19.600517Z&until=2026-03-02T18%3A52%3A19.600517Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:51194 - "GET /events?since=2026-02-27T22%3A44%3A30.000001Z&until=2026-03-02T18%3A52%3A19.600517Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:51204 - "GET /events?since=2026-03-02T06%3A52%3A19.600517Z&until=2026-03-02T18%3A52%3A19.600517Z&limit=1000&category=heartbeat HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:51216 - "GET /events?since=2026-03-02T06%3A52%3A19.600517Z&until=2026-03-02T18%3A52%3A19.600517Z&limit=1000&category=ha_snapshot HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.6:52216 - "GET /rules HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.6:52230 - "GET /rules HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:44068 - "GET /events?since=2026-02-27T18%3A52%3A49.706529Z&until=2026-03-02T18%3A52%3A49.706529Z&limit=1000&category=door HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:44082 - "GET /events?since=2026-02-27T18%3A52%3A49.706529Z&until=2026-03-02T18%3A52%3A49.706529Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:44082 - "GET /events?since=2026-02-27T22%3A44%3A30.000001Z&until=2026-03-02T18%3A52%3A49.706529Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:44084 - "GET /events?since=2026-03-02T06%3A52%3A49.706529Z&until=2026-03-02T18%3A52%3A49.706529Z&limit=1000&category=heartbeat HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:44096 - "GET /events?since=2026-03-02T06%3A52%3A49.706529Z&until=2026-03-02T18%3A52%3A49.706529Z&limit=1000&category=ha_snapshot HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:44794 - "GET /events?since=2026-02-27T18%3A53%3A19.911272Z&until=2026-03-02T18%3A53%3A19.911272Z&limit=1000&category=door HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:44800 - "GET /events?since=2026-02-27T18%3A53%3A19.911272Z&until=2026-03-02T18%3A53%3A19.911272Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:44800 - "GET /events?since=2026-02-27T22%3A44%3A30.000001Z&until=2026-03-02T18%3A53%3A19.911272Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:44808 - "GET /events?since=2026-03-02T06%3A53%3A19.911272Z&until=2026-03-02T18%3A53%3A19.911272Z&limit=1000&category=heartbeat HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:44824 - "GET /events?since=2026-03-02T06%3A53%3A19.911272Z&until=2026-03-02T18%3A53%3A19.911272Z&limit=1000&category=ha_snapshot HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.6:38914 - "GET /rules HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.6:38922 - "GET /rules HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:60106 - "GET /events?since=2026-02-27T18%3A53%3A49.611290Z&until=2026-03-02T18%3A53%3A49.611290Z&limit=1000&category=door HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:60110 - "GET /events?since=2026-02-27T18%3A53%3A49.611290Z&until=2026-03-02T18%3A53%3A49.611290Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:60110 - "GET /events?since=2026-02-27T22%3A44%3A30.000001Z&until=2026-03-02T18%3A53%3A49.611290Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:60124 - "GET /events?since=2026-03-02T06%3A53%3A49.611290Z&until=2026-03-02T18%3A53%3A49.611290Z&limit=1000&category=heartbeat HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:60130 - "GET /events?since=2026-03-02T06%3A53%3A49.611290Z&until=2026-03-02T18%3A53%3A49.611290Z&limit=1000&category=ha_snapshot HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:60240 - "GET /events?since=2026-02-27T18%3A54%3A19.918502Z&until=2026-03-02T18%3A54%3A19.918502Z&limit=1000&category=door HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:60248 - "GET /events?since=2026-02-27T18%3A54%3A19.918502Z&until=2026-03-02T18%3A54%3A19.918502Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:60248 - "GET /events?since=2026-02-27T22%3A44%3A30.000001Z&until=2026-03-02T18%3A54%3A19.918502Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:60254 - "GET /events?since=2026-03-02T06%3A54%3A19.918502Z&until=2026-03-02T18%3A54%3A19.918502Z&limit=1000&category=heartbeat HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:60264 - "GET /events?since=2026-03-02T06%3A54%3A19.918502Z&until=2026-03-02T18%3A54%3A19.918502Z&limit=1000&category=ha_snapshot HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.6:37022 - "GET /rules HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.6:37038 - "GET /rules HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:42348 - "GET /events?since=2026-02-27T18%3A54%3A49.622702Z&until=2026-03-02T18%3A54%3A49.622702Z&limit=1000&category=door HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:42356 - "GET /events?since=2026-02-27T18%3A54%3A49.622702Z&until=2026-03-02T18%3A54%3A49.622702Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:42356 - "GET /events?since=2026-02-27T22%3A44%3A30.000001Z&until=2026-03-02T18%3A54%3A49.622702Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:42362 - "GET /events?since=2026-03-02T06%3A54%3A49.622702Z&until=2026-03-02T18%3A54%3A49.622702Z&limit=1000&category=heartbeat HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:42374 - "GET /events?since=2026-03-02T06%3A54%3A49.622702Z&until=2026-03-02T18%3A54%3A49.622702Z&limit=1000&category=ha_snapshot HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:38290 - "GET /events?since=2026-02-27T18%3A55%3A19.755385Z&until=2026-03-02T18%3A55%3A19.755385Z&limit=1000&category=door HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:38300 - "GET /events?since=2026-02-27T18%3A55%3A19.755385Z&until=2026-03-02T18%3A55%3A19.755385Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:38300 - "GET /events?since=2026-02-27T22%3A44%3A30.000001Z&until=2026-03-02T18%3A55%3A19.755385Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:38308 - "GET /events?since=2026-03-02T06%3A55%3A19.755385Z&until=2026-03-02T18%3A55%3A19.755385Z&limit=1000&category=heartbeat HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:38324 - "GET /events?since=2026-03-02T06%3A55%3A19.755385Z&until=2026-03-02T18%3A55%3A19.755385Z&limit=1000&category=ha_snapshot HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.6:51828 - "GET /rules HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.6:51840 - "GET /rules HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:34306 - "GET /events?since=2026-02-27T18%3A55%3A49.727996Z&until=2026-03-02T18%3A55%3A49.727996Z&limit=1000&category=door HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:34308 - "GET /events?since=2026-02-27T18%3A55%3A49.727996Z&until=2026-03-02T18%3A55%3A49.727996Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:34308 - "GET /events?since=2026-02-27T22%3A44%3A30.000001Z&until=2026-03-02T18%3A55%3A49.727996Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:34320 - "GET /events?since=2026-03-02T06%3A55%3A49.727996Z&until=2026-03-02T18%3A55%3A49.727996Z&limit=1000&category=heartbeat HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:34334 - "GET /events?since=2026-03-02T06%3A55%3A49.727996Z&until=2026-03-02T18%3A55%3A49.727996Z&limit=1000&category=ha_snapshot HTTP/1.1" 200 OK
+backend-1  | {"ts":"2026-03-02T18:56:00.684461Z","level":"INFO","component":"scheduler","event":"scheduler_run_start","run_id":"2011ead0-7dd4-4f16-aefc-1e6e24d5bb17","msg":"scheduler run started","interval_minutes":5,"since":"2026-03-02T18:51:00.684403Z","until":"2026-03-02T18:56:00.684403Z"}
+backend-1  | {"ts":"2026-03-02T18:56:00.684817Z","level":"INFO","component":"scheduler","event":"scheduler_rule_start","run_id":"2011ead0-7dd4-4f16-aefc-1e6e24d5bb17","msg":"rule evaluation started","rule_id":"R-001","subject_key":"default","since":"2026-03-02T15:56:00.684403Z","until":"2026-03-02T18:56:00.684403Z"}
+backend-1  | {"ts":"2026-03-02T18:56:00.693106Z","level":"INFO","component":"scheduler","event":"scheduler_rule_result","run_id":"2011ead0-7dd4-4f16-aefc-1e6e24d5bb17","msg":"rule evaluation finished","rule_id":"R-001","duration_ms":8,"counts":{"evaluated":1,"deviations_upserted":0,"deviations_closed":0}}
+backend-1  | {"ts":"2026-03-02T18:56:00.693356Z","level":"INFO","component":"scheduler","event":"scheduler_rule_start","run_id":"2011ead0-7dd4-4f16-aefc-1e6e24d5bb17","msg":"rule evaluation started","rule_id":"R-002","subject_key":"default","since":"2026-03-02T14:56:00.684403Z","until":"2026-03-02T18:56:00.684403Z"}
+backend-1  | {"ts":"2026-03-02T18:56:00.700863Z","level":"INFO","component":"scheduler","event":"scheduler_rule_result","run_id":"2011ead0-7dd4-4f16-aefc-1e6e24d5bb17","msg":"rule evaluation finished","rule_id":"R-002","duration_ms":7,"counts":{"evaluated":1,"deviations_upserted":0,"deviations_closed":0}}
+backend-1  | {"ts":"2026-03-02T18:56:00.701132Z","level":"INFO","component":"scheduler","event":"scheduler_rule_start","run_id":"2011ead0-7dd4-4f16-aefc-1e6e24d5bb17","msg":"rule evaluation started","rule_id":"R-003","subject_key":"default","since":"2026-03-02T14:56:00.684403Z","until":"2026-03-02T18:56:00.684403Z"}
+backend-1  | {"ts":"2026-03-02T18:56:00.708541Z","level":"INFO","component":"scheduler","event":"scheduler_rule_result","run_id":"2011ead0-7dd4-4f16-aefc-1e6e24d5bb17","msg":"rule evaluation finished","rule_id":"R-003","duration_ms":7,"counts":{"evaluated":1,"deviations_upserted":0,"deviations_closed":0}}
+backend-1  | {"ts":"2026-03-02T18:56:00.708770Z","level":"INFO","component":"scheduler","event":"scheduler_rule_start","run_id":"2011ead0-7dd4-4f16-aefc-1e6e24d5bb17","msg":"rule evaluation started","rule_id":"R-004","subject_key":"default","since":"2026-03-02T17:56:00.684403Z","until":"2026-03-02T18:56:00.684403Z"}
+backend-1  | {"ts":"2026-03-02T18:56:00.716113Z","level":"INFO","component":"scheduler","event":"scheduler_rule_result","run_id":"2011ead0-7dd4-4f16-aefc-1e6e24d5bb17","msg":"rule evaluation finished","rule_id":"R-004","duration_ms":7,"counts":{"evaluated":1,"deviations_upserted":0,"deviations_closed":0}}
+backend-1  | {"ts":"2026-03-02T18:56:00.716329Z","level":"INFO","component":"scheduler","event":"scheduler_rule_start","run_id":"2011ead0-7dd4-4f16-aefc-1e6e24d5bb17","msg":"rule evaluation started","rule_id":"R-005","subject_key":"default","since":"2026-03-02T17:56:00.684403Z","until":"2026-03-02T18:56:00.684403Z"}
+backend-1  | {"ts":"2026-03-02T18:56:00.721794Z","level":"INFO","component":"scheduler","event":"scheduler_rule_result","run_id":"2011ead0-7dd4-4f16-aefc-1e6e24d5bb17","msg":"rule evaluation finished","rule_id":"R-005","duration_ms":5,"counts":{"evaluated":1,"deviations_upserted":0,"deviations_closed":0}}
+backend-1  | {"ts":"2026-03-02T18:56:00.721968Z","level":"INFO","component":"scheduler","event":"scheduler_rule_start","run_id":"2011ead0-7dd4-4f16-aefc-1e6e24d5bb17","msg":"rule evaluation started","rule_id":"R-006","subject_key":"default","since":"2026-03-02T17:56:00.684403Z","until":"2026-03-02T18:56:00.684403Z"}
+backend-1  | {"ts":"2026-03-02T18:56:00.729274Z","level":"INFO","component":"scheduler","event":"scheduler_rule_result","run_id":"2011ead0-7dd4-4f16-aefc-1e6e24d5bb17","msg":"rule evaluation finished","rule_id":"R-006","duration_ms":7,"counts":{"evaluated":1,"deviations_upserted":0,"deviations_closed":0}}
+backend-1  | {"ts":"2026-03-02T18:56:00.729406Z","level":"INFO","component":"scheduler","event":"scheduler_rule_start","run_id":"2011ead0-7dd4-4f16-aefc-1e6e24d5bb17","msg":"rule evaluation started","rule_id":"R-007","subject_key":"default","since":"2026-03-02T17:56:00.684403Z","until":"2026-03-02T18:56:00.684403Z"}
+backend-1  | {"ts":"2026-03-02T18:56:00.732810Z","level":"INFO","component":"scheduler","event":"scheduler_rule_result","run_id":"2011ead0-7dd4-4f16-aefc-1e6e24d5bb17","msg":"rule evaluation finished","rule_id":"R-007","duration_ms":3,"counts":{"evaluated":1,"deviations_upserted":0,"deviations_closed":0}}
+backend-1  | {"ts":"2026-03-02T18:56:00.732936Z","level":"INFO","component":"scheduler","event":"scheduler_rule_start","run_id":"2011ead0-7dd4-4f16-aefc-1e6e24d5bb17","msg":"rule evaluation started","rule_id":"R-008","subject_key":"default","since":"2026-03-02T17:56:00.684403Z","until":"2026-03-02T18:56:00.684403Z"}
+backend-1  | {"ts":"2026-03-02T18:56:00.736671Z","level":"INFO","component":"scheduler","event":"scheduler_rule_result","run_id":"2011ead0-7dd4-4f16-aefc-1e6e24d5bb17","msg":"rule evaluation finished","rule_id":"R-008","duration_ms":3,"counts":{"evaluated":1,"deviations_upserted":0,"deviations_closed":0}}
+backend-1  | {"ts":"2026-03-02T18:56:00.736811Z","level":"INFO","component":"scheduler","event":"scheduler_rule_start","run_id":"2011ead0-7dd4-4f16-aefc-1e6e24d5bb17","msg":"rule evaluation started","rule_id":"R-009","subject_key":"default","since":"2026-03-02T17:56:00.684403Z","until":"2026-03-02T18:56:00.684403Z"}
+backend-1  | 
+backend-1  | {"ts":"2026-03-02T18:56:00.739756Z","level":"INFO","component":"scheduler","event":"anomalies_runner_tick","run_id":"631b68fb-d4f5-459f-9081-0b2046dc7113","msg":"anomalies runner tick","bucket_start":"2026-03-02T18:30:00+00:00","rooms_scored":5,"counts":{"OPEN":0,"UPDATE":0,"CLOSE":0,"NOOP":5,"ERROR":0}}
+backend-1  | {"ts":"2026-03-02T18:56:00.739987Z","level":"INFO","component":"scheduler","event":"scheduler_rule_result","run_id":"2011ead0-7dd4-4f16-aefc-1e6e24d5bb17","msg":"rule evaluation finished","rule_id":"R-009","duration_ms":3,"counts":{"evaluated":1,"deviations_upserted":0,"deviations_closed":0}}
+backend-1  | {"ts":"2026-03-02T18:56:00.740081Z","level":"INFO","component":"scheduler","event":"scheduler_rule_start","run_id":"2011ead0-7dd4-4f16-aefc-1e6e24d5bb17","msg":"rule evaluation started","rule_id":"R-010","subject_key":"default","since":"2026-03-02T17:56:00.684403Z","until":"2026-03-02T18:56:00.684403Z"}
+backend-1  | {"ts":"2026-03-02T18:56:00.742392Z","level":"INFO","component":"scheduler","event":"scheduler_rule_result","run_id":"2011ead0-7dd4-4f16-aefc-1e6e24d5bb17","msg":"rule evaluation finished","rule_id":"R-010","duration_ms":2,"counts":{"evaluated":1,"deviations_upserted":0,"deviations_closed":0}}
+backend-1  | {"ts":"2026-03-02T18:56:00.744484Z","level":"INFO","component":"scheduler","event":"scheduler_run_end","run_id":"2011ead0-7dd4-4f16-aefc-1e6e24d5bb17","msg":"scheduler run finished","duration_ms":64,"counts":{"rules_total":10,"rules_ok":10,"rules_failed":0,"deviations_upserted":0,"deviations_closed":0}}
+backend-1  | INFO:     172.18.0.3:48570 - "GET /events?since=2026-02-27T18%3A56%3A19.629197Z&until=2026-03-02T18%3A56%3A19.629197Z&limit=1000&category=door HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:48572 - "GET /events?since=2026-02-27T18%3A56%3A19.629197Z&until=2026-03-02T18%3A56%3A19.629197Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:48572 - "GET /events?since=2026-02-27T22%3A44%3A30.000001Z&until=2026-03-02T18%3A56%3A19.629197Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:48586 - "GET /events?since=2026-03-02T06%3A56%3A19.629197Z&until=2026-03-02T18%3A56%3A19.629197Z&limit=1000&category=heartbeat HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:48594 - "GET /events?since=2026-03-02T06%3A56%3A19.629197Z&until=2026-03-02T18%3A56%3A19.629197Z&limit=1000&category=ha_snapshot HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.6:50742 - "GET /rules HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.6:50756 - "GET /rules HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:38730 - "GET /events?since=2026-02-27T18%3A56%3A49.594051Z&until=2026-03-02T18%3A56%3A49.594051Z&limit=1000&category=door HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:38746 - "GET /events?since=2026-02-27T18%3A56%3A49.594051Z&until=2026-03-02T18%3A56%3A49.594051Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:38746 - "GET /events?since=2026-02-27T22%3A44%3A30.000001Z&until=2026-03-02T18%3A56%3A49.594051Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:38756 - "GET /events?since=2026-03-02T06%3A56%3A49.594051Z&until=2026-03-02T18%3A56%3A49.594051Z&limit=1000&category=heartbeat HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:38764 - "GET /events?since=2026-03-02T06%3A56%3A49.594051Z&until=2026-03-02T18%3A56%3A49.594051Z&limit=1000&category=ha_snapshot HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:40374 - "GET /events?since=2026-02-27T18%3A57%3A19.636037Z&until=2026-03-02T18%3A57%3A19.636037Z&limit=1000&category=door HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:40386 - "GET /events?since=2026-02-27T18%3A57%3A19.636037Z&until=2026-03-02T18%3A57%3A19.636037Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:40386 - "GET /events?since=2026-02-27T22%3A44%3A30.000001Z&until=2026-03-02T18%3A57%3A19.636037Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:40402 - "GET /events?since=2026-03-02T06%3A57%3A19.636037Z&until=2026-03-02T18%3A57%3A19.636037Z&limit=1000&category=heartbeat HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:40416 - "GET /events?since=2026-03-02T06%3A57%3A19.636037Z&until=2026-03-02T18%3A57%3A19.636037Z&limit=1000&category=ha_snapshot HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.6:40266 - "GET /rules HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.6:40278 - "GET /rules HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:52084 - "GET /events?since=2026-02-27T18%3A57%3A49.596002Z&until=2026-03-02T18%3A57%3A49.596002Z&limit=1000&category=door HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:52086 - "GET /events?since=2026-02-27T18%3A57%3A49.596002Z&until=2026-03-02T18%3A57%3A49.596002Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:52086 - "GET /events?since=2026-02-27T22%3A44%3A30.000001Z&until=2026-03-02T18%3A57%3A49.596002Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:52100 - "GET /events?since=2026-03-02T06%3A57%3A49.596002Z&until=2026-03-02T18%3A57%3A49.596002Z&limit=1000&category=heartbeat HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:52112 - "GET /events?since=2026-03-02T06%3A57%3A49.596002Z&until=2026-03-02T18%3A57%3A49.596002Z&limit=1000&category=ha_snapshot HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:51736 - "GET /events?since=2026-02-27T18%3A58%3A19.596679Z&until=2026-03-02T18%3A58%3A19.596679Z&limit=1000&category=door HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:51748 - "GET /events?since=2026-02-27T18%3A58%3A19.596679Z&until=2026-03-02T18%3A58%3A19.596679Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:51748 - "GET /events?since=2026-02-27T22%3A44%3A30.000001Z&until=2026-03-02T18%3A58%3A19.596679Z&limit=1000&category=presence HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:51750 - "GET /events?since=2026-03-02T06%3A58%3A19.596679Z&until=2026-03-02T18%3A58%3A19.596679Z&limit=1000&category=heartbeat HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.3:51764 - "GET /events?since=2026-03-02T06%3A58%3A19.596679Z&until=2026-03-02T18%3A58%3A19.596679Z&limit=1000&category=ha_snapshot HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.6:39388 - "GET /rules HTTP/1.1" 200 OK
+backend-1  | INFO:     172.18.0.6:39402 - "GET /rules HTTP/1.1" 200 OK
