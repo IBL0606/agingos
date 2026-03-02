@@ -1,0 +1,4 @@
+COMPOSE_PROFILES=<unset>
+
+$ docker compose config --profiles
+bash: command not found: docker

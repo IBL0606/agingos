@@ -1,0 +1,1 @@
+tools/pytest_backend.sh: line 9: docker: command not found

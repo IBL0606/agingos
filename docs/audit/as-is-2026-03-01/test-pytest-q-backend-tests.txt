@@ -1,0 +1,140 @@
+
+==================================== ERRORS ====================================
+_______ ERROR collecting backend/tests/rules/test_r001_no_motion_unit.py _______
+ImportError while importing test module '/workspace/agingos/backend/tests/rules/test_r001_no_motion_unit.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/root/.pyenv/versions/3.10.19/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+backend/tests/rules/test_r001_no_motion_unit.py:5: in <module>
+    from services.rules.context import RuleContext
+E   ModuleNotFoundError: No module named 'services'
+_ ERROR collecting backend/tests/rules/test_r002_front_door_open_at_night_unit.py _
+ImportError while importing test module '/workspace/agingos/backend/tests/rules/test_r002_front_door_open_at_night_unit.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/root/.pyenv/versions/3.10.19/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+backend/tests/rules/test_r002_front_door_open_at_night_unit.py:5: in <module>
+    from services.rules.context import RuleContext
+E   ModuleNotFoundError: No module named 'services'
+_ ERROR collecting backend/tests/rules/test_r003_front_door_open_no_motion_after_unit.py _
+ImportError while importing test module '/workspace/agingos/backend/tests/rules/test_r003_front_door_open_no_motion_after_unit.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/root/.pyenv/versions/3.10.19/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+backend/tests/rules/test_r003_front_door_open_no_motion_after_unit.py:5: in <module>
+    from services.rules.context import RuleContext
+E   ModuleNotFoundError: No module named 'services'
+_ ERROR collecting backend/tests/rules/test_r004_prolonged_bathroom_presence_unit.py _
+ImportError while importing test module '/workspace/agingos/backend/tests/rules/test_r004_prolonged_bathroom_presence_unit.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/root/.pyenv/versions/3.10.19/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+backend/tests/rules/test_r004_prolonged_bathroom_presence_unit.py:5: in <module>
+    from services.rules.context import RuleContext
+E   ModuleNotFoundError: No module named 'services'
+_ ERROR collecting backend/tests/rules/test_r005_no_bathroom_activity_24h_unit.py _
+ImportError while importing test module '/workspace/agingos/backend/tests/rules/test_r005_no_bathroom_activity_24h_unit.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/root/.pyenv/versions/3.10.19/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+backend/tests/rules/test_r005_no_bathroom_activity_24h_unit.py:5: in <module>
+    from services.rules.context import RuleContext
+E   ModuleNotFoundError: No module named 'services'
+_ ERROR collecting backend/tests/rules/test_r006_no_livingroom_daytime_activity_unit.py _
+ImportError while importing test module '/workspace/agingos/backend/tests/rules/test_r006_no_livingroom_daytime_activity_unit.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/root/.pyenv/versions/3.10.19/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+backend/tests/rules/test_r006_no_livingroom_daytime_activity_unit.py:5: in <module>
+    from services.rules.context import RuleContext
+E   ModuleNotFoundError: No module named 'services'
+_ ERROR collecting backend/tests/rules/test_r007_night_wandering_room_switches_unit.py _
+ImportError while importing test module '/workspace/agingos/backend/tests/rules/test_r007_night_wandering_room_switches_unit.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/root/.pyenv/versions/3.10.19/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+backend/tests/rules/test_r007_night_wandering_room_switches_unit.py:5: in <module>
+    from services.rules.context import RuleContext
+E   ModuleNotFoundError: No module named 'services'
+______ ERROR collecting backend/tests/rules/test_r008_door_burst_unit.py _______
+ImportError while importing test module '/workspace/agingos/backend/tests/rules/test_r008_door_burst_unit.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/root/.pyenv/versions/3.10.19/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+backend/tests/rules/test_r008_door_burst_unit.py:5: in <module>
+    from services.rules.context import RuleContext
+E   ModuleNotFoundError: No module named 'services'
+____ ERROR collecting backend/tests/rules/test_r009_ingest_stopped_unit.py _____
+ImportError while importing test module '/workspace/agingos/backend/tests/rules/test_r009_ingest_stopped_unit.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/root/.pyenv/versions/3.10.19/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+backend/tests/rules/test_r009_ingest_stopped_unit.py:5: in <module>
+    from services.rules.context import RuleContext
+E   ModuleNotFoundError: No module named 'services'
+_____ ERROR collecting backend/tests/rules/test_r010_sensor_stuck_unit.py ______
+ImportError while importing test module '/workspace/agingos/backend/tests/rules/test_r010_sensor_stuck_unit.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/root/.pyenv/versions/3.10.19/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+backend/tests/rules/test_r010_sensor_stuck_unit.py:5: in <module>
+    from services.rules.context import RuleContext
+E   ModuleNotFoundError: No module named 'services'
+__________ ERROR collecting backend/tests/test_reopen_policy_r001.py ___________
+ImportError while importing test module '/workspace/agingos/backend/tests/test_reopen_policy_r001.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/root/.pyenv/versions/3.10.19/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+backend/tests/test_reopen_policy_r001.py:5: in <module>
+    from db import SessionLocal
+E   ModuleNotFoundError: No module named 'db'
+___________ ERROR collecting backend/tests/test_severity_mapping.py ____________
+ImportError while importing test module '/workspace/agingos/backend/tests/test_severity_mapping.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/root/.pyenv/versions/3.10.19/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+backend/tests/test_severity_mapping.py:1: in <module>
+    from services.severity import severity_from_score
+E   ModuleNotFoundError: No module named 'services'
+___ ERROR collecting backend/tests/test_status_flow_open_ack_close_reopen.py ___
+ImportError while importing test module '/workspace/agingos/backend/tests/test_status_flow_open_ack_close_reopen.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+backend/tests/test_status_flow_open_ack_close_reopen.py:11: in <module>
+    from backend.db import SessionLocal  # type: ignore
+E   ModuleNotFoundError: No module named 'backend'
+
+During handling of the above exception, another exception occurred:
+/root/.pyenv/versions/3.10.19/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+backend/tests/test_status_flow_open_ack_close_reopen.py:14: in <module>
+    from db import SessionLocal  # type: ignore
+E   ModuleNotFoundError: No module named 'db'
+=========================== short test summary info ============================
+ERROR backend/tests/rules/test_r001_no_motion_unit.py
+ERROR backend/tests/rules/test_r002_front_door_open_at_night_unit.py
+ERROR backend/tests/rules/test_r003_front_door_open_no_motion_after_unit.py
+ERROR backend/tests/rules/test_r004_prolonged_bathroom_presence_unit.py
+ERROR backend/tests/rules/test_r005_no_bathroom_activity_24h_unit.py
+ERROR backend/tests/rules/test_r006_no_livingroom_daytime_activity_unit.py
+ERROR backend/tests/rules/test_r007_night_wandering_room_switches_unit.py
+ERROR backend/tests/rules/test_r008_door_burst_unit.py
+ERROR backend/tests/rules/test_r009_ingest_stopped_unit.py
+ERROR backend/tests/rules/test_r010_sensor_stuck_unit.py
+ERROR backend/tests/test_reopen_policy_r001.py
+ERROR backend/tests/test_severity_mapping.py
+ERROR backend/tests/test_status_flow_open_ack_close_reopen.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 13 errors during collection !!!!!!!!!!!!!!!!!!!
+13 errors in 0.37s
