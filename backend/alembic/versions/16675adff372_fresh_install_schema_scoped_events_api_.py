@@ -48,8 +48,14 @@ def upgrade() -> None:
         sa.Column("user_id", sa.Uuid(), nullable=True),
         sa.Column("active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
     )
     op.create_unique_constraint("api_key_scopes_uq", "api_key_scopes", ["api_key_hash"])
+    op.create_check_constraint("api_key_scopes_role_check", "api_key_scopes", "role IN (\'operator\',\'service\',\'readonly\')")
+    op.create_index("ix_api_key_scopes_active", "api_key_scopes", ["org_id", "home_id", "subject_id"], unique=False, postgresql_where=sa.text("active = true"))
+
+    # CI/bootstrap compatibility: ensure api_key_scopes.updated_at exists
+    op.execute("ALTER TABLE api_key_scopes ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()")
 
     # 3) Baseline tables (as seen on MiniPC)
     op.create_table(
@@ -110,6 +116,9 @@ def downgrade() -> None:
     op.drop_table("baseline_room_bucket")
     op.drop_table("baseline_model_status")
     op.drop_table("baseline_bucket_dim")
+
+    op.drop_index("ix_api_key_scopes_active", table_name="api_key_scopes")
+    op.drop_constraint("api_key_scopes_role_check", "api_key_scopes", type_="check")
 
     op.drop_constraint("api_key_scopes_uq", "api_key_scopes", type_="unique")
     op.drop_table("api_key_scopes")
