@@ -1,0 +1,56 @@
+commit d7f0478575e51d7792ed181a4c866c1700ad26a2
+Author: IBL0606 <henrikbli@hotmail.com>
+Date:   Sun Mar 1 11:17:37 2026 +0100
+
+    P1-2: RuleContext + RuleSpec metadata + back-compat adapter (migrate R-001–R-003) (#20)
+    
+    * P1-2: RuleContext + registry metadata + back-compat adapter (migrate R-001..R-003)
+    
+    * P1-7: add stream_id dimension (db/api/pipeline/ui)
+    
+    * P1-7: add SQL runbook for events stream_id migration
+    
+    * P1-6: add notification policy route and audit SQL
+    
+    * P1-5: add /v1 aliases and deprecation headers for legacy paths
+    
+    * P1-2: implement rules R-004..R-010 (scope-aware ctx), update rule engine/scheduler, add tests+docs
+    
+    * console: forward X-API-Key header to backend via nginx
+    
+    * backend: wire notification policy router; harden episode label UUID; fail-soft subject_state when table missing
+    
+    * chore: ignore local backups and driftpakke scripts
+    
+    * mvp: stabilize baseline+anomalies pipeline (room_id, stream_id, scoring fallback, episodes schema, api fixes, disable reload)
+    
+    * console: alarms page; baseline scope fix; rule param nesting + R-002 allowlist; console volume mount
+    
+    * fix: reduce false alarms (R-002 allowlist, R-006 daytime guard, R-009 ha_snapshot liveness) and wire stream_id env
+    
+    * fix: R-009 liveness_categories yaml clean list (ha_snapshot)
+    
+    * P1-8: console report hygiene (save key binder + coverage cleanup)
+    
+    * P1-8: proposals miner links to proposal_links
+    
+    * P1-8: compose notification worker + tools mount
+    
+    * P1-8: add episodes_svc read API and proposal feedback /v1 aliases
+    
+    * P1-8: fix deviations evaluate route ordering
+    
+    * P1-8: ruff format + lint cleanup
+    
+    * Update ci.yml
+    
+    * Update ci.yml
+    
+    debug: print deviations evaluate on failure
+    
+    * ci(smoke): accept R-002 or R-003 in door window
+    
+    * ci(scenarios): allow ignoring known extra rule_ids (R-009) in exact match
+    
+    
+    This is basically P0-1/2/3/4/5/6 and P1-1/2/3/4/5/6/7/8

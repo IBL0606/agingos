@@ -211,23 +211,14 @@ def health_detail(scope: "AuthScope" = Depends(require_scope)):
             )
 
         except Exception as e:
-            # Fail-soft if table does not exist yet (e.g. migrations not applied)
-            msg = str(e)
-            if "subject_state" in msg and (
-                "does not exist" in msg or "UndefinedTable" in msg
-            ):
-                return {
-                    "available": False,
-                    "org_id": scope.org_id,
-                    "home_id": scope.home_id,
-                    "subject_id": scope.subject_id,
-                    "state": "unknown",
-                    "state_since": None,
-                    "last_event_ts": None,
-                    "updated_at": None,
-                    "note": "subject_state table missing (migrations not applied yet)",
-                }
-            raise
+              # Fail-soft if table does not exist yet (e.g. migrations not applied)
+              msg = str(e)
+              if ("baseline_model_status" in msg) and ("does not exist" in msg or "UndefinedTable" in msg):
+                  db.rollback()
+                  baseline_table_missing = True
+                  b = None
+              else:
+                  raise
         except Exception as e:
             from sqlalchemy.exc import ProgrammingError
 
