@@ -1,0 +1,4 @@
+2:agingos-console-1               127.0.0.1:8080->80/tcp
+3:agingos-ai-bot-1                127.0.0.1:8010->8010/tcp
+4:agingos-backend-1               127.0.0.1:8000->8000/tcp
+6:agingos-db-1                    127.0.0.1:5432->5432/tcp

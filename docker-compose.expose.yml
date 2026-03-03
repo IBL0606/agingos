@@ -1,0 +1,20 @@
+# OPT-IN overlay: expose ports on all interfaces (LAN).
+# Use ONLY when explicitly needed.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.expose.yml up -d
+#   docker compose -f docker-compose.yml -f docker-compose.expose.yml ps
+
+services:
+  backend:
+    ports:
+      - "8000:8000"
+  console:
+    ports:
+      - "8080:80"
+  db:
+    ports:
+      - "5432:5432"
+  ai-bot:
+    ports:
+      - "8010:8010"

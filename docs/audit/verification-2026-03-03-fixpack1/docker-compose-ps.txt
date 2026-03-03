@@ -1,0 +1,10 @@
+## TS_UTC=2026-03-03T05:19:26Z
+## CMD: docker compose ps
+
+NAME                            IMAGE                         COMMAND                  SERVICE               CREATED              STATUS              PORTS
+agingos-ai-bot-1                agingos-ai-bot                "uvicorn app.main:ap…"   ai-bot                About a minute ago   Up About a minute   127.0.0.1:8010->8010/tcp
+agingos-backend-1               agingos-backend               "uvicorn main:app --…"   backend               About a minute ago   Up About a minute   127.0.0.1:8000->8000/tcp
+agingos-console-1               nginx:alpine                  "/docker-entrypoint.…"   console               About a minute ago   Up About a minute   127.0.0.1:8080->80/tcp
+agingos-db-1                    postgres:16                   "docker-entrypoint.s…"   db                    About a minute ago   Up About a minute   127.0.0.1:5432->5432/tcp
+agingos-notification-worker-1   agingos-notification-worker   "sh -lc 'while true;…"   notification-worker   About a minute ago   Up About a minute   8000/tcp
+
