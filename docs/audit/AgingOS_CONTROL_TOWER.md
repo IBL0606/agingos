@@ -126,3 +126,38 @@ must be labeled **HYPOTHESIS** until verified.
 - Scope: devbox only (~/dev/agingos, Docker Desktop). No MiniPC/pilot/prod changes.
 - Plan: audit-capture devbox + docs/v2 skeleton + pilot blockers only
 - PR: (TBD)
+Scope: Devbox only (~/dev/agingos, Docker Desktop). No MiniPC/pilot/prod changes.
+Branch: pilot/fixpack-2026-03-03
+
+### Done (committed in branch)
+- v2 docs skeleton created:
+  - docs/v2/README.md (status-policy: ACTIVE/OBSOLETE/DRAFT + truthfulness rule)
+  - docs/v2/OPERATIONS.md (verified dev start/stop + localhost vs expose overlays)
+  - docs/v2/TESTING.md, docs/v2/PILOT-RUNBOOK.md
+  - docs/obsolete/README.md (policy)
+- Devbox audit capture implemented:
+  - tools/audit_capture_devbox.sh + Makefile target `make audit-capture`
+  - Evidence pack created/refreshed: docs/audit/as-is-2026-03-03-devbox/
+- Pilot blocker SOT-040 (port exposure) addressed on devbox:
+  - docker-compose.yml now has no public ports by default
+  - docker-compose.dev.yml binds ports to 127.0.0.1 (recommended)
+  - docker-compose.expose.yml provides opt-in LAN exposure (0.0.0.0)
+  - Runtime evidence captured: docs/audit/verification-2026-03-03-fixpack1/docker-ports.localhost.txt
+- room_id derivation added in ingest (code):
+  - backend/main.py sets db_event.room_id = derive_room_id(event.payload)
+  - backend/util/room_id.py + backend/config/room_map.yaml (default empty)
+  - Code evidence captured:
+    - docs/audit/verification-2026-03-03-fixpack1/room-id-derivation.diff.txt
+    - docs/audit/verification-2026-03-03-fixpack1/room-id-derivation.NO_EVIDENCE.md
+
+### Open / Next (Fixpack-1 remaining)
+- Extend /health/detail ingest diagnostics (additive):
+  - Add components.ingest.by_category (24h counts + last_seen per category)
+  - Add components.ingest.room_id_completeness_24h (presence/door empty vs set)
+  - Capture read-only evidence (curl outputs + audit-capture refresh) into docs/audit/verification-2026-03-03-fixpack1/
+- Update docs/v2 (PILOT-RUNBOOK / TESTING) to reference the new /health/detail fields (truthful; mark NO_EVIDENCE where needed)
+- Open PR for fixpack-1 and link it here (append-only)
+
+### Evidence notes (truthfulness)
+- Devbox currently has no live events; DB queries for last 24h returned 0 rows for presence/door/ha_snapshot → runtime data effect for room_id completeness remains NO_EVIDENCE until dev has events.
+- Python-based compile checks were unstable (WSL session termination / permission issues) → compile evidence marked NO_EVIDENCE; code evidence is via git diff + file content.

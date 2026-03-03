@@ -1,6 +1,6 @@
 # Devbox AS-IS evidence pack (2026-03-03)
 
-- TS_UTC: 2026-03-03T05:19:26Z
+- TS_UTC: 2026-03-03T17:48:51Z
 - Scope: Devbox only (~/dev/agingos, Docker Desktop)
 - Rule: read-only verification only (GET/SELECT/logs/ps/grep)
 

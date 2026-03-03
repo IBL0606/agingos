@@ -1,5 +1,5 @@
-## TS_UTC=2026-03-03T05:19:26Z
-## CMD: docker exec -i c123f49ca45a7d4ebdf428e94b182d1a958b0e8e2693a7eb414eae9bf0d47356 psql -U agingos -d agingos -P pager=off -c 
+## TS_UTC=2026-03-03T17:48:51Z
+## CMD: docker exec -i 4b569b5592b67c8cbb4f710307f241d04a7d4fb71fb09932eff46c5a231a6ca6 psql -U agingos -d agingos -P pager=off -c 
 SELECT category,
        COUNT(*) AS n_24h,
        MAX("timestamp") AS max_ts_24h
