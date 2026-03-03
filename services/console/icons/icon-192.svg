@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192" role="img" aria-label="AgingOS Console icon">
+  <rect width="192" height="192" rx="32" fill="#0b0f14"/>
+  <rect x="18" y="18" width="156" height="156" rx="24" fill="#1f6feb"/>
+  <text x="96" y="112" text-anchor="middle" font-size="64" font-family="system-ui,Segoe UI,Arial,sans-serif" fill="#e6edf3">A</text>
+</svg>
