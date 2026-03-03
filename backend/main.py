@@ -33,6 +33,7 @@ from datetime import datetime
 from typing import Optional
 
 from util.time import require_utc_aware
+from util.room_id import derive_room_id
 
 app = FastAPI(title="AgingOS Backend")
 
@@ -788,6 +789,9 @@ def receive_event(
         )
         # P1-7: force stream_id onto row (robust even if constructor args change)
         db_event.stream_id = stream_id
+
+        # Derive room_id deterministically from payload (best-effort)
+        db_event.room_id = derive_room_id(event.payload)  # may be None
 
         db.add(db_event)
         try:
