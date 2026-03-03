@@ -1,5 +1,5 @@
-## TS_UTC=2026-03-03T05:01:18Z
-## CMD: docker exec -i 60c43922773cd72185b7d31ad80085c4a5180253fc7c1ebb41b8d705a0b6a2fb psql -U agingos -d agingos -P pager=off -c 
+## TS_UTC=2026-03-03T05:19:26Z
+## CMD: docker exec -i c123f49ca45a7d4ebdf428e94b182d1a958b0e8e2693a7eb414eae9bf0d47356 psql -U agingos -d agingos -P pager=off -c 
 SELECT category,
        SUM(CASE WHEN COALESCE(room_id,'')='' THEN 1 ELSE 0 END) AS room_id_empty,
        SUM(CASE WHEN COALESCE(room_id,'')<>'' THEN 1 ELSE 0 END) AS room_id_set

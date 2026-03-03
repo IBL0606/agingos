@@ -1,9 +1,9 @@
-## TS_UTC=2026-03-03T05:01:18Z
+## TS_UTC=2026-03-03T05:19:26Z
 ## CMD: git --no-pager log -n 1 --decorate=short
 
-commit 309474b7e9776a7126fc7784921a3810be654357 (HEAD -> pilot/fixpack-2026-03-03)
+commit 18c6538662dffa879b540351d498e44635c3eb99 (HEAD -> pilot/fixpack-2026-03-03)
 Author: IBL0606 <henrikbli@hotmail.com>
-Date:   Tue Mar 3 05:59:06 2026 +0100
+Date:   Tue Mar 3 06:02:31 2026 +0100
 
-    docs: add v2 docs skeleton + obsolete policy
+    audit: add devbox audit-capture script + make target + evidence pack
 
