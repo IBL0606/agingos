@@ -15,7 +15,7 @@ This generates a dated evidence pack under `docs/audit/as-is-YYYY-MM-DD-devbox/`
 - git metadata
 - docker compose ps
 - logs tail
-- curl GET outputs for /health and /health/detail and /debug/scope
+- curl GET outputs for /health and /health/detail (including ingest diagnostics fields) and /debug/scope
 - DB SELECT summaries (freshness + room_id completeness)
 - manifest of exact commands executed
 

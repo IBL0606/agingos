@@ -31,6 +31,7 @@ This mode exposes ports on **0.0.0.0** (LAN). Use only when explicitly needed:
 ## Health checks (read-only)
 - `GET /health`
 - `GET /health/detail` (requires `X-API-Key`)
+  - includes ingest diagnostics: `components.ingest.by_category` and `components.ingest.room_id_completeness_24h`
 - `GET /debug/scope` (requires `X-API-Key`)
 
 ## Evidence capture (read-only)

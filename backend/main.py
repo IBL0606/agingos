@@ -176,6 +176,93 @@ def health_detail(scope: "AuthScope" = Depends(require_scope)):
             "error_seconds": INGEST_LAG_ERROR_S,
         }
 
+        # ---- ingest diagnostics (additive) ----
+        # Always present even if there are 0 events; fail-soft on query errors.
+        out["components"]["ingest"]["by_category"] = []
+        out["components"]["ingest"]["room_id_completeness_24h"] = {
+            "presence": {"room_id_empty": 0, "room_id_set": 0, "total": 0},
+            "door": {"room_id_empty": 0, "room_id_set": 0, "total": 0},
+        }
+
+        try:
+            # Per-category counts in last 24h (scoped + stream_id)
+            rows = (
+                db.execute(
+                    text("""
+                    SELECT category,
+                           COUNT(*)::int AS n_24h,
+                           MAX("timestamp") AS max_ts_24h
+                    FROM events
+                    WHERE org_id = :org AND home_id = :home AND subject_id = :sub
+                      AND stream_id = :stream_id
+                      AND "timestamp" >= now() - interval '24 hours'
+                    GROUP BY 1
+                    ORDER BY max_ts_24h DESC NULLS LAST
+                    """),
+                    {
+                        "org": scope.org_id,
+                        "home": scope.home_id,
+                        "sub": scope.subject_id,
+                        "stream_id": stream_id,
+                    },
+                )
+                .mappings()
+                .all()
+            )
+
+            out["components"]["ingest"]["by_category"] = [
+                {
+                    "category": r["category"],
+                    "n_24h": int(r["n_24h"] or 0),
+                    "max_ts_24h": (r["max_ts_24h"].isoformat() if r["max_ts_24h"] is not None else None),
+                }
+                for r in rows
+            ]
+
+            # room_id completeness for presence/door in last 24h
+            comp_rows = (
+                db.execute(
+                    text("""
+                    SELECT category,
+                           COUNT(*)::int AS total,
+                           SUM(CASE WHEN room_id IS NULL OR room_id = '' THEN 1 ELSE 0 END)::int AS room_id_empty,
+                           SUM(CASE WHEN room_id IS NOT NULL AND room_id <> '' THEN 1 ELSE 0 END)::int AS room_id_set
+                    FROM events
+                    WHERE org_id = :org AND home_id = :home AND subject_id = :sub
+                      AND stream_id = :stream_id
+                      AND "timestamp" >= now() - interval '24 hours'
+                      AND category IN ('presence','door')
+                    GROUP BY 1
+                    """),
+                    {
+                        "org": scope.org_id,
+                        "home": scope.home_id,
+                        "sub": scope.subject_id,
+                        "stream_id": stream_id,
+                    },
+                )
+                .mappings()
+                .all()
+            )
+
+            by_cat = {r["category"]: r for r in comp_rows}
+            for cat in ("presence", "door"):
+                r = by_cat.get(cat)
+                if r:
+                    out["components"]["ingest"]["room_id_completeness_24h"][cat] = {
+                        "room_id_empty": int(r["room_id_empty"] or 0),
+                        "room_id_set": int(r["room_id_set"] or 0),
+                        "total": int(r["total"] or 0),
+                    }
+
+        except Exception as e:
+            # Fail-soft: keep defaults, record error string (additive).
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            out["components"]["ingest"]["diagnostics_error"] = str(e)
+
         if n == 0:
             out["components"]["ingest"]["status"] = "ERROR"
             degrade("ERROR", "no events found for this scope")
