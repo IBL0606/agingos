@@ -1,0 +1,16 @@
+## TS_UTC=2026-03-03T05:01:18Z
+## CMD: docker exec -i 60c43922773cd72185b7d31ad80085c4a5180253fc7c1ebb41b8d705a0b6a2fb psql -U agingos -d agingos -P pager=off -c 
+SELECT category,
+       COUNT(*) AS n_24h,
+       MAX("timestamp") AS max_ts_24h
+FROM events
+WHERE "timestamp" >= now() - interval '24 hours'
+GROUP BY 1
+ORDER BY max_ts_24h DESC NULLS LAST;
+
+
+ category | n_24h | max_ts_24h 
+----------+-------+------------
+(0 rows)
+
+

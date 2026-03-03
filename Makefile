@@ -126,3 +126,7 @@ help:
 	@echo "  make smoke-s0    - run AI bot smoke (Sprint 0)"
 	@echo "  make smoke-s1    - run AI insights smoke (Sprint 1)"
 	@echo "  make smoke-ai    - run both Sprint 0 and Sprint 1 AI smoke tests"
+
+.PHONY: audit-capture
+audit-capture:
+	@tools/audit_capture_devbox.sh

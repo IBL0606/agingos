@@ -1,0 +1,9 @@
+## TS_UTC=2026-03-03T05:01:18Z
+## CMD: git --no-pager log -n 1 --decorate=short
+
+commit 309474b7e9776a7126fc7784921a3810be654357 (HEAD -> pilot/fixpack-2026-03-03)
+Author: IBL0606 <henrikbli@hotmail.com>
+Date:   Tue Mar 3 05:59:06 2026 +0100
+
+    docs: add v2 docs skeleton + obsolete policy
+

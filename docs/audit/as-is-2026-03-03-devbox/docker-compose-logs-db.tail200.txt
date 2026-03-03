@@ -1,0 +1,204 @@
+## TS_UTC=2026-03-03T05:01:18Z
+## CMD: docker compose logs --no-color --tail=200 db
+
+db-1  | 	        WITH candidate AS (
+db-1  | 	          SELECT id
+db-1  | 	          FROM notification_outbox
+db-1  | 	          WHERE status IN ('PENDING','RETRY')
+db-1  | 	            AND next_attempt_at <= now()
+db-1  | 	            AND (locked_at IS NULL OR locked_at < (now() - interval '15 minutes'))
+db-1  | 	          ORDER BY next_attempt_at ASC, id ASC
+db-1  | 	          FOR UPDATE SKIP LOCKED
+db-1  | 	          LIMIT 1
+db-1  | 	        )
+db-1  | 	        UPDATE notification_outbox o
+db-1  | 	        SET status = 'IN_FLIGHT',
+db-1  | 	            locked_at = now(),
+db-1  | 	            locked_by = '41d3655865c5',
+db-1  | 	            updated_at = now()
+db-1  | 	        FROM candidate
+db-1  | 	        WHERE o.id = candidate.id
+db-1  | 	        RETURNING
+db-1  | 	          o.id, o.org_id, o.home_id, o.subject_id,
+db-1  | 	          o.route_type, o.route_key, o.destination,
+db-1  | 	          o.message_type, o.severity, o.idempotency_key, o.payload,
+db-1  | 	          o.bypass_policy,
+db-1  | 	          o.status, o.attempt_n, o.max_attempts,
+db-1  | 	          o.next_attempt_at, o.last_attempt_at,
+db-1  | 	          o.delivered_at, o.acked_at;
+db-1  | 	        
+db-1  | 2026-03-03 05:00:53.177 UTC [1835] WARNING:  there is already a transaction in progress
+db-1  | 2026-03-03 05:00:53.177 UTC [1835] ERROR:  relation "notification_outbox" does not exist at character 65
+db-1  | 2026-03-03 05:00:53.177 UTC [1835] STATEMENT:  
+db-1  | 	        WITH candidate AS (
+db-1  | 	          SELECT id
+db-1  | 	          FROM notification_outbox
+db-1  | 	          WHERE status IN ('PENDING','RETRY')
+db-1  | 	            AND next_attempt_at <= now()
+db-1  | 	            AND (locked_at IS NULL OR locked_at < (now() - interval '15 minutes'))
+db-1  | 	          ORDER BY next_attempt_at ASC, id ASC
+db-1  | 	          FOR UPDATE SKIP LOCKED
+db-1  | 	          LIMIT 1
+db-1  | 	        )
+db-1  | 	        UPDATE notification_outbox o
+db-1  | 	        SET status = 'IN_FLIGHT',
+db-1  | 	            locked_at = now(),
+db-1  | 	            locked_by = '41d3655865c5',
+db-1  | 	            updated_at = now()
+db-1  | 	        FROM candidate
+db-1  | 	        WHERE o.id = candidate.id
+db-1  | 	        RETURNING
+db-1  | 	          o.id, o.org_id, o.home_id, o.subject_id,
+db-1  | 	          o.route_type, o.route_key, o.destination,
+db-1  | 	          o.message_type, o.severity, o.idempotency_key, o.payload,
+db-1  | 	          o.bypass_policy,
+db-1  | 	          o.status, o.attempt_n, o.max_attempts,
+db-1  | 	          o.next_attempt_at, o.last_attempt_at,
+db-1  | 	          o.delivered_at, o.acked_at;
+db-1  | 	        
+db-1  | 2026-03-03 05:00:58.227 UTC [1836] WARNING:  there is already a transaction in progress
+db-1  | 2026-03-03 05:00:58.227 UTC [1836] ERROR:  relation "notification_outbox" does not exist at character 65
+db-1  | 2026-03-03 05:00:58.227 UTC [1836] STATEMENT:  
+db-1  | 	        WITH candidate AS (
+db-1  | 	          SELECT id
+db-1  | 	          FROM notification_outbox
+db-1  | 	          WHERE status IN ('PENDING','RETRY')
+db-1  | 	            AND next_attempt_at <= now()
+db-1  | 	            AND (locked_at IS NULL OR locked_at < (now() - interval '15 minutes'))
+db-1  | 	          ORDER BY next_attempt_at ASC, id ASC
+db-1  | 	          FOR UPDATE SKIP LOCKED
+db-1  | 	          LIMIT 1
+db-1  | 	        )
+db-1  | 	        UPDATE notification_outbox o
+db-1  | 	        SET status = 'IN_FLIGHT',
+db-1  | 	            locked_at = now(),
+db-1  | 	            locked_by = '41d3655865c5',
+db-1  | 	            updated_at = now()
+db-1  | 	        FROM candidate
+db-1  | 	        WHERE o.id = candidate.id
+db-1  | 	        RETURNING
+db-1  | 	          o.id, o.org_id, o.home_id, o.subject_id,
+db-1  | 	          o.route_type, o.route_key, o.destination,
+db-1  | 	          o.message_type, o.severity, o.idempotency_key, o.payload,
+db-1  | 	          o.bypass_policy,
+db-1  | 	          o.status, o.attempt_n, o.max_attempts,
+db-1  | 	          o.next_attempt_at, o.last_attempt_at,
+db-1  | 	          o.delivered_at, o.acked_at;
+db-1  | 	        
+db-1  | 2026-03-03 05:01:03.278 UTC [1838] WARNING:  there is already a transaction in progress
+db-1  | 2026-03-03 05:01:03.279 UTC [1838] ERROR:  relation "notification_outbox" does not exist at character 65
+db-1  | 2026-03-03 05:01:03.279 UTC [1838] STATEMENT:  
+db-1  | 	        WITH candidate AS (
+db-1  | 	          SELECT id
+db-1  | 	          FROM notification_outbox
+db-1  | 	          WHERE status IN ('PENDING','RETRY')
+db-1  | 	            AND next_attempt_at <= now()
+db-1  | 	            AND (locked_at IS NULL OR locked_at < (now() - interval '15 minutes'))
+db-1  | 	          ORDER BY next_attempt_at ASC, id ASC
+db-1  | 	          FOR UPDATE SKIP LOCKED
+db-1  | 	          LIMIT 1
+db-1  | 	        )
+db-1  | 	        UPDATE notification_outbox o
+db-1  | 	        SET status = 'IN_FLIGHT',
+db-1  | 	            locked_at = now(),
+db-1  | 	            locked_by = '41d3655865c5',
+db-1  | 	            updated_at = now()
+db-1  | 	        FROM candidate
+db-1  | 	        WHERE o.id = candidate.id
+db-1  | 	        RETURNING
+db-1  | 	          o.id, o.org_id, o.home_id, o.subject_id,
+db-1  | 	          o.route_type, o.route_key, o.destination,
+db-1  | 	          o.message_type, o.severity, o.idempotency_key, o.payload,
+db-1  | 	          o.bypass_policy,
+db-1  | 	          o.status, o.attempt_n, o.max_attempts,
+db-1  | 	          o.next_attempt_at, o.last_attempt_at,
+db-1  | 	          o.delivered_at, o.acked_at;
+db-1  | 	        
+db-1  | 2026-03-03 05:01:08.327 UTC [1839] WARNING:  there is already a transaction in progress
+db-1  | 2026-03-03 05:01:08.328 UTC [1839] ERROR:  relation "notification_outbox" does not exist at character 65
+db-1  | 2026-03-03 05:01:08.328 UTC [1839] STATEMENT:  
+db-1  | 	        WITH candidate AS (
+db-1  | 	          SELECT id
+db-1  | 	          FROM notification_outbox
+db-1  | 	          WHERE status IN ('PENDING','RETRY')
+db-1  | 	            AND next_attempt_at <= now()
+db-1  | 	            AND (locked_at IS NULL OR locked_at < (now() - interval '15 minutes'))
+db-1  | 	          ORDER BY next_attempt_at ASC, id ASC
+db-1  | 	          FOR UPDATE SKIP LOCKED
+db-1  | 	          LIMIT 1
+db-1  | 	        )
+db-1  | 	        UPDATE notification_outbox o
+db-1  | 	        SET status = 'IN_FLIGHT',
+db-1  | 	            locked_at = now(),
+db-1  | 	            locked_by = '41d3655865c5',
+db-1  | 	            updated_at = now()
+db-1  | 	        FROM candidate
+db-1  | 	        WHERE o.id = candidate.id
+db-1  | 	        RETURNING
+db-1  | 	          o.id, o.org_id, o.home_id, o.subject_id,
+db-1  | 	          o.route_type, o.route_key, o.destination,
+db-1  | 	          o.message_type, o.severity, o.idempotency_key, o.payload,
+db-1  | 	          o.bypass_policy,
+db-1  | 	          o.status, o.attempt_n, o.max_attempts,
+db-1  | 	          o.next_attempt_at, o.last_attempt_at,
+db-1  | 	          o.delivered_at, o.acked_at;
+db-1  | 	        
+db-1  | 2026-03-03 05:01:12.529 UTC [1840] WARNING:  there is already a transaction in progress
+db-1  | 2026-03-03 05:01:12.529 UTC [1840] ERROR:  relation "notification_outbox" does not exist at character 65
+db-1  | 2026-03-03 05:01:12.529 UTC [1840] STATEMENT:  
+db-1  | 	        WITH candidate AS (
+db-1  | 	          SELECT id
+db-1  | 	          FROM notification_outbox
+db-1  | 	          WHERE status IN ('PENDING','RETRY')
+db-1  | 	            AND next_attempt_at <= now()
+db-1  | 	            AND (locked_at IS NULL OR locked_at < (now() - interval '15 minutes'))
+db-1  | 	          ORDER BY next_attempt_at ASC, id ASC
+db-1  | 	          FOR UPDATE SKIP LOCKED
+db-1  | 	          LIMIT 1
+db-1  | 	        )
+db-1  | 	        UPDATE notification_outbox o
+db-1  | 	        SET status = 'IN_FLIGHT',
+db-1  | 	            locked_at = now(),
+db-1  | 	            locked_by = '41d3655865c5',
+db-1  | 	            updated_at = now()
+db-1  | 	        FROM candidate
+db-1  | 	        WHERE o.id = candidate.id
+db-1  | 	        RETURNING
+db-1  | 	          o.id, o.org_id, o.home_id, o.subject_id,
+db-1  | 	          o.route_type, o.route_key, o.destination,
+db-1  | 	          o.message_type, o.severity, o.idempotency_key, o.payload,
+db-1  | 	          o.bypass_policy,
+db-1  | 	          o.status, o.attempt_n, o.max_attempts,
+db-1  | 	          o.next_attempt_at, o.last_attempt_at,
+db-1  | 	          o.delivered_at, o.acked_at;
+db-1  | 	        
+db-1  | 2026-03-03 05:01:17.592 UTC [1841] WARNING:  there is already a transaction in progress
+db-1  | 2026-03-03 05:01:17.592 UTC [1841] ERROR:  relation "notification_outbox" does not exist at character 65
+db-1  | 2026-03-03 05:01:17.592 UTC [1841] STATEMENT:  
+db-1  | 	        WITH candidate AS (
+db-1  | 	          SELECT id
+db-1  | 	          FROM notification_outbox
+db-1  | 	          WHERE status IN ('PENDING','RETRY')
+db-1  | 	            AND next_attempt_at <= now()
+db-1  | 	            AND (locked_at IS NULL OR locked_at < (now() - interval '15 minutes'))
+db-1  | 	          ORDER BY next_attempt_at ASC, id ASC
+db-1  | 	          FOR UPDATE SKIP LOCKED
+db-1  | 	          LIMIT 1
+db-1  | 	        )
+db-1  | 	        UPDATE notification_outbox o
+db-1  | 	        SET status = 'IN_FLIGHT',
+db-1  | 	            locked_at = now(),
+db-1  | 	            locked_by = '41d3655865c5',
+db-1  | 	            updated_at = now()
+db-1  | 	        FROM candidate
+db-1  | 	        WHERE o.id = candidate.id
+db-1  | 	        RETURNING
+db-1  | 	          o.id, o.org_id, o.home_id, o.subject_id,
+db-1  | 	          o.route_type, o.route_key, o.destination,
+db-1  | 	          o.message_type, o.severity, o.idempotency_key, o.payload,
+db-1  | 	          o.bypass_policy,
+db-1  | 	          o.status, o.attempt_n, o.max_attempts,
+db-1  | 	          o.next_attempt_at, o.last_attempt_at,
+db-1  | 	          o.delivered_at, o.acked_at;
+db-1  | 	        
+
