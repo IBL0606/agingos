@@ -1,0 +1,10 @@
+## TS_UTC=2026-03-03T17:48:51Z
+## CMD: docker compose logs --no-color --tail=200 backend
+
+backend-1  | INFO:     Started server process [1]
+backend-1  | INFO:     Waiting for application startup.
+backend-1  | {"ts":"2026-03-03T17:48:47.104288Z","level":"INFO","component":"scheduler","event":"scheduler_configured","run_id":"startup","msg":"scheduler configured","interval_minutes":5}
+backend-1  | INFO:     Application startup complete.
+backend-1  | INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+backend-1  | INFO:     172.18.0.1:47148 - "GET /health/detail HTTP/1.1" 403 Forbidden
+

@@ -1,0 +1,17 @@
+## TS_UTC=2026-03-03T17:48:51Z
+## CMD: docker exec -i 4b569b5592b67c8cbb4f710307f241d04a7d4fb71fb09932eff46c5a231a6ca6 psql -U agingos -d agingos -P pager=off -c 
+SELECT category,
+       SUM(CASE WHEN COALESCE(room_id,'')='' THEN 1 ELSE 0 END) AS room_id_empty,
+       SUM(CASE WHEN COALESCE(room_id,'')<>'' THEN 1 ELSE 0 END) AS room_id_set
+FROM events
+WHERE category IN ('presence','door')
+  AND "timestamp" >= now() - interval '24 hours'
+GROUP BY 1
+ORDER BY 1;
+
+
+ category | room_id_empty | room_id_set 
+----------+---------------+-------------
+(0 rows)
+
+

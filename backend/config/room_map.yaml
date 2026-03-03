@@ -1,0 +1,5 @@
+# entity_id -> room_id mapping (optional)
+# Example:
+# binary_sensor.front_door: entrance
+# binary_sensor.bathroom_motion: bathroom
+{}

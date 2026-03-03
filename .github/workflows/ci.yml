@@ -58,7 +58,7 @@ jobs:
         run: |
           set -euo pipefail
           docker compose version
-          docker compose up -d --build
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --build
           docker compose ps
 
       - name: Wait for Postgres (pg_isready) before Alembic
