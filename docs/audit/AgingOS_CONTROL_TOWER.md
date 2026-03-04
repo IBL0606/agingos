@@ -172,4 +172,16 @@ Branch: pilot/fixpack-2026-03-03
   - Add pilotbox post-upgrade evidence-pack TEMPLATE under `docs/audit/_templates/pilotbox_capture/` (NO_EVIDENCE until executed on MiniPC).
 - PR: TBD
 
+## Phase 4 — Fixpack-2 — UPDATE: READY TO MERGE — 2026-03-04T05:12:35Z
+
+- Branch: `pilot/fixpack-2-2026-03-04`
+- PR: https://github.com/IBL0606/agingos/pull/31
+- Scope: docs-only (devbox repo). No MiniPC/pilot/prod changes. No data deletion.
+- Delivered:
+  - `docs/v2/OPERATIONS.md`: explicit MiniPC overlay run/upgrade guidance + systemd template (NO_EVIDENCE until captured on MiniPC).
+  - `docs/v2/PILOT-RUNBOOK.md`: read-only Pilotbox/MiniPC post-upgrade checklist (compose/runtime, health/scope, DB SELECTs).
+  - `docs/audit/_templates/pilotbox_capture/MANIFEST.md`: standardized read-only evidence capture template (NO_EVIDENCE until executed).
+- DoD note:
+  - This unblocks a controlled MiniPC upgrade where LAN exposure is explicit via overlays, and post-upgrade evidence capture is standardized.
+
 
