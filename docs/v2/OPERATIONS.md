@@ -6,6 +6,51 @@ Status: **DRAFT**
 This document applies to **Devbox only** (`~/dev/agingos`, Docker Desktop).
 Pilot/Prod (MiniPC) is out of scope unless explicitly stated.
 
+
+## MiniPC / Pilotbox (Pilot/Prod) — upgrade/run guidance (explicit)
+
+This section is **guidance only**. It does **not** imply any MiniPC changes were made.
+Any MiniPC state must be captured as **read-only evidence** under `docs/audit/as-is-YYYY-MM-DD-pilotbox/`.
+
+### Why this exists
+- `docker-compose.yml` is **safe-by-default** (no published ports).
+- LAN reachability is **opt-in** via `docker-compose.expose.yml`.
+- If MiniPC runs only `docker-compose.yml` after upgrading to `main`, it will likely **lose host/LAN reachability** (expected).
+
+### Run on MiniPC (LAN, recommended for pilot)
+From `/opt/agingos`:
+- Start / reconcile:
+  - `docker compose -f docker-compose.yml -f docker-compose.expose.yml up -d --build`
+- Stop:
+  - `docker compose -f docker-compose.yml -f docker-compose.expose.yml down`
+
+### (Optional) Run on MiniPC (localhost-only)
+From `/opt/agingos`:
+- Start / reconcile:
+  - `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build`
+- Stop:
+  - `docker compose -f docker-compose.yml -f docker-compose.dev.yml down`
+
+### systemd unit guidance (MiniPC)
+This is a **template**. It is **NO_EVIDENCE** until a MiniPC `systemctl cat agingos.service` capture confirms it.
+
+Example (LAN):
+[Unit]
+Description=AgingOS (docker compose)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/agingos
+ExecStart=/usr/bin/docker compose -f docker-compose.yml -f docker-compose.expose.yml up -d --build
+ExecStop=/usr/bin/docker compose -f docker-compose.yml -f docker-compose.expose.yml down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
+
 ## Start/stop (Devbox)
 
 ### Localhost-only (DEFAULT / recommended)
