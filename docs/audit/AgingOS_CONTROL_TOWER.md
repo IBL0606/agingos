@@ -161,3 +161,15 @@ Branch: pilot/fixpack-2026-03-03
 ### Evidence notes (truthfulness)
 - Devbox currently has no live events; DB queries for last 24h returned 0 rows for presence/door/ha_snapshot → runtime data effect for room_id completeness remains NO_EVIDENCE until dev has events.
 - Python-based compile checks were unstable (WSL session termination / permission issues) → compile evidence marked NO_EVIDENCE; code evidence is via git diff + file content.
+
+## Phase 4 — Fixpack-2 (docs/runbook + pilotbox evidence template) — IN PROGRESS — 2026-03-04T05:09:25Z
+
+- Branch: `pilot/fixpack-2-2026-03-04`
+- Scope: devbox/docs only (`~/dev/agingos`, Docker Desktop). No MiniPC/pilot/prod changes.
+- Goals:
+  - Document explicit MiniPC run/upgrade using overlays (LAN via `docker-compose.expose.yml`).
+  - Document systemd unit guidance that matches overlay-based run command (template; NO_EVIDENCE until captured).
+  - Add pilotbox post-upgrade evidence-pack TEMPLATE under `docs/audit/_templates/pilotbox_capture/` (NO_EVIDENCE until executed on MiniPC).
+- PR: TBD
+
+
