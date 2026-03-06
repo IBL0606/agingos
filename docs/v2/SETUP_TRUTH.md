@@ -28,9 +28,9 @@ docker compose exec -T backend alembic -c alembic.ini current
 
 # activate scope mapping for dev-key-2 (sha256 precomputed)
 docker compose exec -T db psql -U agingos -d agingos -c "
-INSERT INTO api_key_scopes (org_id, home_id, subject_id, role, api_key_hash, user_id, active)
-VALUES ('default','default','default','owner','966c44be82076d2c2ad29390d50c34034a35056007f29606f6457b02af023402','dev-user',true)
-ON CONFLICT (api_key_hash) DO UPDATE SET active=true, org_id=EXCLUDED.org_id, home_id=EXCLUDED.home_id, subject_id=EXCLUDED.subject_id, role=EXCLUDED.role, user_id=EXCLUDED.user_id;
+INSERT INTO api_key_scopes (org_id, home_id, subject_id, role, api_key_hash, active)
+VALUES ('default','default','default','operator','966c44be82076d2c2ad29390d50c34034a35056007f29606f6457b02af023402',true)
+ON CONFLICT (api_key_hash) DO UPDATE SET active=true, org_id=EXCLUDED.org_id, home_id=EXCLUDED.home_id, subject_id=EXCLUDED.subject_id, role=EXCLUDED.role, updated_at=now();
 "
 
 docker compose exec -T backend curl -sS http://127.0.0.1:8000/health
@@ -47,6 +47,7 @@ Expected truth after scheduler fix:
 - `/health/detail` requires an active `api_key_scopes` mapping for the presented API key.
 - Fresh empty install may still return `overall_status=ERROR` with reason `no events found for this scope` (data-aware behavior).
 - Scheduler/anomalies runner must not repeatedly fail with transaction-aborted loop from invalid `baseline_model_status.user_id` query.
+- For this fresh-install verification path, `api_key_scopes.user_id` is not required in the bootstrap mapping shown above.
 
 ### Upgrade (existing home data)
 
