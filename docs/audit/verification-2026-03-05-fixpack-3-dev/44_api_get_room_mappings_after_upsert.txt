@@ -1,0 +1,7 @@
+HTTP/1.1 200 OK
+date: Thu, 05 Mar 2026 20:46:33 GMT
+server: uvicorn
+content-length: 452
+content-type: application/json
+
+[{"entity_id":"binary_sensor.bathroom_motion","room_id":"bathroom","active":true,"note":"dev test","org_id":"default","home_id":"default","created_at":"2026-03-05T05:41:48.880817Z","updated_at":"2026-03-05T05:41:48.880817Z"},{"entity_id":"binary_sensor.front_door","room_id":"entrance","active":true,"note":"dev upsert proof","org_id":"default","home_id":"default","created_at":"2026-03-05T05:41:48.880817Z","updated_at":"2026-03-05T20:46:26.922188Z"}]

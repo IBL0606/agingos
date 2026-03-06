@@ -1,0 +1,11 @@
+== docker port agingos-backend-1 8000/tcp ==
+
+== docker port agingos-console-1 80/tcp ==
+
+== docker inspect HostPort backend 8000/tcp ==
+
+NO_HOSTPORT
+
+== docker inspect HostPort console 80/tcp ==
+
+NO_HOSTPORT

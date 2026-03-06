@@ -1,0 +1,7 @@
+HTTP/1.1 200 OK
+date: Fri, 06 Mar 2026 11:52:08 GMT
+server: uvicorn
+content-length: 388
+content-type: application/json
+
+[{"room_id":"bathroom","display_name":"Bad","room_type":"BATHROOM","org_id":"default","home_id":"default","created_at":"2026-03-05T05:41:36.989335Z","updated_at":"2026-03-05T05:41:36.989335Z"},{"room_id":"entrance","display_name":"Entré","room_type":"ENTRANCE","org_id":"default","home_id":"default","created_at":"2026-03-05T05:41:36.989335Z","updated_at":"2026-03-05T05:41:36.989335Z"}]

@@ -1,0 +1,61 @@
+== repo root dirs ==
+total 592
+drwxr-xr-x 14 henrik henrik  4096 Mar  4 19:30 .
+drwxr-xr-x  3 henrik henrik  4096 Jan  5 18:47 ..
+drwxr-xr-x  2 henrik henrik  4096 Dec 12 13:55 .devcontainer
+-rw-r--r--  1 henrik henrik   157 Mar  1 18:56 .env
+-rw-r--r--  1 henrik henrik   157 Mar  1 18:53 .env.bak.20260301T175549Z
+-rw-r--r--  1 henrik henrik   157 Mar  1 18:53 .env.bak.20260301T175632Z
+-rw-r--r--  1 henrik henrik   168 Mar  1 18:46 .env.example
+drwxr-xr-x  8 henrik henrik  4096 Mar  5 19:59 .git
+-rw-r--r--  1 henrik henrik   133 Jan 21 21:30 .gitattributes
+drwxr-xr-x  3 henrik henrik  4096 Dec 25 14:03 .github
+-rw-r--r--  1 henrik henrik  1086 Mar  1 18:46 .gitignore
+drwxr-xr-x  3 root   root    4096 Dec 30 12:30 .ruff_cache
+-rw-r--r--  1 henrik henrik  1656 Mar  1 18:46 004_proposals_patternminer_mode.sql
+-rw-r--r--  1 henrik henrik  2539 Dec 18 10:36 CHANGELOG.md
+-rw-r--r--  1 henrik henrik  5408 Mar  1 18:46 CHANGELOG_CONSOLE_PILOT_READY.md
+-rw-r--r--  1 henrik henrik  4753 Mar  4 05:56 Makefile
+-rw-r--r--  1 henrik henrik 12165 Mar  1 18:46 README.md
+-rw-r--r--  1 henrik henrik  1424 Mar  3 06:18 _backup_OPERATIONS.md.pre_health_detail_diag.20260303T175247Z.bak
+-rw-r--r--  1 henrik henrik   605 Mar  3 05:58 _backup_PILOT-RUNBOOK.md.pre_health_detail_diag.20260303T175247Z.bak
+-rw-r--r--  1 henrik henrik   674 Mar  3 05:58 _backup_TESTING.md.pre_health_detail_diag.20260303T175247Z.bak
+-rw-r--r--  1 henrik henrik 10687 Mar  3 05:56 _backup_ci.yml.pre_ci_overlay.20260303T180924Z.bak
+-rw-r--r--  1 henrik henrik  2000 Mar  1 18:46 _backup_docker-compose.yml.20260303T050450Z.bak
+-rw-r--r--  1 henrik henrik  1878 Mar  3 06:15 _backup_docker-compose.yml.pre_remove_ports.20260303T051604Z.bak
+-rw-r--r--  1 henrik henrik  1970 Mar  3 06:04 _backup_docker-compose.yml.pre_remove_profiles.20260303T051520Z.bak
+-rw-r--r--  1 henrik henrik 80240 Mar  1 19:12 _backup_main.py.pre_add_rollback.20260301T181335Z.bak
+-rw-r--r--  1 henrik henrik 80630 Mar  1 18:46 _backup_main.py.pre_failsoft.20260301T181107Z.bak
+-rw-r--r--  1 henrik henrik 80454 Mar  3 06:25 _backup_main.py.pre_health_ingest_diag.20260303T174837Z.bak
+-rw-r--r--  1 henrik henrik 80670 Mar  1 19:11 _backup_main.py.pre_remove_garbage.20260301T181246Z.bak
+drwxr-xr-x  3 henrik henrik  4096 Mar  5 20:31 _handoff
+-rw-r--r--  1 henrik henrik 90736 Dec 26 23:28 agingos_repo.zip
+drwxr-xr-x 12 henrik henrik  4096 Mar  5 19:58 backend
+drwxr-xr-x  2 henrik henrik  4096 Dec 31 07:23 backups
+-rw-r--r--  1 henrik henrik   438 Mar  4 05:56 docker-compose.ci.yml
+-rw-r--r--  1 henrik henrik   438 Mar  4 05:56 docker-compose.dev.yml
+-rw-r--r--  1 henrik henrik   422 Mar  4 05:56 docker-compose.expose.yml
+-rw-r--r--  1 henrik henrik   403 Dec 27 14:06 docker-compose.field.yml
+-rw-r--r--  1 henrik henrik   175 Mar  1 18:46 docker-compose.smoke.yml
+-rw-r--r--  1 henrik henrik  1878 Mar  4 05:56 docker-compose.yml
+drwxr-xr-x 17 henrik henrik  4096 Mar  4 05:56 docs
+drwxr-xr-x  4 henrik henrik  4096 Dec 15 13:38 examples
+-rw-r--r--  1 henrik henrik   579 Dec 27 14:06 pyproject.toml
+drwxr-xr-x  2 henrik henrik  4096 Mar  1 18:46 scripts
+drwxr-xr-x  4 henrik henrik  4096 Jan 18 13:07 services
+drwxr-xr-x  2 henrik henrik  4096 Mar  4 05:56 tools
+
+== do we have ./routes on host? ==
+NO_HOST_ROUTES_DIR
+
+== do we have ./backend/routes on host? ==
+total 64
+drwxr-xr-x  3 henrik henrik  4096 Mar  5 20:37 .
+drwxr-xr-x 12 henrik henrik  4096 Mar  5 19:58 ..
+drwxr-xr-x  2 root   root    4096 Jan 18 14:21 __pycache__
+-rw-r--r--  1 henrik henrik  9397 Mar  1 18:46 anomalies.py
+-rw-r--r--  1 henrik henrik 10409 Mar  1 18:46 baseline.py
+-rw-r--r--  1 henrik henrik  5028 Mar  1 18:46 deviations.py
+-rw-r--r--  1 henrik henrik  6785 Mar  1 18:46 notification_policy.py
+-rw-r--r--  1 henrik henrik  2845 Mar  5 20:39 rooms.py
+-rw-r--r--  1 henrik henrik  6011 Mar  1 18:46 rules.py

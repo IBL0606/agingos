@@ -1,0 +1,16 @@
+14:from services.auth import (
+22:from routes.rules import router as rules_router
+23:from routes.deviations import router as deviations_router
+24:from routes.baseline import router as baseline_router
+25:from routes.anomalies import router as anomalies_router
+26:from routes.notification_policy import router as notification_router
+68:app.include_router(rules_router, dependencies=[Depends(require_scope)])
+69:app.include_router(deviations_router, dependencies=[Depends(require_scope)])
+70:app.include_router(baseline_router, dependencies=[Depends(require_scope)])
+71:app.include_router(anomalies_router, dependencies=[Depends(require_scope)])
+72:app.include_router(notification_router, dependencies=[Depends(require_scope)])
+75:app.include_router(rules_router, prefix="/v1", dependencies=[Depends(require_scope)])
+76:app.include_router(
+79:app.include_router(baseline_router, prefix="/v1", dependencies=[Depends(require_scope)])
+80:app.include_router(
+83:app.include_router(

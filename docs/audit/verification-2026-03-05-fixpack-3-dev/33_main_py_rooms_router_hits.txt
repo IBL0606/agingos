@@ -1,0 +1,9 @@
+   28: from routes.rooms import router as rooms_router
+   62:         # Simple successor mapping: prefix /v1 + same path
+   75: app.include_router(rooms_router, dependencies=[Depends(require_scope)])
+   77: app.include_router(rules_router, prefix="/v1", dependencies=[Depends(require_scope)])
+   79:     deviations_router, prefix="/v1", dependencies=[Depends(require_scope)]
+   81: app.include_router(baseline_router, prefix="/v1", dependencies=[Depends(require_scope)])
+   83:     anomalies_router, prefix="/v1", dependencies=[Depends(require_scope)]
+   86:     notification_router, prefix="/v1", dependencies=[Depends(require_scope)]
+   91: app.include_router(rooms_router, prefix="/v1", dependencies=[Depends(require_scope)])

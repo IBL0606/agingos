@@ -1,0 +1,25 @@
+#1 [internal] load local bake definitions
+#1 reading from stdin 545B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 442B done
+#2 DONE 0.0s
+Dockerfile:7
+
+--------------------
+
+   5 |     # Utilities for debugging/health checks
+
+   6 |     RUN apt-get update \\
+
+   7 | >>>     && apt-get install -y --no-install-recommends curl \\
+
+   8 |         && rm -rf /var/lib/apt/lists/*
+
+   9 |     
+
+--------------------
+
+failed to solve: dockerfile parse error on line 7: unknown instruction: &&
+

@@ -1,0 +1,26 @@
+    75	app.include_router(rooms_router, dependencies=[Depends(require_scope)])
+    76	# P1-5: /v1 stable contract (additive). Keep legacy paths working.
+    77	app.include_router(rules_router, prefix="/v1", dependencies=[Depends(require_scope)])
+    78	app.include_router(
+    79	    deviations_router, prefix="/v1", dependencies=[Depends(require_scope)]
+    80	)
+    81	app.include_router(baseline_router, prefix="/v1", dependencies=[Depends(require_scope)])
+    82	app.include_router(
+    83	    anomalies_router, prefix="/v1", dependencies=[Depends(require_scope)]
+    84	)
+    85	app.include_router(
+    86	    notification_router, prefix="/v1", dependencies=[Depends(require_scope)]
+    87	)
+    88	
+    89	
+    90	app.include_router(
+    91	    rooms_router, prefix=\"/v1\", dependencies=[Depends(require_scope)]
+    92	)
+    93	@app.get("/health")
+    94	def health():
+    95	    return {"status": "ok"}
+    96	
+    97	
+    98	@app.get("/health/detail")
+    99	def health_detail(scope: "AuthScope" = Depends(require_scope)):
+   100	    """

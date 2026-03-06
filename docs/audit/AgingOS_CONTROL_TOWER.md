@@ -185,3 +185,37 @@ Branch: pilot/fixpack-2026-03-03
   - This unblocks a controlled MiniPC upgrade where LAN exposure is explicit via overlays, and post-upgrade evidence capture is standardized.
 
 
+
+### Fixpack-3 — Room Mapping (dev) — 2026-03-06
+Link: PR_TBD
+Type: fixpack (room mapping)
+Status: IN PROGRESS
+
+Summary:
+- Added Room Catalog (rooms) + Sensor→room mapping (sensor_room_map) (scoped per org/home).
+- Ingest resolves events.room_id deterministically for presence/door:
+  payload-first → mapping-second → fallback.
+- Added backend API:
+  - GET/POST /v1/rooms
+  - GET/POST /v1/room_mappings
+  - GET /v1/room_mappings/unknown_sensors?stream_id=prod
+- Added Console “Romoppsett” page: rooms.html + nav-link.
+
+Evidence (dev):
+- docs/audit/verification-2026-03-05-fixpack-3-dev/01_roomid_after_ingest_fix.txt
+- docs/audit/verification-2026-03-05-fixpack-3-dev/02_db_dt_rooms.txt
+- docs/audit/verification-2026-03-05-fixpack-3-dev/03_db_dt_sensor_room_map.txt
+- docs/audit/verification-2026-03-05-fixpack-3-dev/43_api_post_room_mappings_upsert.txt
+- docs/audit/verification-2026-03-05-fixpack-3-dev/44_api_get_room_mappings_after_upsert.txt
+- docs/audit/verification-2026-03-05-fixpack-3-dev/45_api_get_rooms.txt
+- docs/audit/verification-2026-03-05-fixpack-3-dev/46_api_get_room_mappings.txt
+- docs/audit/verification-2026-03-05-fixpack-3-dev/47_api_get_unknown_sensors_initial.txt
+- docs/audit/verification-2026-03-05-fixpack-3-dev/52_console_rooms_html_served.txt
+- docs/audit/verification-2026-03-05-fixpack-3-dev/53_console_nav_rooms_link_present.txt
+- docs/audit/verification-2026-03-05-fixpack-3-dev/54_rooms_html_api_key_masked.txt
+
+Pilotbox:
+- Template only (NO_EVIDENCE): docs/audit/_templates/pilotbox_capture/fixpack-3_room_mapping.md
+
+Remaining:
+- Replace PR_TBD with actual PR link and set Status to READY TO MERGE when review is complete.

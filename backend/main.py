@@ -25,6 +25,8 @@ from routes.baseline import router as baseline_router
 from routes.anomalies import router as anomalies_router
 from routes.notification_policy import router as notification_router
 
+from routes.rooms import router as rooms_router
+from routes.room_mappings import router as room_mappings_router
 from fastapi import Query
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
@@ -71,6 +73,8 @@ app.include_router(baseline_router, dependencies=[Depends(require_scope)])
 app.include_router(anomalies_router, dependencies=[Depends(require_scope)])
 app.include_router(notification_router, dependencies=[Depends(require_scope)])
 
+app.include_router(rooms_router, dependencies=[Depends(require_scope)])
+app.include_router(room_mappings_router, dependencies=[Depends(require_scope)])
 # P1-5: /v1 stable contract (additive). Keep legacy paths working.
 app.include_router(rules_router, prefix="/v1", dependencies=[Depends(require_scope)])
 app.include_router(
@@ -85,6 +89,9 @@ app.include_router(
 )
 
 
+
+app.include_router(rooms_router, prefix="/v1", dependencies=[Depends(require_scope)])
+app.include_router(room_mappings_router, prefix="/v1", dependencies=[Depends(require_scope)])
 @app.get("/health")
 def health():
     return {"status": "ok"}
