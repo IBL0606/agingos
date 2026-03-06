@@ -636,6 +636,15 @@
     return Number.isFinite(t) ? t : null;
   }
 
+  function clampInt(n, lo, hi, fallback) {
+    const v = Number(n);
+    if (!Number.isFinite(v)) return fallback;
+    const i = Math.trunc(v);
+    if (i < lo) return lo;
+    if (i > hi) return hi;
+    return i;
+  }
+
   function loadThresholds() {
     const raw = localStorage.getItem("agingos_report_thresholds_v0");
     let t = {};
@@ -646,7 +655,7 @@
       stale_event_minutes: Number($("thrStaleEventMin").value || (t.stale_event_minutes ?? 60)),
       runner_stale_minutes: Number($("thrRunnerStaleMin").value || (t.runner_stale_minutes ?? 10)),
       baseline_cov_min: Number($("thrBaselineCovMin").value || (t.baseline_cov_min ?? 0.2)),
-      events_limit: Number($("thrEventsLimit").value || (t.events_limit ?? 200)),
+      events_limit: clampInt($("thrEventsLimit").value || (t.events_limit ?? 200), 1, 1000, 200),
     };
   }
 
