@@ -1,0 +1,67 @@
+{
+  "overall_status": "ERROR",
+  "reasons": [
+    "ingest lag >= 7200s"
+  ],
+  "ingest": {
+    "status": "ERROR",
+    "events_n": 2,
+    "max_event_ts": "2026-03-06T18:45:43.967818+00:00",
+    "lag_seconds": 10609.25191,
+    "thresholds": {
+      "degraded_seconds": 900,
+      "error_seconds": 7200
+    },
+    "by_category": [
+      {
+        "category": "presence",
+        "n_24h": 1,
+        "max_ts_24h": "2026-03-06T18:45:43.967818+00:00"
+      }
+    ],
+    "room_id_completeness_24h": {
+      "presence": {
+        "room_id_empty": 0,
+        "room_id_set": 1,
+        "total": 1
+      },
+      "door": {
+        "room_id_empty": 0,
+        "room_id_set": 0,
+        "total": 0
+      }
+    }
+  },
+  "baseline": {
+    "status": "OK",
+    "expected_model_end": "2026-03-05",
+    "latest": {
+      "model_start": "2026-02-27",
+      "model_end": "2026-03-05",
+      "baseline_ready": true,
+      "computed_at": "2026-03-06T18:46:51.719571+00:00",
+      "days_in_window": 7,
+      "days_with_data": 1,
+      "room_bucket_rows": 1,
+      "room_bucket_supported": true,
+      "transition_rows": 0,
+      "transition_supported": false
+    },
+    "thresholds": {
+      "max_age_hours": 36
+    },
+    "age_hours": 2.9281944880555555
+  },
+  "worker": {
+    "status": "OK",
+    "runner_status": {
+      "last_run_at": "2026-03-06T21:40:06.344168+00:00",
+      "last_ok_at": null,
+      "last_error_at": null,
+      "last_error_msg": null,
+      "last_scored_bucket_start": null,
+      "last_counts": null,
+      "last_rooms_scored": null
+    }
+  }
+}

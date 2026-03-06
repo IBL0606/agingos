@@ -79,6 +79,17 @@ This mode exposes ports on **0.0.0.0** (LAN). Use only when explicitly needed:
   - includes ingest diagnostics: `components.ingest.by_category` and `components.ingest.room_id_completeness_24h`
 - `GET /debug/scope` (requires `X-API-Key`)
 
+
+## Console health card (Fixpack-4B / MUST-2)
+- Host page: `services/console/index.html` (Status).
+- Truth source: `GET /health/detail` (requires `X-API-Key`).
+- Card must show:
+  - overall color state from `overall_status` (`OK`→grønn, `DEGRADED`→gul, `ERROR`→rød, ellers ukjent)
+  - kort forklaring i vanlig språk
+  - 1–3 konkrete neste steg
+  - komponentvis status for ingest + baseline + worker-ekvivalent (`worker`/`anomalies_runner`/`scheduler`)
+- If component fields are missing in `/health/detail`, Console must explicitly render `Ukjent / mangler data` (never silently green).
+
 ## Evidence capture (read-only)
 Canonical Devbox evidence capture:
 - `make audit-capture`

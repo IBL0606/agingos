@@ -290,3 +290,52 @@ Evidence:
 
 NO_EVIDENCE in this container:
 - Docker runtime commands unavailable (`docker: command not found`), so full runtime PASS could not be executed here.
+
+
+## Phase 4 — Fixpack-4B draft (MUST-2 console health card) — 2026-03-06
+
+Scope: Console status presentation + docs/evidence guidance only.
+
+Delivered in repo draft:
+- Added automatic health card on `services/console/index.html` that reads `/health/detail` as source of truth.
+- Card maps `overall_status` to green/yellow/red and shows short explanation + 1–3 operational next steps.
+- Card renders truthful component breakdown for ingest, baseline, and worker-equivalent (`worker` -> `anomalies_runner` -> `scheduler` fallback).
+- Missing component data is rendered explicitly as `Ukjent / mangler data` (never auto-green).
+- Updated `docs/v2/OPERATIONS.md` and `docs/v2/TESTING.md` with MUST-2 behavior and verification instructions.
+
+Evidence pack proposal:
+- `docs/audit/verification-2026-03-06-fixpack-4b-health-card/`
+
+NO_EVIDENCE in this container:
+- Runtime `/health/detail` and live browser rendering checks require running stack/API key not available in this edit-only run.
+
+### Fixpack-4B — MUST-2 Helsestatuskort i Console — READY TO MERGE — 2026-03-06
+Link: https://github.com/IBL0606/agingos/pull/35
+Status: READY TO MERGE
+Branch: pr-35-fixpack-4b
+Head: 04edea3
+
+Scope:
+- Console health card / presentasjon / UX / docs / evidence only.
+- `/health/detail` beholdt som sann backend-kilde.
+- Ingen setup-truth endringer.
+- Ingen backend-kontraktsendringer.
+
+Levert:
+- Nytt health card i `services/console/index.html`
+- G/Y/R overall-status fra `/health/detail`
+- menneskespråk + 1–3 “hva gjør vi”-steg
+- eksplisitt ukjent/mangler-data-håndtering
+- docs/v2 oppdatert
+- evidence path opprettet
+
+Bevist:
+- CHECK-HEALTH-01 PASS
+- CHECK-HEALTH-02 PASS
+- Live UI på devbox viste RØD health card i samsvar med `/health/detail` overall ERROR og ingest ERROR
+- Evidence path: `docs/audit/verification-2026-03-06-fixpack-4b-health-card/`
+
+Truth note:
+- Worker-detaljen i UI rendret `DEGRADED` i live test fordi UI tolker manglende `last_ok_at` strengere enn backend `status=OK`.
+- Overall-kortet og ingest/baseline-delene var sann mot `/health/detail`.
+- Dette er ikke blocker for MUST-2, men bør harmoniseres senere hvis vi vil ha helt ren direkte-mapping.
