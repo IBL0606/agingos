@@ -133,6 +133,26 @@
   .dashgrid .spanall{grid-column:1/-1;}
   @media (min-width: 900px){ .dashgrid{grid-template-columns:repeat(2,minmax(0,1fr));} }
   @media (min-width: 1200px){ .dashgrid{grid-template-columns:repeat(3,minmax(0,1fr));} }
+      /* FIXPACK-4B health card */
+      .health-card{margin:10px 0 12px;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:var(--card);box-shadow:var(--shadow);}
+      .health-card.health-green{border-color:rgba(35,134,54,0.6);}
+      .health-card.health-yellow{border-color:rgba(210,153,34,0.75);}
+      .health-card.health-red{border-color:rgba(218,54,51,0.75);}
+      .health-card.health-unknown{border-color:rgba(159,176,192,0.6);}
+      .health-overall{display:flex;align-items:center;gap:8px;font-weight:700;}
+      .health-dot{width:11px;height:11px;border-radius:50%;display:inline-block;background:rgba(159,176,192,0.8);}
+      .health-dot.green{background:var(--ok);}
+      .health-dot.yellow{background:var(--deg);}
+      .health-dot.red{background:var(--err);}
+      .health-next-steps{margin:8px 0 0 20px;}
+      .health-next-steps li{margin:2px 0;}
+      .health-breakdown{display:grid;grid-template-columns:repeat(3,minmax(180px,1fr));gap:8px;margin-top:10px;}
+      .health-item{border:1px solid var(--border);border-radius:10px;padding:8px;}
+      .health-item-title{font-weight:600;font-size:13px;}
+      .health-item-status{font-size:12px;margin-top:4px;}
+      .health-item-note{font-size:12px;color:var(--muted);margin-top:4px;}
+      @media (max-width: 860px){.health-breakdown{grid-template-columns:1fr;}}
+
 </style>
 
 <style>
@@ -194,6 +214,36 @@
 
   <button class="smallbtn" id="refreshStatusBtn" type="button">Oppdater status</button>
 </div>
+
+  <section class="health-card health-unknown" id="healthCard">
+    <div class="health-overall">
+      <span class="health-dot" id="healthOverallDot"></span>
+      <span id="healthOverallTitle">Helsesjekk: ukjent</span>
+      <span class="pill" id="healthOverallPill">UKJENT</span>
+    </div>
+    <div class="muted" id="healthExplanation" style="margin-top:6px;">Mangler data fra /health/detail.</div>
+    <ul class="health-next-steps" id="healthNextSteps">
+      <li>Legg inn API-nøkkel og trykk «Oppdater status».</li>
+    </ul>
+    <div class="health-breakdown" id="healthBreakdown">
+      <div class="health-item">
+        <div class="health-item-title">Ingest</div>
+        <div class="health-item-status">Ukjent / mangler data</div>
+      </div>
+      <div class="health-item">
+        <div class="health-item-title">Baseline</div>
+        <div class="health-item-status">Ukjent / mangler data</div>
+      </div>
+      <div class="health-item">
+        <div class="health-item-title">Worker</div>
+        <div class="health-item-status">Ukjent / mangler data</div>
+      </div>
+    </div>
+    <details class="details" style="margin-top:8px;">
+      <summary class="muted">Datakilde</summary>
+      <div class="muted" style="margin-top:4px;">Kortet er direkte mappet fra <code>/api/health/detail</code>. Manglende komponentfelt vises som ukjent.</div>
+    </details>
+  </section>
   
     <div class="row" style="align-items:center; justify-content:space-between; margin:10px 0 10px;">
       <div class="right" style="justify-content:flex-start;">
@@ -239,7 +289,7 @@
       <details class="details" style="margin:6px 0 10px;">
         <summary class="muted">Datakilder (teknisk)</summary>
         <div class="muted small" style="margin-top:6px;">
-          Backend: <code>/api/health</code> · Analyse: <code>/api/ai/status</code> · Baseline: <code>/api/baseline/status</code>
+          Backend: <code>/api/health</code> · Helsesammendrag: <code>/api/health/detail</code> · Analyse: <code>/api/ai/status</code> · Baseline: <code>/api/baseline/status</code>
         </div>
       </details>
     <div class="grid2">
@@ -1031,6 +1081,139 @@ function saveExpectedRooms() {
 }
 
 // --- Systemstatus (vNext minimal) ---
+function mapHealthTone(status) {
+  const s = String(status || "").toUpperCase();
+  if (s === "OK") return { tone: "green", label: "GRØNN" };
+  if (s === "DEGRADED") return { tone: "yellow", label: "GUL" };
+  if (s === "ERROR") return { tone: "red", label: "RØD" };
+  return { tone: "unknown", label: "UKJENT" };
+}
+
+function formatSecondsToHuman(seconds) {
+  const n = Number(seconds);
+  if (!Number.isFinite(n)) return null;
+  if (n < 120) return `${Math.round(n)} sek`;
+  if (n < 7200) return `${Math.round(n / 60)} min`;
+  return `${Math.round(n / 3600)} t`;
+}
+
+function buildHealthCardModel(detail) {
+  if (!detail || typeof detail !== "object") {
+    return {
+      overall: mapHealthTone(null),
+      title: "Helsesjekk: ukjent",
+      explanation: "Mangler data fra /health/detail.",
+      steps: ["Legg inn API-nøkkel og trykk «Oppdater status»."],
+      breakdown: [
+        { name: "Ingest", status: "Ukjent / mangler data", note: "Ingen komponentdata mottatt." },
+        { name: "Baseline", status: "Ukjent / mangler data", note: "Ingen komponentdata mottatt." },
+        { name: "Worker", status: "Ukjent / mangler data", note: "Ingen komponentdata mottatt." },
+      ],
+    };
+  }
+
+  const components = (detail.components && typeof detail.components === "object") ? detail.components : {};
+  const ingest = components.ingest || null;
+  const baseline = components.baseline || null;
+  const worker = components.worker || components.anomalies_runner || components.scheduler || null;
+  const workerName = components.worker ? "Worker" : (components.anomalies_runner ? "Anomali-worker" : (components.scheduler ? "Scheduler" : "Worker"));
+
+  const overall = mapHealthTone(detail.overall_status);
+  const reasons = Array.isArray(detail.reasons) ? detail.reasons.filter(Boolean) : [];
+
+  const breakdown = [];
+  breakdown.push({
+    name: "Ingest",
+    status: ingest && ingest.status ? String(ingest.status) : "Ukjent / mangler data",
+    note: ingest ? `Siste event: ${ingest.max_event_ts || "mangler"} · Lag: ${formatSecondsToHuman(ingest.lag_seconds) || "mangler"}` : "Mangler ingest-komponent i /health/detail.",
+  });
+  breakdown.push({
+    name: "Baseline",
+    status: baseline && baseline.status ? String(baseline.status) : "Ukjent / mangler data",
+    note: baseline ? `Sist modell: ${(baseline.latest && baseline.latest.model_end) || "mangler"} · Alder: ${Number.isFinite(Number(baseline.age_hours)) ? `${Math.round(Number(baseline.age_hours))} t` : "mangler"}` : "Mangler baseline-komponent i /health/detail.",
+  });
+  breakdown.push({
+    name: workerName,
+    status: worker && worker.status ? String(worker.status) : "Ukjent / mangler data",
+    note: worker ? `Sist OK: ${(worker.runner_status && worker.runner_status.last_ok_at) || "mangler"}` : "Mangler worker/scheduler-komponent i /health/detail.",
+  });
+
+  let explanation = "Systemet ser stabilt ut nå.";
+  if (overall.tone === "red") explanation = "Noe viktig virker ikke, og bør rettes før pilotdrift.";
+  else if (overall.tone === "yellow") explanation = "Systemet går, men trenger oppfølging for trygg pilotdrift.";
+  if (reasons.length) explanation += ` Årsak: ${reasons.slice(0, 2).join(". ")}.`;
+
+  const steps = [];
+  if (!ingest) {
+    steps.push("Sjekk at /health/detail faktisk returnerer ingest-komponenten for valgt scope.");
+  } else if (String(ingest.status || "").toUpperCase() !== "OK") {
+    const lag = Number(ingest.lag_seconds);
+    const errS = Number(ingest.thresholds && ingest.thresholds.error_seconds);
+    const degS = Number(ingest.thresholds && ingest.thresholds.degraded_seconds);
+    steps.push(`Sjekk datainnhenting nå: ingest har lag ${formatSecondsToHuman(lag) || "ukjent"}${Number.isFinite(degS) ? ` (gul grense ${formatSecondsToHuman(degS)})` : ""}${Number.isFinite(errS) ? ` og rød grense ${formatSecondsToHuman(errS)}` : ""}.`);
+  }
+  if (!baseline) {
+    steps.push("Sjekk hvorfor baseline-komponenten mangler i /health/detail.");
+  } else if (String(baseline.status || "").toUpperCase() !== "OK") {
+    const maxAge = Number(baseline.thresholds && baseline.thresholds.max_age_hours);
+    steps.push(`Kjør baseline-oppdatering og verifiser modellvindu (maks alder ${Number.isFinite(maxAge) ? `${maxAge} t` : "ukjent"}).`);
+  }
+  if (!worker) {
+    steps.push("Sjekk worker/scheduler-feltene i /health/detail (mangler data)." );
+  } else if (String(worker.status || "").toUpperCase() !== "OK") {
+    steps.push(`Sjekk ${workerName.toLowerCase()} i container-logger og bekreft at siste kjøring lykkes.`);
+  }
+  if (!steps.length) steps.push("Ingen akutte tiltak. Fortsett med vanlig overvåking i pilotdrift.");
+
+  return {
+    overall,
+    title: `Helsesjekk: ${overall.label}`,
+    explanation,
+    steps: steps.slice(0, 3),
+    breakdown,
+  };
+}
+
+function renderHealthCard(detail) {
+  const card = document.getElementById("healthCard");
+  if (!card) return;
+  const model = buildHealthCardModel(detail);
+  card.classList.remove("health-green", "health-yellow", "health-red", "health-unknown");
+  card.classList.add(`health-${model.overall.tone}`);
+
+  const dot = document.getElementById("healthOverallDot");
+  if (dot) {
+    dot.className = "health-dot" + (model.overall.tone === "green" ? " green" : (model.overall.tone === "yellow" ? " yellow" : (model.overall.tone === "red" ? " red" : "")));
+  }
+  const title = document.getElementById("healthOverallTitle");
+  if (title) title.textContent = model.title;
+  const pill = document.getElementById("healthOverallPill");
+  if (pill) pill.textContent = model.overall.label;
+  const ex = document.getElementById("healthExplanation");
+  if (ex) ex.textContent = model.explanation;
+
+  const ul = document.getElementById("healthNextSteps");
+  if (ul) {
+    ul.innerHTML = "";
+    model.steps.forEach((step) => {
+      const li = document.createElement("li");
+      li.textContent = step;
+      ul.appendChild(li);
+    });
+  }
+
+  const bd = document.getElementById("healthBreakdown");
+  if (bd) {
+    bd.innerHTML = "";
+    model.breakdown.forEach((item) => {
+      const el = document.createElement("div");
+      el.className = "health-item";
+      el.innerHTML = `<div class="health-item-title">${item.name}</div><div class="health-item-status">${item.status || "Ukjent / mangler data"}</div><div class="health-item-note">${item.note || ""}</div>`;
+      bd.appendChild(el);
+    });
+  }
+}
+
 async function refreshSystemStatus() {
   const out = {};
   const now = new Date();
@@ -1079,6 +1262,15 @@ async function refreshSystemStatus() {
     backendLevel = "ERROR";
     setText("sysHealth", "FEIL: " + out.health_error);
     errors.push("Backend /health feiler");
+  }
+
+  // /health/detail truth source for health card
+  try {
+    out.health_detail = await apiGet("/health/detail");
+    renderHealthCard(out.health_detail);
+  } catch (e) {
+    out.health_detail_error = String(e && e.message ? e.message : e);
+    renderHealthCard(null);
   }
 
   // AI (/ai/status) - offline/disabled => DEGRADED (ikke ERROR)
