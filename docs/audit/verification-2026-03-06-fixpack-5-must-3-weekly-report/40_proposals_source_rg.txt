@@ -1,0 +1,5 @@
+1257:@app.get("/proposals")
+1284:                  COALESCE((
+1287:                      SELECT action_id, action, prev_state, new_state, actor, source, note, created_at
+1328:                  COALESCE((
+1331:                      SELECT action_id, action, prev_state, new_state, actor, source, note, created_at

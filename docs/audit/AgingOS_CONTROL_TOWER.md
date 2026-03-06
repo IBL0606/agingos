@@ -339,3 +339,32 @@ Truth note:
 - Worker-detaljen i UI rendret `DEGRADED` i live test fordi UI tolker manglende `last_ok_at` strengere enn backend `status=OK`.
 - Overall-kortet og ingest/baseline-delene var sann mot `/health/detail`.
 - Dette er ikke blocker for MUST-2, men bør harmoniseres senere hvis vi vil ha helt ren direkte-mapping.
+
+## Phase 4 — Fixpack-5 draft (MUST-3 weekly report in Console) — 2026-03-06
+
+Scope: MUST-3 only (weekly report UX + truthful data sourcing + docs/evidence guidance).
+
+Delivered in repo draft:
+- Hardened `services/console/report.html` with non-technical weekly summary card containing exactly:
+  - Data inn
+  - Romdekning
+  - Alarmer
+  - Endringer
+- Each section now renders explicit truth label:
+  - REAL
+  - TEMPLATE/FALLBACK
+  - NO_EVIDENCE
+- Weekly truth guard implemented:
+  - REAL for Data inn/Romdekning only when observed event span is >= 7 days (from `/events` timestamps).
+- Reused existing data sources (no parallel report stack):
+  - `/events` (Data inn/Romdekning)
+  - `/anomalies?last=7d` (Alarmer)
+  - `/proposals` with `actions[]` (Endringer)
+- Driftpakke JSON export now includes `weekly_report` snapshot.
+- Updated docs/v2 for MUST-3 ops/testing and created evidence pack path.
+
+Evidence path:
+- `docs/audit/verification-2026-03-06-fixpack-5-must-3-weekly-report/`
+
+NO_EVIDENCE in this container:
+- Live API-backed 7-day runtime verification was not executable here; only code-path and static evidence were captured.

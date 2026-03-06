@@ -48,3 +48,21 @@ Required captures:
 
 Truth rule:
 - If `/health/detail` is missing a component or thresholds, evidence must show that Console rendered unknown/missing state explicitly.
+
+
+## MUST-3 weekly report verification (Fixpack-5)
+Evidence pack proposal:
+- `docs/audit/verification-2026-03-06-fixpack-5-must-3-weekly-report/`
+
+Required captures:
+1) CHECK-REPORT-01 (non-technical weekly page exists)
+- `curl -sS http://127.0.0.1:8080/report.html | tee docs/audit/verification-2026-03-06-fixpack-5-must-3-weekly-report/10_report_html.txt`
+- Verify `Ukesammendrag (for ikke-tekniske)` is present.
+
+2) CHECK-REPORT-02 (four required sections)
+- `rg -n "Data inn|Romdekning|Alarmer|Endringer" docs/audit/verification-2026-03-06-fixpack-5-must-3-weekly-report/10_report_html.txt | tee docs/audit/verification-2026-03-06-fixpack-5-must-3-weekly-report/11_sections_present.txt`
+
+3) CHECK-REPORT-03 (real data vs fallback/no-evidence separation)
+- Open `/report.html`, press `Oppdater rapport`, and verify each section shows exactly one truth label: `REAL`, `TEMPLATE/FALLBACK`, or `NO_EVIDENCE`.
+- Export `Last ned driftpakke (JSON)` and verify `weekly_report` exists in exported JSON.
+- If runtime stack is unavailable, record `NO_EVIDENCE` explicitly.
