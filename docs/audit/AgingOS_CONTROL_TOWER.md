@@ -263,3 +263,30 @@ Evidence:
 
 NO_EVIDENCE:
 - Docker runtime verification commands are not executable in this container (`docker: command not found`).
+
+## Phase 4 — Fixpack-4A final follow-up (CHECK-SETUP-01 PASS path enablement) — 2026-03-06
+
+Scope: MUST-1 setup truth only; dev-repo controlled baseline bootstrap capability.
+
+Problem proven before this change:
+- Fresh install could not reach `/health/detail overall_status=OK` on dev unless baseline status became valid.
+- Dev repo lacked MiniPC cron-equivalent baseline builder entrypoint (`public.run_baseline_nightly`).
+
+Delivered in repo:
+- New Alembic migration adds in-repo DB baseline bootstrap functions:
+  - `public._baseline_resolve_scope_from_user(uuid)`
+  - `public.build_daily_room_bucket_rollup(date, uuid)`
+  - `public.build_daily_transition_rollup(date, uuid)`
+  - `public.build_baseline_7d(date, uuid, double precision, double precision, integer)`
+  - `public.run_baseline_nightly(uuid, double precision, double precision, integer)`
+- `docs/v2/SETUP_TRUTH.md` updated with exact fresh-install PASS sequence:
+  - scope mapping insert for `dev-key-2`
+  - deterministic event seed (fresh + yesterday)
+  - baseline build invocation via `run_baseline_nightly`
+  - `/health` and `/health/detail` verification sequence
+
+Evidence:
+- `docs/audit/verification-2026-03-06-fixpack-4a-final-setup-pass/`
+
+NO_EVIDENCE in this container:
+- Docker runtime commands unavailable (`docker: command not found`), so full runtime PASS could not be executed here.

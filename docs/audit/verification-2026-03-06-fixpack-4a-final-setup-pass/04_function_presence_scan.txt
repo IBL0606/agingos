@@ -1,0 +1,19 @@
+$ rg -n "CREATE OR REPLACE FUNCTION public.run_baseline_nightly|build_daily_room_bucket_rollup|build_daily_transition_rollup|build_baseline_7d|_baseline_resolve_scope_from_user" backend/alembic/versions/a8f9c2d1e4b7_add_baseline_bootstrap_functions_for_dev_setup.py
+24:CREATE OR REPLACE FUNCTION public._baseline_resolve_scope_from_user(
+50:CREATE OR REPLACE FUNCTION public.build_daily_room_bucket_rollup(
+65:  FROM public._baseline_resolve_scope_from_user(p_user);
+119:CREATE OR REPLACE FUNCTION public.build_daily_transition_rollup(
+134:  FROM public._baseline_resolve_scope_from_user(p_user);
+181:CREATE OR REPLACE FUNCTION public.build_baseline_7d(
+213:  FROM public._baseline_resolve_scope_from_user(p_user);
+286:CREATE OR REPLACE FUNCTION public.run_baseline_nightly(
+311:    PERFORM public.build_daily_room_bucket_rollup(d, p_user);
+312:    PERFORM public.build_daily_transition_rollup(d, p_user);
+317:    PERFORM public.build_daily_room_bucket_rollup(d, p_user);
+318:    PERFORM public.build_daily_transition_rollup(d, p_user);
+321:  PERFORM public.build_baseline_7d(end_day, p_user, p_sigma_floor, p_alpha, p_min_days_required);
+335:  JOIN public._baseline_resolve_scope_from_user(p_user) r
+349:DROP FUNCTION IF EXISTS public.build_baseline_7d(date, uuid, double precision, double precision, integer);
+350:DROP FUNCTION IF EXISTS public.build_daily_transition_rollup(date, uuid);
+351:DROP FUNCTION IF EXISTS public.build_daily_room_bucket_rollup(date, uuid);
+352:DROP FUNCTION IF EXISTS public._baseline_resolve_scope_from_user(uuid);
