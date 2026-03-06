@@ -219,3 +219,74 @@ Pilotbox:
 
 Remaining:
 - Replace PR_TBD with actual PR link and set Status to READY TO MERGE when review is complete.
+
+## Phase 4 — Fixpack-4A (MUST-1 setup truth only) — 2026-03-06
+
+- Branch: current working branch
+- Scope: dev repo/docs only. No MiniPC/pilotbox runtime change.
+- Goal: make install/upgrade per-home verification deterministic and impossible to misread.
+
+Delivered:
+- Added `docs/v2/SETUP_TRUTH.md` as canonical MUST-1 setup truth.
+- Explicitly separated fresh install vs upgrade command sequences.
+- Explicitly documented `/health/detail` truth: runtime/data-aware; empty scoped install can report `overall_status=ERROR` with reason `no events found for this scope`.
+- Created evidence pack: `docs/audit/verification-2026-03-06-fixpack-4a-setup/`.
+
+Evidence status:
+- Runtime checks in this container are **NO_EVIDENCE** because Docker CLI is unavailable (`command not found`).
+- Repo-level deterministic truth (Makefile/compose/backend health logic/docs diffs) is captured in the evidence pack.
+
+## Phase 4 — Fixpack-4A follow-up (scheduler fresh-install transaction poison) — 2026-03-06
+
+Scope: narrow runtime fix + setup truth doc correction.
+
+Root cause (proven):
+- `_anomaly_pick_one_scope()` queried `baseline_model_status.user_id`.
+- `baseline_model_status` has no `user_id` column.
+- Query failure could leave SQL transaction aborted (`InFailedSqlTransaction`) and poison follow-up scheduler/anomalies queries.
+
+Delivered:
+- `backend/services/scheduler.py`
+  - Removed invalid `user_id` select dependency from `baseline_model_status` scope-pick query.
+  - Added rollback on `ProgrammingError` in scope-pick fallback.
+  - Added rollback on per-room anomalies errors to clear aborted transaction before continuing.
+  - Added rollback on outer anomalies-job exception path before re-raise.
+- `backend/tests/test_scheduler_anomaly_scope.py`
+  - Unit tests for scope fallback rollback, no-user_id scope behavior, and per-room rollback/continue behavior.
+- `docs/v2/SETUP_TRUTH.md`
+  - Corrected fresh-install truth for base compose vs dev overlay host access.
+  - Added explicit `/health/detail` requirement for active `api_key_scopes` mapping.
+  - Updated expected fresh-empty behavior after fix.
+
+Evidence:
+- `docs/audit/verification-2026-03-06-fixpack-4a-scheduler-followup/`
+
+NO_EVIDENCE:
+- Docker runtime verification commands are not executable in this container (`docker: command not found`).
+
+## Phase 4 — Fixpack-4A final follow-up (CHECK-SETUP-01 PASS path enablement) — 2026-03-06
+
+Scope: MUST-1 setup truth only; dev-repo controlled baseline bootstrap capability.
+
+Problem proven before this change:
+- Fresh install could not reach `/health/detail overall_status=OK` on dev unless baseline status became valid.
+- Dev repo lacked MiniPC cron-equivalent baseline builder entrypoint (`public.run_baseline_nightly`).
+
+Delivered in repo:
+- New Alembic migration adds in-repo DB baseline bootstrap functions:
+  - `public._baseline_resolve_scope_from_user(uuid)`
+  - `public.build_daily_room_bucket_rollup(date, uuid)`
+  - `public.build_daily_transition_rollup(date, uuid)`
+  - `public.build_baseline_7d(date, uuid, double precision, double precision, integer)`
+  - `public.run_baseline_nightly(uuid, double precision, double precision, integer)`
+- `docs/v2/SETUP_TRUTH.md` updated with exact fresh-install PASS sequence:
+  - scope mapping insert for `dev-key-2`
+  - deterministic event seed (fresh + yesterday)
+  - baseline build invocation via `run_baseline_nightly`
+  - `/health` and `/health/detail` verification sequence
+
+Evidence:
+- `docs/audit/verification-2026-03-06-fixpack-4a-final-setup-pass/`
+
+NO_EVIDENCE in this container:
+- Docker runtime commands unavailable (`docker: command not found`), so full runtime PASS could not be executed here.

@@ -1,0 +1,2 @@
+$ docker --version
+bash: command not found: docker

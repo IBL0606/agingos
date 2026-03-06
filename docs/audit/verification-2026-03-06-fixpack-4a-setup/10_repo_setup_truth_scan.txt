@@ -1,0 +1,48 @@
+$ rg -n "make up|alembic upgrade head|docker compose" README.md Makefile docs/v2/OPERATIONS.md docs/v2/TESTING.md
+docs/v2/OPERATIONS.md:23:  - `docker compose -f docker-compose.yml -f docker-compose.expose.yml up -d --build`
+docs/v2/OPERATIONS.md:25:  - `docker compose -f docker-compose.yml -f docker-compose.expose.yml down`
+docs/v2/OPERATIONS.md:30:  - `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build`
+docs/v2/OPERATIONS.md:32:  - `docker compose -f docker-compose.yml -f docker-compose.dev.yml down`
+docs/v2/OPERATIONS.md:39:Description=AgingOS (docker compose)
+docs/v2/OPERATIONS.md:47:ExecStart=/usr/bin/docker compose -f docker-compose.yml -f docker-compose.expose.yml up -d --build
+docs/v2/OPERATIONS.md:48:ExecStop=/usr/bin/docker compose -f docker-compose.yml -f docker-compose.expose.yml down
+docs/v2/OPERATIONS.md:60:  - `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d`
+docs/v2/OPERATIONS.md:64:  - `docker compose -f docker-compose.yml -f docker-compose.dev.yml down`
+docs/v2/OPERATIONS.md:70:  - `docker compose -f docker-compose.yml -f docker-compose.expose.yml up -d`
+docs/v2/OPERATIONS.md:74:  - `docker compose -f docker-compose.yml -f docker-compose.expose.yml down`
+README.md:8:    docker compose up -d --build
+README.md:14:    docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+README.md:31:make up
+README.md:47:- `make up` venter på DB og kjører deretter `alembic upgrade head` automatisk.
+README.md:51:docker compose exec -T backend alembic -c alembic.ini upgrade head
+README.md:84:(Alternativ uten Makefile: `docker compose -f docker-compose.yml -f docker-compose.field.yml ...`)
+README.md:90:1. `make up` (evt `docker compose up -d --build`)
+README.md:93:3. `make down` (evt `docker compose down`)
+README.md:123:docker compose exec -T db psql -U agingos -d agingos -c \
+README.md:127:docker compose exec -T db psql -U agingos -d agingos -c \
+README.md:139:- Se alle services: `docker compose logs -f`
+README.md:140:- Se backend: `docker compose logs -f backend`
+README.md:350:- **API svarer ikke:** `docker compose ps` og `docker compose logs -f backend`
+README.md:351:- **DB ikke klar / migrering feiler:** sjekk `docker compose logs -f db`, og kjør migrasjoner manuelt:
+README.md:353:  docker compose exec -T backend alembic -c alembic.ini upgrade head
+README.md:367:  docker compose exec db psql -U agingos -d agingos -c "SHOW timezone;"
+README.md:385:- Docker-baserte tester: `make up` → `make smoke` → `make scenario` → `make down`
+Makefile:22:	docker compose up -d --build
+Makefile:25:	  if docker compose exec -T db pg_isready -U agingos -d agingos >/dev/null 2>&1; then \
+Makefile:32:	docker compose exec -T backend alembic -c alembic.ini upgrade head
+Makefile:35:	docker compose down
+Makefile:38:	docker compose -f docker-compose.yml -f docker-compose.field.yml up -d --build db
+Makefile:41:	  if docker compose -f docker-compose.yml -f docker-compose.field.yml exec -T db pg_isready -U agingos -d agingos >/dev/null 2>&1; then \
+Makefile:48:	docker compose -f docker-compose.yml -f docker-compose.field.yml run --rm backend alembic -c alembic.ini upgrade head
+Makefile:50:	docker compose -f docker-compose.yml -f docker-compose.field.yml up -d --build backend
+Makefile:53:	docker compose -f docker-compose.yml -f docker-compose.field.yml down
+Makefile:56:	docker compose -f docker-compose.yml -f docker-compose.field.yml logs -f
+Makefile:59:	docker compose logs -f
+Makefile:68:	docker compose exec -T db psql -U agingos -d agingos -c "TRUNCATE TABLE events RESTART IDENTITY CASCADE;" >/dev/null 2>&1 || true
+Makefile:69:	docker compose exec -T db psql -U agingos -d agingos -c "TRUNCATE TABLE deviations_v1 RESTART IDENTITY CASCADE;" >/dev/null 2>&1 || true
+Makefile:70:	docker compose exec -T db psql -U agingos -d agingos -c "TRUNCATE TABLE deviations RESTART IDENTITY CASCADE;" >/dev/null 2>&1 || true
+Makefile:80:	docker compose exec -T db pg_dump -U agingos -d agingos > "$${out}"; \
+Makefile:92:	docker compose exec -T db psql -U agingos -d agingos -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+Makefile:93:	docker compose exec -T db psql -U agingos -d agingos < "$$FILE"
+Makefile:111:	@echo "  make up          - start services (dev)"
+docs/v2/TESTING.md:16:- docker compose ps

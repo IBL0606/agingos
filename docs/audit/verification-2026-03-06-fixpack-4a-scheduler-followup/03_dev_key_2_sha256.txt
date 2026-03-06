@@ -1,0 +1,2 @@
+$ python - <<"PY"\nimport hashlib\nprint(hashlib.sha256(b"dev-key-2").hexdigest())\nPY
+966c44be82076d2c2ad29390d50c34034a35056007f29606f6457b02af023402
