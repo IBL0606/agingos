@@ -94,3 +94,9 @@ Rule: anything not proven by evidence must be marked **NO_EVIDENCE** or **HYPOTH
 - Console: /rooms.html (Romoppsett)
 - Pilotbox template (NO_EVIDENCE): docs/audit/_templates/pilotbox_capture/fixpack-3_room_mapping.md
 <!-- FIXPACK-3: ROOM MAPPING END -->
+
+## Setup truth pointer (Devbox)
+For install/upgrade verification commands and expected truth, use:
+- `docs/v2/SETUP_TRUTH.md`
+
+Do not assume `/health/detail overall_status=OK` on fresh empty installs; verify actual output.

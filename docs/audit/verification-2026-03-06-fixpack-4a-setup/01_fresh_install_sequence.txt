@@ -1,0 +1,2 @@
+# CHECK-SETUP-01 fresh install sequence
+$ docker compose down -v --remove-orphans

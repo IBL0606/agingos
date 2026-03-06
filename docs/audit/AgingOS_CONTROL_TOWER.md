@@ -219,3 +219,19 @@ Pilotbox:
 
 Remaining:
 - Replace PR_TBD with actual PR link and set Status to READY TO MERGE when review is complete.
+
+## Phase 4 — Fixpack-4A (MUST-1 setup truth only) — 2026-03-06
+
+- Branch: current working branch
+- Scope: dev repo/docs only. No MiniPC/pilotbox runtime change.
+- Goal: make install/upgrade per-home verification deterministic and impossible to misread.
+
+Delivered:
+- Added `docs/v2/SETUP_TRUTH.md` as canonical MUST-1 setup truth.
+- Explicitly separated fresh install vs upgrade command sequences.
+- Explicitly documented `/health/detail` truth: runtime/data-aware; empty scoped install can report `overall_status=ERROR` with reason `no events found for this scope`.
+- Created evidence pack: `docs/audit/verification-2026-03-06-fixpack-4a-setup/`.
+
+Evidence status:
+- Runtime checks in this container are **NO_EVIDENCE** because Docker CLI is unavailable (`command not found`).
+- Repo-level deterministic truth (Makefile/compose/backend health logic/docs diffs) is captured in the evidence pack.

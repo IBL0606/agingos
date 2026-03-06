@@ -20,3 +20,8 @@ This generates a dated evidence pack under `docs/audit/as-is-YYYY-MM-DD-devbox/`
 - manifest of exact commands executed
 
 NO_EVIDENCE: the target is introduced in this fixpack and will become the standard way to reduce NO_EVIDENCE claims.
+
+## MUST-1 setup verification (fresh install vs upgrade)
+Use the exact commands in `docs/v2/SETUP_TRUTH.md`.
+
+Truth rule: `/health/detail` is data-aware; empty fresh install can return `overall_status=ERROR` with `no events found for this scope`.

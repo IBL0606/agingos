@@ -1,0 +1,7 @@
+$ git status --short
+ M docs/audit/AgingOS_CONTROL_TOWER.md
+ M docs/v2/OPERATIONS.md
+ M docs/v2/README.md
+ M docs/v2/TESTING.md
+?? docs/audit/verification-2026-03-06-fixpack-4a-setup/
+?? docs/v2/SETUP_TRUTH.md
