@@ -90,6 +90,24 @@ This mode exposes ports on **0.0.0.0** (LAN). Use only when explicitly needed:
   - komponentvis status for ingest + baseline + worker-ekvivalent (`worker`/`anomalies_runner`/`scheduler`)
 - If component fields are missing in `/health/detail`, Console must explicitly render `Ukjent / mangler data` (never silently green).
 
+
+## Weekly report (Fixpack-5 / MUST-3)
+- Host page: `services/console/report.html` (`/report.html`).
+- Purpose: non-technical weekly summary with four fixed sections:
+  - `Data inn`
+  - `Romdekning`
+  - `Alarmer`
+  - `Endringer`
+- Truth-source reuse (no parallel reporting stack):
+  - `Data inn` + `Romdekning`: derived from `GET /events` (same source already used by report/driftpakke).
+  - `Alarmer`: `GET /anomalies?last=7d`.
+  - `Endringer`: `GET /proposals` and nested `actions[].created_at/action`.
+- Weekly truth labels are mandatory per section:
+  - `REAL`: at least 7 days observed event span exists.
+  - `TEMPLATE/FALLBACK`: source exists, but observed data is <7 days or zero rows.
+  - `NO_EVIDENCE`: source missing/unavailable, or no truthful source exists.
+- Rule: never present one-week real coverage unless ≥7 days observed span is verified from event timestamps.
+
 ## Evidence capture (read-only)
 Canonical Devbox evidence capture:
 - `make audit-capture`

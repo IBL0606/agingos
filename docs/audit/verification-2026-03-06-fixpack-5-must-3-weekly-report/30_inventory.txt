@@ -1,0 +1,17 @@
+Inventory (requested files)
+- services/console/report.html: FOUND
+- tools/driftpakke_v1.py: MISSING (NO_EVIDENCE)
+- tools/driftpakke_run.py: MISSING (NO_EVIDENCE)
+- tools/pilot_weekly_export.sh: MISSING (NO_EVIDENCE)
+- docs/v2 pages: FOUND (README.md, OPERATIONS.md, TESTING.md, etc.)
+
+Existing runtime/API sources reused by report:
+- /health
+- /events
+- /anomalies/runner_status
+- /baseline/status
+- /baseline
+- /ai/status
+
+Additional existing source reused for MUST-3 Endringer:
+- /proposals (includes nested proposal actions)

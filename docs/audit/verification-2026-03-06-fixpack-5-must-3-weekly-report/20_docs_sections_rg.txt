@@ -1,0 +1,19 @@
+docs/v2/OPERATIONS.md:35:This is a **template**. It is **NO_EVIDENCE** until a MiniPC `systemctl cat agingos.service` capture confirms it.
+docs/v2/OPERATIONS.md:94:## Weekly report (Fixpack-5 / MUST-3)
+docs/v2/OPERATIONS.md:97:  - `Data inn`
+docs/v2/OPERATIONS.md:98:  - `Romdekning`
+docs/v2/OPERATIONS.md:99:  - `Alarmer`
+docs/v2/OPERATIONS.md:100:  - `Endringer`
+docs/v2/OPERATIONS.md:102:  - `Data inn` + `Romdekning`: derived from `GET /events` (same source already used by report/driftpakke).
+docs/v2/OPERATIONS.md:103:  - `Alarmer`: `GET /anomalies?last=7d`.
+docs/v2/OPERATIONS.md:104:  - `Endringer`: `GET /proposals` and nested `actions[].created_at/action`.
+docs/v2/OPERATIONS.md:106:  - `REAL`: at least 7 days observed event span exists.
+docs/v2/OPERATIONS.md:107:  - `TEMPLATE/FALLBACK`: source exists, but observed data is <7 days or zero rows.
+docs/v2/OPERATIONS.md:108:  - `NO_EVIDENCE`: source missing/unavailable, or no truthful source exists.
+docs/v2/OPERATIONS.md:118:Rule: anything not proven by evidence must be marked **NO_EVIDENCE** or **HYPOTHESIS**.
+docs/v2/OPERATIONS.md:124:- Pilotbox template (NO_EVIDENCE): docs/audit/_templates/pilotbox_capture/fixpack-3_room_mapping.md
+docs/v2/TESTING.md:22:NO_EVIDENCE: the target is introduced in this fixpack and will become the standard way to reduce NO_EVIDENCE claims.
+docs/v2/TESTING.md:53:## MUST-3 weekly report verification (Fixpack-5)
+docs/v2/TESTING.md:63:- `rg -n "Data inn|Romdekning|Alarmer|Endringer" docs/audit/verification-2026-03-06-fixpack-5-must-3-weekly-report/10_report_html.txt | tee docs/audit/verification-2026-03-06-fixpack-5-must-3-weekly-report/11_sections_present.txt`
+docs/v2/TESTING.md:66:- Open `/report.html`, press `Oppdater rapport`, and verify each section shows exactly one truth label: `REAL`, `TEMPLATE/FALLBACK`, or `NO_EVIDENCE`.
+docs/v2/TESTING.md:68:- If runtime stack is unavailable, record `NO_EVIDENCE` explicitly.

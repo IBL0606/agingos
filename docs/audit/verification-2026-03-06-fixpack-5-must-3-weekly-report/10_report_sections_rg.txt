@@ -1,0 +1,28 @@
+205:  <a class="navlink" href="./alarms.html">Alarmer</a>
+225:    <h2>Ukesammendrag (for ikke-tekniske)</h2>
+226:    <div class="muted">Status vises som <b>REAL</b> (målt minst 7 dager), <b>TEMPLATE/FALLBACK</b> (mindre enn 7 dager), eller <b>NO_EVIDENCE</b> (ingen brukbar kilde).</div>
+229:        <div class="weekly-head"><span class="weekly-title">Data inn</span><span class="weekly-mode" id="wkModeData">—</span></div>
+233:        <div class="weekly-head"><span class="weekly-title">Romdekning</span><span class="weekly-mode" id="wkModeCoverage">—</span></div>
+237:        <div class="weekly-head"><span class="weekly-title">Alarmer</span><span class="weekly-mode" id="wkModeAlarms">—</span></div>
+241:        <div class="weekly-head"><span class="weekly-title">Endringer</span><span class="weekly-mode" id="wkModeChanges">—</span></div>
+779:    if (mode === "REAL") el.classList.add("real");
+780:    else if (mode === "TEMPLATE/FALLBACK") el.classList.add("template");
+786:    const wk = window.__weekly_report_v1 || {};
+787:    const data = wk.data_inn || { mode: "NO_EVIDENCE", text: "NO_EVIDENCE" };
+788:    const cov = wk.romdekning || { mode: "NO_EVIDENCE", text: "NO_EVIDENCE" };
+789:    const ala = wk.alarmer || { mode: "NO_EVIDENCE", text: "NO_EVIDENCE" };
+790:    const endr = wk.endringer || { mode: "NO_EVIDENCE", text: "NO_EVIDENCE" };
+1197:      weekly.data_inn = { mode: "NO_EVIDENCE", text: "NO_EVIDENCE: Fant ingen hendelser med gyldig tidspunkt fra /events." };
+1198:      weekly.romdekning = { mode: "NO_EVIDENCE", text: "NO_EVIDENCE: Uten gyldige hendelser kan romdekning ikke beregnes." };
+1200:      weekly.data_inn = { mode: "REAL", text: `REAL: ${weekEvents} hendelser siste 7 dager. Observasjonsvindu ${weekly.observed_span_days.toFixed(1)} dager.` };
+1201:      weekly.romdekning = { mode: "REAL", text: `REAL: ${roomsSeen.length} rom med data siste uke. Mangler ${missingExpected.length} forventede rom.` };
+1203:      weekly.data_inn = { mode: "TEMPLATE/FALLBACK", text: `TEMPLATE/FALLBACK: Kun ${weekly.observed_span_days.toFixed(1)} dager observert (< 7). ${weekEvents} hendelser i observert periode.` };
+1204:      weekly.romdekning = { mode: "TEMPLATE/FALLBACK", text: `TEMPLATE/FALLBACK: ${roomsSeen.length} rom sett, men observasjonsvindu er under 7 dager.` };
+1208:      weekly.alarmer = { mode: "REAL", text: `REAL: ${alarms7d.length} alarmer siste 7 dager (rød ${alarmCounts.RED}, gul ${alarmCounts.YELLOW}, grønne ${alarmCounts.GREEN}, aktive nå ${alarmCounts.active}).` };
+1210:      weekly.alarmer = { mode: "NO_EVIDENCE", text: "NO_EVIDENCE: Klarte ikke hente alarmer fra /anomalies?last=7d." };
+1212:      weekly.alarmer = { mode: "TEMPLATE/FALLBACK", text: "TEMPLATE/FALLBACK: Ingen alarmer funnet siste 7 dager i tilgjengelige data." };
+1216:      weekly.endringer = { mode: "REAL", text: `REAL: ${actionsInWeek} registrerte endringer siste 7 dager (test ${actionCounts.TEST}, aktivert ${actionCounts.ACTIVATE}, avvist ${actionCounts.REJECT}, øvrige ${actionCounts.OTHER}).` };
+1218:      weekly.endringer = { mode: "NO_EVIDENCE", text: "NO_EVIDENCE: Klarte ikke hente endringskilde fra /proposals." };
+1220:      weekly.endringer = { mode: "TEMPLATE/FALLBACK", text: "TEMPLATE/FALLBACK: Ingen registrerte proposal-actions siste 7 dager." };
+1223:    window.__weekly_report_v1 = weekly;
+1252:      weekly_report: weekly,

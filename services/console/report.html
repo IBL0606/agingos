@@ -167,7 +167,15 @@
     table { border-collapse: collapse; width: 100%; }
     th, td { border: 1px solid var(--border); padding: 6px 8px; font-size: 13px; text-align: left; }
     th { background: transparent; }
-    .warnbox { margin-top:10px; padding:8px 10px; border:1px solid rgba(210,153,34,0.55); background:rgba(210,153,34,0.10); border-radius:8px; font-size:12px; }
+  .warnbox { margin-top:10px; padding:8px 10px; border:1px solid rgba(210,153,34,0.55); background:rgba(210,153,34,0.10); border-radius:8px; font-size:12px; }
+  .weekly-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); gap:10px; margin-top:10px; }
+  .weekly-box { border:1px solid var(--border); border-radius:10px; padding:10px; background: rgba(255,255,255,0.03); }
+  .weekly-head { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px; }
+  .weekly-title { font-weight:600; }
+  .weekly-mode { font-size:11px; text-transform:uppercase; letter-spacing:0.03em; }
+  .weekly-mode.real { color: #7ee787; }
+  .weekly-mode.template { color: #d29922; }
+  .weekly-mode.noevidence { color: #ff7b72; }
     code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   
       /* Step 8 (Nav/IA/UX): consistent topbar/nav */
@@ -212,6 +220,29 @@
   <p class="muted">
     Henter snapshot fra API og genererer <b>Driftpakke v0</b> (JSON) med ærlige felter (kun det vi faktisk kan hente).
   </p>
+
+  <div class="card">
+    <h2>Ukesammendrag (for ikke-tekniske)</h2>
+    <div class="muted">Status vises som <b>REAL</b> (målt minst 7 dager), <b>TEMPLATE/FALLBACK</b> (mindre enn 7 dager), eller <b>NO_EVIDENCE</b> (ingen brukbar kilde).</div>
+    <div class="weekly-grid">
+      <div class="weekly-box">
+        <div class="weekly-head"><span class="weekly-title">Data inn</span><span class="weekly-mode" id="wkModeData">—</span></div>
+        <div id="wkData">Trykk «Oppdater rapport».</div>
+      </div>
+      <div class="weekly-box">
+        <div class="weekly-head"><span class="weekly-title">Romdekning</span><span class="weekly-mode" id="wkModeCoverage">—</span></div>
+        <div id="wkCoverage">Trykk «Oppdater rapport».</div>
+      </div>
+      <div class="weekly-box">
+        <div class="weekly-head"><span class="weekly-title">Alarmer</span><span class="weekly-mode" id="wkModeAlarms">—</span></div>
+        <div id="wkAlarms">Trykk «Oppdater rapport».</div>
+      </div>
+      <div class="weekly-box">
+        <div class="weekly-head"><span class="weekly-title">Endringer</span><span class="weekly-mode" id="wkModeChanges">—</span></div>
+        <div id="wkChanges">Trykk «Oppdater rapport».</div>
+      </div>
+    </div>
+  </div>
 
   <div class="statusbar">
     <span class="statuschip"><span class="dot" id="dotSystem"></span><span>SYSTEM</span><span class="pill" id="stSystem">ukjent</span></span>
@@ -605,6 +636,15 @@
     return Number.isFinite(t) ? t : null;
   }
 
+  function clampInt(n, lo, hi, fallback) {
+    const v = Number(n);
+    if (!Number.isFinite(v)) return fallback;
+    const i = Math.trunc(v);
+    if (i < lo) return lo;
+    if (i > hi) return hi;
+    return i;
+  }
+
   function loadThresholds() {
     const raw = localStorage.getItem("agingos_report_thresholds_v0");
     let t = {};
@@ -615,7 +655,7 @@
       stale_event_minutes: Number($("thrStaleEventMin").value || (t.stale_event_minutes ?? 60)),
       runner_stale_minutes: Number($("thrRunnerStaleMin").value || (t.runner_stale_minutes ?? 10)),
       baseline_cov_min: Number($("thrBaselineCovMin").value || (t.baseline_cov_min ?? 0.2)),
-      events_limit: Number($("thrEventsLimit").value || (t.events_limit ?? 200)),
+      events_limit: clampInt($("thrEventsLimit").value || (t.events_limit ?? 200), 1, 1000, 200),
     };
   }
 
@@ -741,6 +781,33 @@
   }
 
   function asBool(v) { return !!v; }
+
+  function setWeeklyMode(id, mode) {
+    const el = $(id);
+    el.classList.remove("real", "template", "noevidence");
+    if (mode === "REAL") el.classList.add("real");
+    else if (mode === "TEMPLATE/FALLBACK") el.classList.add("template");
+    else el.classList.add("noevidence");
+    el.textContent = mode;
+  }
+
+  function renderWeeklySection() {
+    const wk = window.__weekly_report_v1 || {};
+    const data = wk.data_inn || { mode: "NO_EVIDENCE", text: "NO_EVIDENCE" };
+    const cov = wk.romdekning || { mode: "NO_EVIDENCE", text: "NO_EVIDENCE" };
+    const ala = wk.alarmer || { mode: "NO_EVIDENCE", text: "NO_EVIDENCE" };
+    const endr = wk.endringer || { mode: "NO_EVIDENCE", text: "NO_EVIDENCE" };
+
+    setWeeklyMode("wkModeData", data.mode);
+    setWeeklyMode("wkModeCoverage", cov.mode);
+    setWeeklyMode("wkModeAlarms", ala.mode);
+    setWeeklyMode("wkModeChanges", endr.mode);
+
+    $("wkData").textContent = data.text;
+    $("wkCoverage").textContent = cov.text;
+    $("wkAlarms").textContent = ala.text;
+    $("wkChanges").textContent = endr.text;
+  }
 
   // NOTE: we implement baseline evaluation in refreshAll() (needs parsed bs + per-room list)
   function evaluateBaseline(bs, baselineRows, thr, expected) {
@@ -874,8 +941,12 @@
     }
 
     const now = Date.now();
+    const weekMs = 7 * 24 * 60 * 60 * 1000;
+    const weekAgoTs = now - weekMs;
     const per_room = {};
     let unknown = 0;
+    const validEventTs = [];
+    let weekEvents = 0;
 
     for (const ev of events) {
       const room = parseRoomFromEvent(ev);
@@ -884,6 +955,8 @@
       const ts = parseEventTs(ev);
       if (!per_room[room]) per_room[room] = { last_seen: null, c5m: 0, c60m: 0, c24h: 0 };
       if (ts != null) {
+        validEventTs.push(ts);
+        if (ts >= weekAgoTs) weekEvents += 1;
         // windows
         if ((now - ts) <= 5*60*1000) per_room[room].c5m += 1;
         if ((now - ts) <= 60*60*1000) per_room[room].c60m += 1;
@@ -906,6 +979,9 @@
     const roomsSeen = Object.keys(per_room).filter(r => r !== "(ukjent rom)").sort();
     const missingExpected = expected.filter(r => !per_room[r]);
     const max_event_ts = Number.isFinite(maxSeen) ? new Date(maxSeen).toISOString() : null;
+    const minSeen = validEventTs.length ? Math.min(...validEventTs) : null;
+    const observedMs = (minSeen != null && Number.isFinite(maxSeen)) ? (maxSeen - minSeen) : 0;
+    const hasFullWeekObserved = observedMs >= weekMs;
 
     ctx.coverage = {
       rooms_seen: roomsSeen,
@@ -934,6 +1010,24 @@
       (bs && bs.status && typeof bs.status.room_bucket_rows === "number") ? bs.status.room_bucket_rows : null;
     const wanted = rbTotal ? Math.min(Math.max(500, rbTotal), 5000) : 2000;
     try { br = await apiGet("/baseline?limit=" + encodeURIComponent(String(wanted))); } catch (e) { ctx.errors.baseline = String(e.message || e); }
+
+    // Weekly alarms (explicit source: /anomalies?last=7d)
+    let alarms7d = [];
+    try {
+      const a = await apiGet("/anomalies?last=7d&limit=2000");
+      alarms7d = Array.isArray(a) ? a : [];
+    } catch (e) {
+      ctx.errors.anomalies_7d = String(e.message || e);
+    }
+
+    // Weekly changes (explicit source: /proposals with proposal_actions)
+    let proposals = [];
+    try {
+      const p = await apiGet("/proposals?limit=500");
+      proposals = Array.isArray(p) ? p : [];
+    } catch (e) {
+      ctx.errors.proposals = String(e.message || e);
+    }
 
     ctx.baseline_status = bs;
 
@@ -1083,6 +1177,61 @@
     // Warnings + snapshot
     const warnings = computeWarnings(ctx);
     ctx.warnings = warnings;
+
+    const alarmCounts = { RED: 0, YELLOW: 0, GREEN: 0, active: 0 };
+    for (const a of alarms7d) {
+      const lvl = String((a && a.level) || "").toUpperCase();
+      if (lvl === "RED") alarmCounts.RED += 1;
+      else if (lvl === "YELLOW") alarmCounts.YELLOW += 1;
+      else alarmCounts.GREEN += 1;
+      if (a && a.active === true) alarmCounts.active += 1;
+    }
+
+    const actionCounts = { TEST: 0, ACTIVATE: 0, REJECT: 0, OTHER: 0 };
+    let actionsInWeek = 0;
+    for (const p of proposals) {
+      const acts = Array.isArray(p && p.actions) ? p.actions : [];
+      for (const a of acts) {
+        const ts = Date.parse(String((a && a.created_at) || ""));
+        if (!Number.isFinite(ts) || ts < weekAgoTs) continue;
+        actionsInWeek += 1;
+        const key = String((a && a.action) || "").toUpperCase();
+        if (key === "TEST" || key === "ACTIVATE" || key === "REJECT") actionCounts[key] += 1;
+        else actionCounts.OTHER += 1;
+      }
+    }
+
+    const weekly = { observed_span_days: observedMs > 0 ? (observedMs / 86400000) : 0, has_full_week_observed: hasFullWeekObserved };
+    if (validEventTs.length === 0) {
+      weekly.data_inn = { mode: "NO_EVIDENCE", text: "NO_EVIDENCE: Fant ingen hendelser med gyldig tidspunkt fra /events." };
+      weekly.romdekning = { mode: "NO_EVIDENCE", text: "NO_EVIDENCE: Uten gyldige hendelser kan romdekning ikke beregnes." };
+    } else if (hasFullWeekObserved) {
+      weekly.data_inn = { mode: "REAL", text: `REAL: ${weekEvents} hendelser siste 7 dager. Observasjonsvindu ${weekly.observed_span_days.toFixed(1)} dager.` };
+      weekly.romdekning = { mode: "REAL", text: `REAL: ${roomsSeen.length} rom med data siste uke. Mangler ${missingExpected.length} forventede rom.` };
+    } else {
+      weekly.data_inn = { mode: "TEMPLATE/FALLBACK", text: `TEMPLATE/FALLBACK: Kun ${weekly.observed_span_days.toFixed(1)} dager observert (< 7). ${weekEvents} hendelser i observert periode.` };
+      weekly.romdekning = { mode: "TEMPLATE/FALLBACK", text: `TEMPLATE/FALLBACK: ${roomsSeen.length} rom sett, men observasjonsvindu er under 7 dager.` };
+    }
+
+    if (alarms7d.length > 0) {
+      weekly.alarmer = { mode: "REAL", text: `REAL: ${alarms7d.length} alarmer siste 7 dager (rød ${alarmCounts.RED}, gul ${alarmCounts.YELLOW}, grønne ${alarmCounts.GREEN}, aktive nå ${alarmCounts.active}).` };
+    } else if (ctx.errors.anomalies_7d) {
+      weekly.alarmer = { mode: "NO_EVIDENCE", text: "NO_EVIDENCE: Klarte ikke hente alarmer fra /anomalies?last=7d." };
+    } else {
+      weekly.alarmer = { mode: "TEMPLATE/FALLBACK", text: "TEMPLATE/FALLBACK: Ingen alarmer funnet siste 7 dager i tilgjengelige data." };
+    }
+
+    if (actionsInWeek > 0) {
+      weekly.endringer = { mode: "REAL", text: `REAL: ${actionsInWeek} registrerte endringer siste 7 dager (test ${actionCounts.TEST}, aktivert ${actionCounts.ACTIVATE}, avvist ${actionCounts.REJECT}, øvrige ${actionCounts.OTHER}).` };
+    } else if (ctx.errors.proposals) {
+      weekly.endringer = { mode: "NO_EVIDENCE", text: "NO_EVIDENCE: Klarte ikke hente endringskilde fra /proposals." };
+    } else {
+      weekly.endringer = { mode: "TEMPLATE/FALLBACK", text: "TEMPLATE/FALLBACK: Ingen registrerte proposal-actions siste 7 dager." };
+    }
+
+    window.__weekly_report_v1 = weekly;
+    renderWeeklySection();
+
     $("warningsBox").textContent = warnings.length ? ("warnings: " + warnings.join(", ")) : "Ingen warnings.";
 
     // Driftpakke v0 snapshot
@@ -1109,6 +1258,7 @@
       },
       coverage: ctx.coverage,
       baseline_summary: ctx.baseline_rows,
+      weekly_report: weekly,
       errors: ctx.errors,
       warnings: warnings
     };
