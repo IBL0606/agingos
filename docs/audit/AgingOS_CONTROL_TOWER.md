@@ -187,9 +187,9 @@ Branch: pilot/fixpack-2026-03-03
 
 
 ### Fixpack-3 — Room Mapping (dev) — 2026-03-06
-Link: PR_TBD
+Link: https://github.com/IBL0606/agingos/pull/32
 Type: fixpack (room mapping)
-Status: IN PROGRESS
+Status: READY TO MERGE
 
 Summary:
 - Added Room Catalog (rooms) + Sensor→room mapping (sensor_room_map) (scoped per org/home).
