@@ -1,0 +1,144 @@
+$ git diff -- backend/services/scheduler.py backend/tests/test_scheduler_anomaly_scope.py docs/v2/SETUP_TRUTH.md
+diff --git a/backend/services/scheduler.py b/backend/services/scheduler.py
+index b595d6e..b76139a 100644
+--- a/backend/services/scheduler.py
++++ b/backend/services/scheduler.py
+@@ -693,7 +693,7 @@ def _anomaly_pick_one_scope(db) -> AuthScope:
+             db.execute(
+                 text(
+                     """
+-                    SELECT org_id, home_id, subject_id, user_id
++                    SELECT org_id, home_id, subject_id
+                     FROM baseline_model_status
+                     ORDER BY computed_at DESC NULLS LAST, model_end DESC
+                     LIMIT 1
+@@ -706,10 +706,9 @@ def _anomaly_pick_one_scope(db) -> AuthScope:
+     except ProgrammingError:
+         # Missing table / bad schema: clear aborted transaction then run in "rules-only" mode
+         try:
+-            pass  # no db handle here; ignore
++            db.rollback()
+         except Exception:
+             pass
+-        # Missing table / bad schema: run in "rules-only" mode
+         return AuthScope(
+             org_id="default",
+             home_id="default",
+@@ -729,13 +728,11 @@ def _anomaly_pick_one_scope(db) -> AuthScope:
+             api_key_hash="scheduler",
+         )
+ 
+-    uid = row.get("user_id") or "system"
+-
+     return AuthScope(
+         org_id=str(row.get("org_id") or "default"),
+         home_id=str(row.get("home_id") or "default"),
+         subject_id=str(row.get("subject_id") or "default"),
+-        user_id=str(uid),
++        user_id="system",
+         role="system",
+         api_key_hash="scheduler",
+     )
+@@ -1007,9 +1004,16 @@ def run_anomalies_job() -> dict:
+             except Exception:
+                 counts["ERROR"] += 1
+                 # keep going; one room must not crash whole run
++                try:
++                    db.rollback()
++                except Exception:
++                    pass
+         db.commit()
+     except Exception:
+-        pass  # no db handle here; ignore
++        try:
++            db.rollback()
++        except Exception:
++            pass
+         raise
+     finally:
+         db.close()
+diff --git a/docs/v2/SETUP_TRUTH.md b/docs/v2/SETUP_TRUTH.md
+index 82922af..39982ca 100644
+--- a/docs/v2/SETUP_TRUTH.md
++++ b/docs/v2/SETUP_TRUTH.md
+@@ -9,44 +9,62 @@ Rule: install/upgrade is **per-home scope** (`org_id`, `home_id`, `subject_id`)
+ ## MUST-1: fresh install vs upgrade (do not mix)
+ 
+ ### Fresh install (new DB volume)
+-Command sequence:
++
++#### Runtime bring-up truth
++- `make up` uses **base compose only** (`docker compose up -d --build`), then waits for DB and runs `alembic upgrade head`.
++- Base compose does not publish host ports by default.
++- If host path `127.0.0.1:8000` is needed, start with dev overlay:
++
++```bash
++docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
++```
++
++#### Verification sequence (fresh install)
+ 
+ ```bash
+ docker compose down -v --remove-orphans
+ make up
+-docker compose ps
+ docker compose exec -T backend alembic -c alembic.ini current
++
++# activate scope mapping for dev-key-2 (sha256 precomputed)
++docker compose exec -T db psql -U agingos -d agingos -c "
++INSERT INTO api_key_scopes (org_id, home_id, subject_id, role, api_key_hash, user_id, active)
++VALUES ('default','default','default','owner','966c44be82076d2c2ad29390d50c34034a35056007f29606f6457b02af023402','dev-user',true)
++ON CONFLICT (api_key_hash) DO UPDATE SET active=true, org_id=EXCLUDED.org_id, home_id=EXCLUDED.home_id, subject_id=EXCLUDED.subject_id, role=EXCLUDED.role, user_id=EXCLUDED.user_id;
++"
++
+ docker compose exec -T backend curl -sS http://127.0.0.1:8000/health
+-docker compose exec -T backend curl -sS http://127.0.0.1:8000/health/detail
+-```
+ 
+-Expected truth:
+-- `make up` runs `alembic upgrade head` automatically.
+-- `/health` should return `{"status":"ok"}` when backend is up.
+-- `/health/detail` is runtime/data-aware and may be `overall_status=ERROR` when no scoped events exist (this is valid on empty installs).
++docker compose exec -T backend curl -sS \
++  -H "X-API-Key: dev-key-2" \
++  http://127.0.0.1:8000/health/detail
+ 
+-Code evidence for the empty-install health/detail behavior:
+-- `if n == 0: ... status = "ERROR" ... reason "no events found for this scope"`.
++docker compose logs --tail=200 backend
++```
++
++Expected truth after scheduler fix:
++- `/health` returns `{"status":"ok"}`.
++- `/health/detail` requires an active `api_key_scopes` mapping for the presented API key.
++- Fresh empty install may still return `overall_status=ERROR` with reason `no events found for this scope` (data-aware behavior).
++- Scheduler/anomalies runner must not repeatedly fail with transaction-aborted loop from invalid `baseline_model_status.user_id` query.
+ 
+ ### Upgrade (existing home data)
+-Command sequence:
+ 
+ ```bash
+ docker compose pull || true
+ docker compose up -d --build
+ docker compose exec -T backend alembic -c alembic.ini upgrade head
+ docker compose exec -T backend alembic -c alembic.ini current
+-docker compose exec -T backend curl -sS http://127.0.0.1:8000/health/detail
++docker compose exec -T backend curl -sS \
++  -H "X-API-Key: dev-key-2" \
++  http://127.0.0.1:8000/health/detail
+ ```
+ 
+ Expected truth:
+ - `alembic upgrade head` is idempotent.
+ - `/health/detail` output depends on current scoped data freshness/content and must be read as observed output, not assumed `OK`.
+ 
+-## Verification evidence path for Fixpack-4A
+-
+-- `docs/audit/verification-2026-03-06-fixpack-4a-setup/`
++## Verification evidence paths
+ 
+-Current run status in this container:
+-- Runtime execution is **NO_EVIDENCE** because Docker CLI is unavailable (`command not found`).
+-- Repo-truth mapping is captured in the same evidence pack.
++- Fixpack-4A base: `docs/audit/verification-2026-03-06-fixpack-4a-setup/`
++- Fixpack-4A follow-up (scheduler root-cause fix): `docs/audit/verification-2026-03-06-fixpack-4a-scheduler-followup/`

@@ -235,3 +235,31 @@ Delivered:
 Evidence status:
 - Runtime checks in this container are **NO_EVIDENCE** because Docker CLI is unavailable (`command not found`).
 - Repo-level deterministic truth (Makefile/compose/backend health logic/docs diffs) is captured in the evidence pack.
+
+## Phase 4 — Fixpack-4A follow-up (scheduler fresh-install transaction poison) — 2026-03-06
+
+Scope: narrow runtime fix + setup truth doc correction.
+
+Root cause (proven):
+- `_anomaly_pick_one_scope()` queried `baseline_model_status.user_id`.
+- `baseline_model_status` has no `user_id` column.
+- Query failure could leave SQL transaction aborted (`InFailedSqlTransaction`) and poison follow-up scheduler/anomalies queries.
+
+Delivered:
+- `backend/services/scheduler.py`
+  - Removed invalid `user_id` select dependency from `baseline_model_status` scope-pick query.
+  - Added rollback on `ProgrammingError` in scope-pick fallback.
+  - Added rollback on per-room anomalies errors to clear aborted transaction before continuing.
+  - Added rollback on outer anomalies-job exception path before re-raise.
+- `backend/tests/test_scheduler_anomaly_scope.py`
+  - Unit tests for scope fallback rollback, no-user_id scope behavior, and per-room rollback/continue behavior.
+- `docs/v2/SETUP_TRUTH.md`
+  - Corrected fresh-install truth for base compose vs dev overlay host access.
+  - Added explicit `/health/detail` requirement for active `api_key_scopes` mapping.
+  - Updated expected fresh-empty behavior after fix.
+
+Evidence:
+- `docs/audit/verification-2026-03-06-fixpack-4a-scheduler-followup/`
+
+NO_EVIDENCE:
+- Docker runtime verification commands are not executable in this container (`docker: command not found`).
