@@ -1,0 +1,22 @@
+$ rg -n "make up|upgrade head|health/detail|no events found for this scope|setup truth" Makefile backend/main.py docs/v2/SETUP_TRUTH.md docs/v2/OPERATIONS.md docs/v2/TESTING.md docs/v2/README.md
+docs/v2/TESTING.md:18:- curl GET outputs for /health and /health/detail (including ingest diagnostics fields) and /debug/scope
+docs/v2/TESTING.md:27:Truth rule: `/health/detail` is data-aware; empty fresh install can return `overall_status=ERROR` with `no events found for this scope`.
+docs/v2/SETUP_TRUTH.md:16:make up
+docs/v2/SETUP_TRUTH.md:20:docker compose exec -T backend curl -sS http://127.0.0.1:8000/health/detail
+docs/v2/SETUP_TRUTH.md:24:- `make up` runs `alembic upgrade head` automatically.
+docs/v2/SETUP_TRUTH.md:26:- `/health/detail` is runtime/data-aware and may be `overall_status=ERROR` when no scoped events exist (this is valid on empty installs).
+docs/v2/SETUP_TRUTH.md:28:Code evidence for the empty-install health/detail behavior:
+docs/v2/SETUP_TRUTH.md:29:- `if n == 0: ... status = "ERROR" ... reason "no events found for this scope"`.
+docs/v2/SETUP_TRUTH.md:37:docker compose exec -T backend alembic -c alembic.ini upgrade head
+docs/v2/SETUP_TRUTH.md:39:docker compose exec -T backend curl -sS http://127.0.0.1:8000/health/detail
+docs/v2/SETUP_TRUTH.md:43:- `alembic upgrade head` is idempotent.
+docs/v2/SETUP_TRUTH.md:44:- `/health/detail` output depends on current scoped data freshness/content and must be read as observed output, not assumed `OK`.
+Makefile:32:	docker compose exec -T backend alembic -c alembic.ini upgrade head
+Makefile:48:	docker compose -f docker-compose.yml -f docker-compose.field.yml run --rm backend alembic -c alembic.ini upgrade head
+Makefile:111:	@echo "  make up          - start services (dev)"
+docs/v2/OPERATIONS.md:78:- `GET /health/detail` (requires `X-API-Key`)
+docs/v2/OPERATIONS.md:102:Do not assume `/health/detail overall_status=OK` on fresh empty installs; verify actual output.
+docs/v2/README.md:26:- Canonical MUST-1 setup truth: `docs/v2/SETUP_TRUTH.md`
+backend/main.py:45:# - Exempt ops endpoints: /health, /health/detail, /debug/*
+backend/main.py:100:@app.get("/health/detail")
+backend/main.py:275:            degrade("ERROR", "no events found for this scope")

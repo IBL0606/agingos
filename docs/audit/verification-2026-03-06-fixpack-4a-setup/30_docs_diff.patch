@@ -1,0 +1,64 @@
+$ git diff -- docs/v2/SETUP_TRUTH.md docs/v2/README.md docs/v2/TESTING.md docs/v2/OPERATIONS.md docs/audit/AgingOS_CONTROL_TOWER.md
+diff --git a/docs/audit/AgingOS_CONTROL_TOWER.md b/docs/audit/AgingOS_CONTROL_TOWER.md
+index bc0bdd3..bbafbd7 100644
+--- a/docs/audit/AgingOS_CONTROL_TOWER.md
++++ b/docs/audit/AgingOS_CONTROL_TOWER.md
+@@ -219,3 +219,19 @@ Pilotbox:
+ 
+ Remaining:
+ - Replace PR_TBD with actual PR link and set Status to READY TO MERGE when review is complete.
++
++## Phase 4 — Fixpack-4A (MUST-1 setup truth only) — 2026-03-06
++
++- Branch: current working branch
++- Scope: dev repo/docs only. No MiniPC/pilotbox runtime change.
++- Goal: make install/upgrade per-home verification deterministic and impossible to misread.
++
++Delivered:
++- Added `docs/v2/SETUP_TRUTH.md` as canonical MUST-1 setup truth.
++- Explicitly separated fresh install vs upgrade command sequences.
++- Explicitly documented `/health/detail` truth: runtime/data-aware; empty scoped install can report `overall_status=ERROR` with reason `no events found for this scope`.
++- Created evidence pack: `docs/audit/verification-2026-03-06-fixpack-4a-setup/`.
++
++Evidence status:
++- Runtime checks in this container are **NO_EVIDENCE** because Docker CLI is unavailable (`command not found`).
++- Repo-level deterministic truth (Makefile/compose/backend health logic/docs diffs) is captured in the evidence pack.
+diff --git a/docs/v2/OPERATIONS.md b/docs/v2/OPERATIONS.md
+index 77fa182..936d403 100644
+--- a/docs/v2/OPERATIONS.md
++++ b/docs/v2/OPERATIONS.md
+@@ -94,3 +94,9 @@ Rule: anything not proven by evidence must be marked **NO_EVIDENCE** or **HYPOTH
+ - Console: /rooms.html (Romoppsett)
+ - Pilotbox template (NO_EVIDENCE): docs/audit/_templates/pilotbox_capture/fixpack-3_room_mapping.md
+ <!-- FIXPACK-3: ROOM MAPPING END -->
++
++## Setup truth pointer (Devbox)
++For install/upgrade verification commands and expected truth, use:
++- `docs/v2/SETUP_TRUTH.md`
++
++Do not assume `/health/detail overall_status=OK` on fresh empty installs; verify actual output.
+diff --git a/docs/v2/README.md b/docs/v2/README.md
+index 57ee9e2..18dcc33 100644
+--- a/docs/v2/README.md
++++ b/docs/v2/README.md
+@@ -21,3 +21,7 @@ This Phase 4 fixpack is **Devbox-only**.
+ - Console: /rooms.html (Romoppsett)
+ - Pilotbox template (NO_EVIDENCE): docs/audit/_templates/pilotbox_capture/fixpack-3_room_mapping.md
+ <!-- FIXPACK-3: ROOM MAPPING END -->
++
++## Setup truth (Fixpack-4A)
++- Canonical MUST-1 setup truth: `docs/v2/SETUP_TRUTH.md`
++- This document separates **fresh install** vs **upgrade** and defines deterministic verification commands.
+diff --git a/docs/v2/TESTING.md b/docs/v2/TESTING.md
+index c598409..e1eafb5 100644
+--- a/docs/v2/TESTING.md
++++ b/docs/v2/TESTING.md
+@@ -20,3 +20,8 @@ This generates a dated evidence pack under `docs/audit/as-is-YYYY-MM-DD-devbox/`
+ - manifest of exact commands executed
+ 
+ NO_EVIDENCE: the target is introduced in this fixpack and will become the standard way to reduce NO_EVIDENCE claims.
++
++## MUST-1 setup verification (fresh install vs upgrade)
++Use the exact commands in `docs/v2/SETUP_TRUTH.md`.
++
++Truth rule: `/health/detail` is data-aware; empty fresh install can return `overall_status=ERROR` with `no events found for this scope`.

@@ -693,7 +693,7 @@ def _anomaly_pick_one_scope(db) -> AuthScope:
             db.execute(
                 text(
                     """
-                    SELECT org_id, home_id, subject_id, user_id
+                    SELECT org_id, home_id, subject_id
                     FROM baseline_model_status
                     ORDER BY computed_at DESC NULLS LAST, model_end DESC
                     LIMIT 1
@@ -706,10 +706,9 @@ def _anomaly_pick_one_scope(db) -> AuthScope:
     except ProgrammingError:
         # Missing table / bad schema: clear aborted transaction then run in "rules-only" mode
         try:
-            pass  # no db handle here; ignore
+            db.rollback()
         except Exception:
             pass
-        # Missing table / bad schema: run in "rules-only" mode
         return AuthScope(
             org_id="default",
             home_id="default",
@@ -729,13 +728,11 @@ def _anomaly_pick_one_scope(db) -> AuthScope:
             api_key_hash="scheduler",
         )
 
-    uid = row.get("user_id") or "system"
-
     return AuthScope(
         org_id=str(row.get("org_id") or "default"),
         home_id=str(row.get("home_id") or "default"),
         subject_id=str(row.get("subject_id") or "default"),
-        user_id=str(uid),
+        user_id="system",
         role="system",
         api_key_hash="scheduler",
     )
@@ -1007,9 +1004,16 @@ def run_anomalies_job() -> dict:
             except Exception:
                 counts["ERROR"] += 1
                 # keep going; one room must not crash whole run
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
         db.commit()
     except Exception:
-        pass  # no db handle here; ignore
+        try:
+            db.rollback()
+        except Exception:
+            pass
         raise
     finally:
         db.close()

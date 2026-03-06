@@ -1,0 +1,6 @@
+$ rg -n "run_baseline_nightly|full PASS target|fix4a-now-1|docker compose down -v --remove-orphans" docs/v2/SETUP_TRUTH.md
+22:#### Verification sequence (fresh install, full PASS target)
+25:docker compose down -v --remove-orphans
+40:  ('fix4a-now-1', NOW() AT TIME ZONE 'utc', 'presence', '{\"state\":\"on\"}', 'default', 'default', 'default', 'prod', 'stue'),
+48:FROM public.run_baseline_nightly('ba7cd3c0-a65b-4fe4-a564-b27607a791c8'::uuid, 0.1, 0.25, 1);
+63:- With seeded scoped ingest + successful `run_baseline_nightly(...)`, `/health/detail` can reach `overall_status="OK"`.

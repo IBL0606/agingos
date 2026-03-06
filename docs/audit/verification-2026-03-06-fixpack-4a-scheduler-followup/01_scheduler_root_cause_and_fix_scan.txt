@@ -1,0 +1,10 @@
+$ rg -n "SELECT org_id, home_id, subject_id|baseline_model_status|db.rollback\(\)|counts\[\"ERROR\"\]" backend/services/scheduler.py
+612:        return {"skipped": True, "reason": "baseline_model_status_missing"}
+684:    Primary source: baseline_model_status (if present).
+696:                    SELECT org_id, home_id, subject_id
+697:                    FROM baseline_model_status
+709:            db.rollback()
+932:            FROM baseline_model_status
+1005:                counts["ERROR"] += 1
+1008:                    db.rollback()
+1014:            db.rollback()

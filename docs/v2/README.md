@@ -21,3 +21,7 @@ This Phase 4 fixpack is **Devbox-only**.
 - Console: /rooms.html (Romoppsett)
 - Pilotbox template (NO_EVIDENCE): docs/audit/_templates/pilotbox_capture/fixpack-3_room_mapping.md
 <!-- FIXPACK-3: ROOM MAPPING END -->
+
+## Setup truth (Fixpack-4A)
+- Canonical MUST-1 setup truth: `docs/v2/SETUP_TRUTH.md`
+- This document separates **fresh install** vs **upgrade** and defines deterministic verification commands.
