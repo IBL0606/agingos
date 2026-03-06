@@ -368,3 +368,22 @@ Evidence path:
 
 NO_EVIDENCE in this container:
 - Live API-backed 7-day runtime verification was not executable here; only code-path and static evidence were captured.
+
+## Phase 4 — Fixpack-5 follow-up patch (MUST-3 runtime schema reconcile) — 2026-03-06
+
+Scope: minimal PR #36 patch only; no feature broadening.
+
+Delivered in repo draft:
+- Added additive Alembic migration `9c5f1a2b7e44_reconcile_weekly_report_runtime_schema.py`.
+- Migration aligns DB schema with runtime expectations used by weekly report sources:
+  - `proposals.home_id` (add + backfill `'default'` + NOT NULL/default)
+  - missing `anomaly_episodes` lifecycle/scope columns (including `start_bucket`, `last_bucket`, `peak_bucket`, `org_id`, `home_id`, `subject_id`, counters).
+- Added scope indexes for query stability:
+  - `ix_proposals_scope_updated`
+  - `ix_anomaly_episodes_scope_start`
+
+Evidence path:
+- `docs/audit/verification-2026-03-06-fixpack-5-must-3-weekly-report/`
+
+NO_EVIDENCE in this container:
+- Live dev runtime verification of `GET /anomalies?last=7d` and `GET /proposals?limit=500` post-migration was not executable here due missing runtime DB/docker access.

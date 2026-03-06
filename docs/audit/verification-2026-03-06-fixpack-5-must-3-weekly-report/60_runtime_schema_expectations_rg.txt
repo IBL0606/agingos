@@ -1,0 +1,132 @@
+backend/models/anomaly_episode.py:48:    peak_bucket_start_ts: Mapped[Optional[datetime]] = mapped_column(
+backend/models/anomaly_episode.py:51:    peak_bucket_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+backend/models/anomaly_episode.py:59:    peak_bucket_details: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+backend/models/anomaly_episode.py:73:    start_bucket: Mapped[datetime | None] = mapped_column(
+backend/models/anomaly_episode.py:76:    last_bucket: Mapped[datetime | None] = mapped_column(
+backend/models/anomaly_episode.py:79:    peak_bucket: Mapped[datetime | None] = mapped_column(
+backend/models/anomaly_episode.py:86:    green_streak: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+backend/models/anomaly_episode.py:87:    bucket_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+backend/models/anomaly_episode.py:98:    org_id: Mapped[str] = mapped_column(Text, nullable=False, default="default")
+backend/models/anomaly_episode.py:99:    home_id: Mapped[str] = mapped_column(Text, nullable=False, default="default")
+backend/models/anomaly_episode.py:100:    subject_id: Mapped[str] = mapped_column(Text, nullable=False, default="default")
+backend/main.py:118:            "org_id": scope.org_id,
+backend/main.py:119:            "home_id": scope.home_id,
+backend/main.py:120:            "subject_id": scope.subject_id,
+backend/main.py:146:                WHERE org_id = :org AND home_id = :home AND subject_id = :sub
+backend/main.py:150:                    "org": scope.org_id,
+backend/main.py:151:                    "home": scope.home_id,
+backend/main.py:152:                    "sub": scope.subject_id,
+backend/main.py:203:                    WHERE org_id = :org AND home_id = :home AND subject_id = :sub
+backend/main.py:210:                        "org": scope.org_id,
+backend/main.py:211:                        "home": scope.home_id,
+backend/main.py:212:                        "sub": scope.subject_id,
+backend/main.py:238:                    WHERE org_id = :org AND home_id = :home AND subject_id = :sub
+backend/main.py:245:                        "org": scope.org_id,
+backend/main.py:246:                        "home": scope.home_id,
+backend/main.py:247:                        "sub": scope.subject_id,
+backend/main.py:294:                    WHERE org_id = :org AND home_id = :home AND subject_id = :sub
+backend/main.py:299:                        "org": scope.org_id,
+backend/main.py:300:                        "home": scope.home_id,
+backend/main.py:301:                        "sub": scope.subject_id,
+backend/main.py:661:                "org_id": scope.org_id,
+backend/main.py:662:                "home_id": scope.home_id,
+backend/main.py:663:                "subject_id": scope.subject_id,
+backend/main.py:725:        org_id=scope.org_id,
+backend/main.py:726:        home_id=scope.home_id,
+backend/main.py:727:        subject_id=scope.subject_id,
+backend/main.py:738:            "org_id": scope.org_id,
+backend/main.py:739:            "home_id": scope.home_id,
+backend/main.py:740:            "subject_id": scope.subject_id,
+backend/main.py:803:        where = ["org_id = :org_id", "home_id = :home_id", "subject_id = :subject_id"]
+backend/main.py:806:            "org_id": scope.org_id,
+backend/main.py:807:            "home_id": scope.home_id,
+backend/main.py:808:            "subject_id": scope.subject_id,
+backend/main.py:839:              org_id, home_id, subject_id,
+backend/main.py:880:            org_id=scope.org_id,
+backend/main.py:881:            home_id=scope.home_id,
+backend/main.py:882:            subject_id=scope.subject_id,
+backend/main.py:1046:            INSERT INTO monitor_modes (org_id, home_id, subject_id, monitor_key, room_id, mode, updated_at)
+backend/main.py:1047:              VALUES (:org_id, :home_id, :subject_id, :k, :r, :m, now())
+backend/main.py:1048:              ON CONFLICT (org_id, home_id, subject_id, monitor_key, room_id)
+backend/main.py:1053:            "org_id": scope.org_id,
+backend/main.py:1054:            "home_id": scope.home_id,
+backend/main.py:1055:            "subject_id": scope.subject_id,
+backend/main.py:1084:            WHERE org_id=:org_id AND home_id=:home_id AND subject_id=:subject_id
+backend/main.py:1090:            "org_id": scope.org_id,
+backend/main.py:1091:            "home_id": scope.home_id,
+backend/main.py:1092:            "subject_id": scope.subject_id,
+backend/main.py:1113:              (org_id, home_id, subject_id, proposal_id, verdict, note, actor, source, created_at)
+backend/main.py:1115:              (:org_id, :home_id, :subject_id, :proposal_id, :verdict, :note, :actor, :source, now())
+backend/main.py:1119:            "org_id": scope.org_id,
+backend/main.py:1120:            "home_id": scope.home_id,
+backend/main.py:1121:            "subject_id": scope.subject_id,
+backend/main.py:1137:                  feedback_id, proposal_id, org_id, home_id, subject_id,
+backend/main.py:1140:                WHERE org_id=:org_id AND home_id=:home_id AND subject_id=:subject_id
+backend/main.py:1147:                "org_id": scope.org_id,
+backend/main.py:1148:                "home_id": scope.home_id,
+backend/main.py:1149:                "subject_id": scope.subject_id,
+backend/main.py:1274:                  p.proposal_id, p.org_id, p.home_id, p.subject_id, p.room_id,
+backend/main.py:1295:                WHERE p.org_id = :org_id AND p.home_id = :home_id AND p.subject_id = :subject_id AND p.updated_at > :last_ts
+backend/main.py:1304:                        "org_id": scope.org_id,
+backend/main.py:1305:                        "home_id": scope.home_id,
+backend/main.py:1306:                        "subject_id": scope.subject_id,
+backend/main.py:1318:                  p.proposal_id, p.org_id, p.home_id, p.subject_id, p.room_id,
+backend/main.py:1339:                WHERE p.org_id = :org_id AND p.home_id = :home_id AND p.subject_id = :subject_id
+backend/main.py:1348:                        "org_id": scope.org_id,
+backend/main.py:1349:                        "home_id": scope.home_id,
+backend/main.py:1350:                        "subject_id": scope.subject_id,
+backend/main.py:1381:    org_id: str,
+backend/main.py:1382:    home_id: str,
+backend/main.py:1383:    subject_id: str,
+backend/main.py:1392:                "SELECT proposal_id, state, action_target, room_id FROM proposals WHERE proposal_id = :id AND org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id FOR UPDATE"
+backend/main.py:1396:                "org_id": org_id,
+backend/main.py:1397:                "home_id": home_id,
+backend/main.py:1398:                "subject_id": subject_id,
+backend/main.py:1536:                org_id=scope.org_id,
+backend/main.py:1537:                home_id=scope.home_id,
+backend/main.py:1538:                subject_id=scope.subject_id,
+backend/main.py:1560:                org_id=scope.org_id,
+backend/main.py:1561:                home_id=scope.home_id,
+backend/main.py:1562:                subject_id=scope.subject_id,
+backend/main.py:1584:                org_id=scope.org_id,
+backend/main.py:1585:                home_id=scope.home_id,
+backend/main.py:1586:                subject_id=scope.subject_id,
+backend/main.py:1660:        params["org_id"] = scope.org_id
+backend/main.py:1661:        params["home_id"] = scope.home_id
+backend/main.py:1662:        params["subject_id"] = scope.subject_id
+backend/main.py:1664:            "org_id = :org_id",
+backend/main.py:1665:            "home_id = :home_id",
+backend/main.py:1666:            "subject_id = :subject_id",
+backend/main.py:1946:                "WHERE id = :id AND org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id"
+backend/main.py:1950:                "org_id": scope.org_id,
+backend/main.py:1951:                "home_id": scope.home_id,
+backend/main.py:1952:                "subject_id": scope.subject_id,
+backend/main.py:2012:                "WHERE id = :id AND org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id"
+backend/main.py:2016:                "org_id": scope.org_id,
+backend/main.py:2017:                "home_id": scope.home_id,
+backend/main.py:2018:                "subject_id": scope.subject_id,
+backend/main.py:2110:            EventDB.org_id == scope.org_id,
+backend/main.py:2111:            EventDB.home_id == scope.home_id,
+backend/main.py:2112:            EventDB.subject_id == scope.subject_id,
+backend/main.py:2177:                "org_id": scope.org_id,
+backend/main.py:2178:                "home_id": scope.home_id,
+backend/main.py:2179:                "subject_id": scope.subject_id,
+backend/main.py:2191:                SELECT org_id, home_id, subject_id, state, state_since, last_event_ts, updated_at
+backend/main.py:2193:                WHERE org_id = :org AND home_id = :home AND subject_id = :sub
+backend/main.py:2196:                {"org": scope.org_id, "home": scope.home_id, "sub": scope.subject_id},
+backend/main.py:2204:                "org_id": scope.org_id,
+backend/main.py:2205:                "home_id": scope.home_id,
+backend/main.py:2206:                "subject_id": scope.subject_id,
+backend/main.py:2233:    Computes subject_state for this (org_id, home_id) using DB function.
+backend/main.py:2244:                    "org": scope.org_id,
+backend/main.py:2245:                    "home": scope.home_id,
+backend/main.py:2255:            "org_id": scope.org_id,
+backend/main.py:2256:            "home_id": scope.home_id,
+backend/main.py:2411:        where = ["org_id = :org_id", "home_id = :home_id", "subject_id = :subject_id"]
+backend/main.py:2414:            "org_id": scope.org_id,
+backend/main.py:2415:            "home_id": scope.home_id,
+backend/main.py:2416:            "subject_id": scope.subject_id,
+backend/main.py:2471:                    "FROM monitor_modes WHERE org_id=:org_id AND home_id=:home_id AND subject_id=:subject_id AND monitor_key=:k AND room_id=:r"
+backend/main.py:2474:                    "org_id": scope.org_id,
+backend/main.py:2475:                    "home_id": scope.home_id,
+backend/main.py:2476:                    "subject_id": scope.subject_id,
