@@ -1,0 +1,4 @@
+docs/audit/verification-2026-03-05-fixpack-3-dev/20_backend_logs_tail_after_escape_fix.txt:53:backend-1  |     rooms_router, prefix=\"/v1\", dependencies=[Depends(require_scope)]
+docs/audit/verification-2026-03-05-fixpack-3-dev/16_backend_logs_tail.txt:53:backend-1  |     rooms_router, prefix=\"/v1\", dependencies=[Depends(require_scope)]
+docs/audit/verification-2026-03-05-fixpack-3-dev/25_image_app_main_py_75_105_after_fix.txt:17:    91	    rooms_router, prefix=\"/v1\", dependencies=[Depends(require_scope)]
+docs/audit/verification-2026-03-05-fixpack-3-dev/22_image_app_main_py_70_110.txt:22:    91	    rooms_router, prefix=\"/v1\", dependencies=[Depends(require_scope)]

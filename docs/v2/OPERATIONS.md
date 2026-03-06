@@ -87,3 +87,10 @@ Writes a dated evidence pack under:
 - `docs/audit/as-is-YYYY-MM-DD-devbox/`
 
 Rule: anything not proven by evidence must be marked **NO_EVIDENCE** or **HYPOTHESIS**.
+
+<!-- FIXPACK-3: ROOM MAPPING START -->
+## Romoppsett (Fixpack-3)
+- Se: docs/v2/ROOM_MAPPING.md
+- Console: /rooms.html (Romoppsett)
+- Pilotbox template (NO_EVIDENCE): docs/audit/_templates/pilotbox_capture/fixpack-3_room_mapping.md
+<!-- FIXPACK-3: ROOM MAPPING END -->

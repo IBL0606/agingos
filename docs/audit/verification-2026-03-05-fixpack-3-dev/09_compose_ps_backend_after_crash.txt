@@ -1,0 +1,2 @@
+NAME                IMAGE             COMMAND                  SERVICE   CREATED              STATUS              PORTS
+agingos-backend-1   agingos-backend   "uvicorn main:app --…"   backend   About a minute ago   Up About a minute   8000/tcp

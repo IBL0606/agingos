@@ -25,6 +25,8 @@ from routes.baseline import router as baseline_router
 from routes.anomalies import router as anomalies_router
 from routes.notification_policy import router as notification_router
 
+from routes.rooms import router as rooms_router
+from routes.room_mappings import router as room_mappings_router
 from fastapi import Query
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
@@ -33,7 +35,7 @@ from datetime import datetime
 from typing import Optional
 
 from util.time import require_utc_aware
-from util.room_id import derive_room_id
+from util.room_id import derive_room_id, derive_room_id_scoped
 
 app = FastAPI(title="AgingOS Backend")
 
@@ -71,6 +73,8 @@ app.include_router(baseline_router, dependencies=[Depends(require_scope)])
 app.include_router(anomalies_router, dependencies=[Depends(require_scope)])
 app.include_router(notification_router, dependencies=[Depends(require_scope)])
 
+app.include_router(rooms_router, dependencies=[Depends(require_scope)])
+app.include_router(room_mappings_router, dependencies=[Depends(require_scope)])
 # P1-5: /v1 stable contract (additive). Keep legacy paths working.
 app.include_router(rules_router, prefix="/v1", dependencies=[Depends(require_scope)])
 app.include_router(
@@ -85,6 +89,9 @@ app.include_router(
 )
 
 
+
+app.include_router(rooms_router, prefix="/v1", dependencies=[Depends(require_scope)])
+app.include_router(room_mappings_router, prefix="/v1", dependencies=[Depends(require_scope)])
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -878,7 +885,7 @@ def receive_event(
         db_event.stream_id = stream_id
 
         # Derive room_id deterministically from payload (best-effort)
-        db_event.room_id = derive_room_id(event.payload)  # may be None
+        db_event.room_id = derive_room_id_scoped(db, scope, event.payload)  # may be None
 
         db.add(db_event)
         try:

@@ -1,0 +1,36 @@
+    70	app.include_router(deviations_router, dependencies=[Depends(require_scope)])
+    71	app.include_router(baseline_router, dependencies=[Depends(require_scope)])
+    72	app.include_router(anomalies_router, dependencies=[Depends(require_scope)])
+    73	app.include_router(notification_router, dependencies=[Depends(require_scope)])
+    74	
+    75	app.include_router(rooms_router, dependencies=[Depends(require_scope)])
+    76	# P1-5: /v1 stable contract (additive). Keep legacy paths working.
+    77	app.include_router(rules_router, prefix="/v1", dependencies=[Depends(require_scope)])
+    78	app.include_router(
+    79	    deviations_router, prefix="/v1", dependencies=[Depends(require_scope)]
+    80	)
+    81	app.include_router(baseline_router, prefix="/v1", dependencies=[Depends(require_scope)])
+    82	app.include_router(
+    83	    anomalies_router, prefix="/v1", dependencies=[Depends(require_scope)]
+    84	)
+    85	app.include_router(
+    86	    notification_router, prefix="/v1", dependencies=[Depends(require_scope)]
+    87	)
+    88	
+    89	
+    90	
+    91	app.include_router(rooms_router, prefix="/v1", dependencies=[Depends(require_scope)])
+    92	@app.get("/health")
+    93	def health():
+    94	    return {"status": "ok"}
+    95	
+    96	
+    97	@app.get("/health/detail")
+    98	def health_detail(scope: "AuthScope" = Depends(require_scope)):
+    99	    """
+   100	    Full pipeline health (P0-5).
+   101	    - Always scoped: returns explicit resolved scope to avoid false confidence.
+   102	    - Additive: does not change /health.
+   103	    """
+   104	    from datetime import datetime, timezone
+   105	    from sqlalchemy import text

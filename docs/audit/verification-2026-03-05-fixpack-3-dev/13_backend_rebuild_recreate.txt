@@ -1,0 +1,62 @@
+#1 [internal] load local bake definitions
+#1 reading from stdin 521B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 490B done
+#2 DONE 0.0s
+
+#3 [auth] library/python:pull token for registry-1.docker.io
+#3 DONE 0.0s
+
+#4 [internal] load metadata for docker.io/library/python:3.11-slim
+#4 DONE 1.3s
+
+#5 [internal] load .dockerignore
+#5 transferring context: 2B done
+#5 DONE 0.0s
+
+#6 [1/6] FROM docker.io/library/python:3.11-slim@sha256:d6e4d224f70f9e0172a06a3a2eba2f768eb146811a349278b38fff3a36463b47
+#6 resolve docker.io/library/python:3.11-slim@sha256:d6e4d224f70f9e0172a06a3a2eba2f768eb146811a349278b38fff3a36463b47 0.0s done
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 transferring context: 92.40kB 0.0s done
+#7 DONE 0.0s
+
+#8 [3/6] RUN apt-get update     && apt-get install -y --no-install-recommends curl     && rm -rf /var/lib/apt/lists/*
+#8 CACHED
+
+#9 [4/6] COPY requirements.txt .
+#9 CACHED
+
+#10 [2/6] WORKDIR /app
+#10 CACHED
+
+#11 [5/6] RUN pip install --no-cache-dir -r requirements.txt
+#11 CACHED
+
+#12 [6/6] COPY . .
+#12 DONE 0.1s
+
+#13 exporting to image
+#13 exporting layers 0.1s done
+#13 exporting manifest sha256:2953e6e6d1bf1ac955300386862f540c4d91ffb73834fe9d37adfc2c55e43d4e 0.0s done
+#13 exporting config sha256:1493f90f8d8838357f572b6deff542d300c630909d922b94372590765e47314c 0.0s done
+#13 exporting attestation manifest sha256:2599c31118331a12310d5d7b7ebbed9f34524f63b96cfe6ed4ce9f716cc4016b 0.0s done
+#13 exporting manifest list sha256:0217896b453d35aa5ffb60439a3e1195d01f827336068c5bbfa2e8a3c5c75b5d 0.0s done
+#13 naming to docker.io/library/agingos-backend:latest done
+#13 unpacking to docker.io/library/agingos-backend:latest 0.1s done
+#13 DONE 0.3s
+
+#14 resolving provenance for metadata file
+#14 DONE 0.0s
+ agingos-backend  Built
+ Container agingos-db-1  Recreate
+ Container agingos-db-1  Recreated
+ Container agingos-backend-1  Recreate
+ Container agingos-backend-1  Recreated
+ Container agingos-db-1  Starting
+ Container agingos-db-1  Started
+ Container agingos-backend-1  Starting
+ Container agingos-backend-1  Started

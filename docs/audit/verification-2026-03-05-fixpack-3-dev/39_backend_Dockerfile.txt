@@ -1,0 +1,18 @@
+     1	FROM python:3.11-slim
+     2	
+     3	WORKDIR /app
+     4	
+     5	# Utilities for debugging/health checks
+     6	RUN apt-get update \
+     7	    && apt-get install -y --no-install-recommends curl \
+     8	    && rm -rf /var/lib/apt/lists/*
+     9	
+    10	COPY requirements.txt .
+    11	RUN pip install --no-cache-dir -r requirements.txt
+    12	
+    13	COPY . .
+    14	
+    15	EXPOSE 8000
+    16	
+    17	# Default: production-like (no auto-reload). Dev profile enables --reload via docker-compose.
+    18	CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

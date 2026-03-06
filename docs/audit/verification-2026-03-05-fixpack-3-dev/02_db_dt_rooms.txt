@@ -1,0 +1,6 @@
+        List of relations
+ Schema | Name  | Type  |  Owner  
+--------+-------+-------+---------
+ public | rooms | table | agingos
+(1 row)
+

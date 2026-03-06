@@ -1,0 +1,7 @@
+  backend:
+    build:
+    build:
+      context: /home/henrik/dev/agingos/backend
+      context: /home/henrik/dev/agingos/backend
+      dockerfile: Dockerfile
+      dockerfile: Dockerfile

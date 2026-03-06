@@ -1,0 +1,16 @@
+PWD=/app
+
+LS .
+total 180
+drwxr-xr-x 12 1000 1000  4096 Mar  5 18:58 .
+drwxr-xr-x  1 root root  4096 Mar  5 19:45 ..
+-rw-r--r--  1 1000 1000   451 Jan 21 20:20 Dockerfile
+drwxr-xr-x  2 1000 1000  4096 Mar  5 18:58 __pycache__
+drwxr-xr-x  4 1000 1000  4096 Jan 18 13:21 alembic
+-rw-r--r--  1 1000 1000  3707 Dec 13 19:00 alembic.ini
+drwxr-xr-x  3 1000 1000  4096 Mar  4 04:56 config
+-rw-r--r--  1 1000 1000   484 Dec 25 13:03 db.py
+-rwxr-xr-x  1 1000 1000 27311 Mar  1 17:46 episodes_build.py
+
+FIND rooms.py (max depth 5)
+./routes/rooms.py

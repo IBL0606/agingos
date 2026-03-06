@@ -1,0 +1,16 @@
+backend/util/room_id.py:71:      3) sensor_room_map lookup by payload.entity_id (active=true)
+backend/util/room_id.py:99:                FROM public.rooms
+backend/util/room_id.py:116:                FROM public.rooms
+backend/util/room_id.py:135:                FROM public.sensor_room_map
+backend/alembic/versions/169d4a5837e0_create_rooms_and_sensor_room_map.py:1:"""create rooms and sensor_room_map
+backend/alembic/versions/169d4a5837e0_create_rooms_and_sensor_room_map.py:24:        CREATE TABLE IF NOT EXISTS public.rooms (
+backend/alembic/versions/169d4a5837e0_create_rooms_and_sensor_room_map.py:36:          ON public.rooms (org_id, home_id);
+backend/alembic/versions/169d4a5837e0_create_rooms_and_sensor_room_map.py:38:        CREATE TABLE IF NOT EXISTS public.sensor_room_map (
+backend/alembic/versions/169d4a5837e0_create_rooms_and_sensor_room_map.py:48:          CONSTRAINT fk_sensor_room_map_room
+backend/alembic/versions/169d4a5837e0_create_rooms_and_sensor_room_map.py:50:            REFERENCES public.rooms (org_id, home_id, room_id)
+backend/alembic/versions/169d4a5837e0_create_rooms_and_sensor_room_map.py:55:        CREATE INDEX IF NOT EXISTS ix_sensor_room_map_scope
+backend/alembic/versions/169d4a5837e0_create_rooms_and_sensor_room_map.py:56:          ON public.sensor_room_map (org_id, home_id);
+backend/alembic/versions/169d4a5837e0_create_rooms_and_sensor_room_map.py:58:        CREATE INDEX IF NOT EXISTS ix_sensor_room_map_room
+backend/alembic/versions/169d4a5837e0_create_rooms_and_sensor_room_map.py:59:          ON public.sensor_room_map (org_id, home_id, room_id)
+backend/alembic/versions/169d4a5837e0_create_rooms_and_sensor_room_map.py:68:        DROP TABLE IF EXISTS public.sensor_room_map;
+backend/alembic/versions/169d4a5837e0_create_rooms_and_sensor_room_map.py:69:        DROP TABLE IF EXISTS public.rooms;

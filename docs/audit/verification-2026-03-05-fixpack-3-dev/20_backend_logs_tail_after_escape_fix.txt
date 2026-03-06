@@ -1,0 +1,55 @@
+backend-1  | Traceback (most recent call last):
+backend-1  |   File "/usr/local/bin/uvicorn", line 8, in <module>
+backend-1  |     sys.exit(main())
+backend-1  |              ^^^^^^
+backend-1  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1485, in __call__
+backend-1  |     return self.main(*args, **kwargs)
+backend-1  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1406, in main
+backend-1  |     rv = self.invoke(ctx)
+backend-1  |          ^^^^^^^^^^^^^^^^
+backend-1  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1269, in invoke
+backend-1  |     return ctx.invoke(self.callback, **ctx.params)
+backend-1  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1  |   File "/usr/local/lib/python3.11/site-packages/click/core.py", line 824, in invoke
+backend-1  |     return callback(*args, **kwargs)
+backend-1  |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/main.py", line 410, in main
+backend-1  |     run(
+backend-1  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/main.py", line 577, in run
+backend-1  |     server.run()
+backend-1  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/server.py", line 65, in run
+backend-1  |     return asyncio.run(self.serve(sockets=sockets))
+backend-1  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1  |   File "/usr/local/lib/python3.11/asyncio/runners.py", line 190, in run
+backend-1  |     return runner.run(main)
+backend-1  |            ^^^^^^^^^^^^^^^^
+backend-1  |   File "/usr/local/lib/python3.11/asyncio/runners.py", line 118, in run
+backend-1  |     return self._loop.run_until_complete(task)
+backend-1  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1  |   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+backend-1  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/server.py", line 69, in serve
+backend-1  |     await self._serve(sockets)
+backend-1  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/server.py", line 76, in _serve
+backend-1  |     config.load()
+backend-1  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/config.py", line 434, in load
+backend-1  |     self.loaded_app = import_from_string(self.app)
+backend-1  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/importer.py", line 19, in import_from_string
+backend-1  |     module = importlib.import_module(module_str)
+backend-1  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1  |   File "/usr/local/lib/python3.11/importlib/__init__.py", line 126, in import_module
+backend-1  |     return _bootstrap._gcd_import(name[level:], package, level)
+backend-1  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1  |   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+backend-1  |   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+backend-1  |   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+backend-1  |   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+backend-1  |   File "<frozen importlib._bootstrap_external>", line 936, in exec_module
+backend-1  |   File "<frozen importlib._bootstrap_external>", line 1074, in get_code
+backend-1  |   File "<frozen importlib._bootstrap_external>", line 1004, in source_to_code
+backend-1  |   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+backend-1  |   File "/app/main.py", line 91
+backend-1  |     rooms_router, prefix=\"/v1\", dependencies=[Depends(require_scope)]
+backend-1  |                           ^
+backend-1  | SyntaxError: unexpected character after line continuation character

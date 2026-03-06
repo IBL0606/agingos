@@ -1,0 +1,153 @@
+name: agingos
+services:
+  ai-bot:
+    build:
+      context: /home/henrik/dev/agingos/services/ai-bot
+      dockerfile: Dockerfile
+    depends_on:
+      backend:
+        condition: service_started
+        required: true
+    environment:
+      AGINGOS_API_BASE_URL: http://backend:8000
+      AGINGOS_API_KEY: dev-key-2
+      BOT_SCHEMA_VERSION: v1
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        host_ip: 127.0.0.1
+        target: 8010
+        published: "8010"
+        protocol: tcp
+    restart: unless-stopped
+  backend:
+    build:
+      context: /home/henrik/dev/agingos/backend
+      dockerfile: Dockerfile
+    command:
+      - uvicorn
+      - main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+    depends_on:
+      db:
+        condition: service_started
+        required: true
+    environment:
+      AGINGOS_API_KEY: dev-key-2
+      AGINGOS_API_KEYS: dev-key-2
+      AGINGOS_AUTH_MODE: api_key
+      AGINGOS_STREAM_ID: prod
+      AI_BOT_BASE_URL: http://ai-bot:8010
+      AI_BOT_ENABLED: "true"
+      DATABASE_URL: postgresql://agingos:agingos@db:5432/agingos
+      PYTHONDONTWRITEBYTECODE: "1"
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        host_ip: 127.0.0.1
+        target: 8000
+        published: "8000"
+        protocol: tcp
+    volumes:
+      - type: bind
+        source: /home/henrik/dev/agingos/backend
+        target: /app
+        bind:
+          create_host_path: true
+      - type: bind
+        source: /home/henrik/dev/agingos/tools
+        target: /tools
+        read_only: true
+        bind:
+          create_host_path: true
+  console:
+    depends_on:
+      backend:
+        condition: service_started
+        required: true
+    image: nginx:alpine
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        host_ip: 127.0.0.1
+        target: 80
+        published: "8080"
+        protocol: tcp
+    volumes:
+      - type: bind
+        source: /home/henrik/dev/agingos/services/console
+        target: /usr/share/nginx/html
+        read_only: true
+        bind:
+          create_host_path: true
+      - type: bind
+        source: /home/henrik/dev/agingos/services/console/nginx.conf
+        target: /etc/nginx/conf.d/default.conf
+        read_only: true
+        bind:
+          create_host_path: true
+  db:
+    environment:
+      POSTGRES_DB: agingos
+      POSTGRES_PASSWORD: agingos
+      POSTGRES_USER: agingos
+    image: postgres:16
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        host_ip: 127.0.0.1
+        target: 5432
+        published: "5432"
+        protocol: tcp
+    volumes:
+      - type: volume
+        source: pgdata
+        target: /var/lib/postgresql/data
+        volume: {}
+  notification-worker:
+    build:
+      context: /home/henrik/dev/agingos/backend
+      dockerfile: Dockerfile
+    command:
+      - sh
+      - -lc
+      - while true; do python3 /tools/notification_worker.py 50 || true; sleep 5; done
+    depends_on:
+      db:
+        condition: service_started
+        required: true
+    environment:
+      AGINGOS_API_KEY: dev-key-2
+      AGINGOS_API_KEYS: dev-key-2
+      AGINGOS_AUTH_MODE: api_key
+      AGINGOS_STREAM_ID: prod
+      DATABASE_URL: postgresql://agingos:agingos@db:5432/agingos
+      PYTHONDONTWRITEBYTECODE: "1"
+    networks:
+      default: null
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /home/henrik/dev/agingos/backend
+        target: /app
+        bind:
+          create_host_path: true
+      - type: bind
+        source: /home/henrik/dev/agingos/tools
+        target: /tools
+        read_only: true
+        bind:
+          create_host_path: true
+networks:
+  default:
+    name: agingos_default
+volumes:
+  pgdata:
+    name: agingos_pgdata

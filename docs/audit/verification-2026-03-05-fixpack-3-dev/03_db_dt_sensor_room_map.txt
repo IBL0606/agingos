@@ -1,0 +1,6 @@
+             List of relations
+ Schema |      Name       | Type  |  Owner  
+--------+-----------------+-------+---------
+ public | sensor_room_map | table | agingos
+(1 row)
+

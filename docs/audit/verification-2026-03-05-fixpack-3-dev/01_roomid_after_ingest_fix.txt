@@ -1,0 +1,6 @@
+ category | total_24h | room_id_empty_24h | room_id_set_24h 
+----------+-----------+-------------------+-----------------
+ door     |         2 |                 1 |               1
+ presence |         2 |                 1 |               1
+(2 rows)
+

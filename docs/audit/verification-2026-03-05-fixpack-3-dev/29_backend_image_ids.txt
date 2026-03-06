@@ -1,0 +1,5 @@
+== backend container image (ID + repo tag) ==
+CID=3163a29e538b9dc0cfb118f70733cc19d6e4055807556cad5bf919fb7fed565e IMAGE=agingos-backend IMAGE_ID=sha256:0217896b453d35aa5ffb60439a3e1195d01f827336068c5bbfa2e8a3c5c75b5d
+
+== local image IDs ==
+agingos-backend:latest sha256:0217896b453d35aa5ffb60439a3e1195d01f827336068c5bbfa2e8a3c5c75b5d
