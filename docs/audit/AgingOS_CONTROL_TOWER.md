@@ -387,3 +387,54 @@ Evidence path:
 
 NO_EVIDENCE in this container:
 - Live dev runtime verification of `GET /anomalies?last=7d` and `GET /proposals?limit=500` post-migration was not executable here due missing runtime DB/docker access.
+
+## Phase 4 — Fixpack-5 (MUST-3 weekly report in Console) — VERIFIED ON DEV — 2026-03-06
+
+Scope: MUST-3 only (weekly report UX + truthful data sourcing + minimal runtime/schema reconciliation required for dev verification).
+
+Final verified status:
+- CHECK-REPORT-01: PASS
+- CHECK-REPORT-02: PASS
+- CHECK-REPORT-03: PASS (dev runtime verified; sparse data rendered truthfully as fallback where applicable)
+
+What is proven on dev:
+- `services/console/report.html` contains a non-technical weekly summary card with exactly:
+  - Data inn
+  - Romdekning
+  - Alarmer
+  - Endringer
+- Each section renders explicit truth mode:
+  - REAL
+  - TEMPLATE/FALLBACK
+  - NO_EVIDENCE
+- `Data inn` / `Romdekning` only qualify as REAL when observed event span is >= 7 days from `/events` timestamps.
+- `weekly_report` is included in exported driftpakke JSON snapshot.
+- Runtime sources now respond on dev without 500/422 blockers:
+  - `GET /events?limit=1000` -> 200
+  - `GET /anomalies?last=7d&limit=2000` -> 200
+  - `GET /proposals?limit=500` -> 200
+
+Fixes required to reach verified PASS:
+- Clamped report `events_limit` to API-safe range `1..1000` to prevent false `422` on `/events`.
+- Added additive schema-reconcile migration:
+  - `backend/alembic/versions/9c5f1a2b7e44_reconcile_weekly_report_runtime_schema.py`
+  - Purpose: align dev DB schema with current runtime expectations for `/anomalies` and `/proposals`
+  - Additive only; no destructive migration
+
+Truth note:
+- Current dev dataset is sparse, so some weekly sections may render `TEMPLATE/FALLBACK` rather than `REAL`.
+- This is expected and truthful, and does not fail MUST-3 as long as the source works and the UI clearly marks the mode.
+
+Evidence path:
+- `docs/audit/verification-2026-03-06-fixpack-5-must-3-weekly-report/`
+
+Key evidence in this fixpack:
+- report sections present in served report page
+- docs/v2 updates for MUST-3
+- events limit clamp proof
+- runtime schema expectation proof
+- rendered migration SQL excerpt
+- dev runtime endpoint proof after migration (`/events`, `/anomalies`, `/proposals` all 200)
+
+PR:
+- PR #36 — Fixpack-5 / MUST-3 weekly report in Console
