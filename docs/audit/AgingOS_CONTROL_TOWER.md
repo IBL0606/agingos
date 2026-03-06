@@ -308,3 +308,34 @@ Evidence pack proposal:
 
 NO_EVIDENCE in this container:
 - Runtime `/health/detail` and live browser rendering checks require running stack/API key not available in this edit-only run.
+
+### Fixpack-4B — MUST-2 Helsestatuskort i Console — READY TO MERGE — 2026-03-06
+Link: https://github.com/IBL0606/agingos/pull/35
+Status: READY TO MERGE
+Branch: pr-35-fixpack-4b
+Head: 04edea3
+
+Scope:
+- Console health card / presentasjon / UX / docs / evidence only.
+- `/health/detail` beholdt som sann backend-kilde.
+- Ingen setup-truth endringer.
+- Ingen backend-kontraktsendringer.
+
+Levert:
+- Nytt health card i `services/console/index.html`
+- G/Y/R overall-status fra `/health/detail`
+- menneskespråk + 1–3 “hva gjør vi”-steg
+- eksplisitt ukjent/mangler-data-håndtering
+- docs/v2 oppdatert
+- evidence path opprettet
+
+Bevist:
+- CHECK-HEALTH-01 PASS
+- CHECK-HEALTH-02 PASS
+- Live UI på devbox viste RØD health card i samsvar med `/health/detail` overall ERROR og ingest ERROR
+- Evidence path: `docs/audit/verification-2026-03-06-fixpack-4b-health-card/`
+
+Truth note:
+- Worker-detaljen i UI rendret `DEGRADED` i live test fordi UI tolker manglende `last_ok_at` strengere enn backend `status=OK`.
+- Overall-kortet og ingest/baseline-delene var sann mot `/health/detail`.
+- Dette er ikke blocker for MUST-2, men bør harmoniseres senere hvis vi vil ha helt ren direkte-mapping.
