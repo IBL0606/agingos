@@ -202,3 +202,26 @@ Rerun same idempotency_key and prove grouped count stays 1:
 Expected outputs:
 - override rerun case: outbox row is `DELIVERED` with non-null `delivered_at`/`acked_at`, and one grouped receipt row (`n=1`).
 - same-key rerun case: grouped receipt row count remains `n=1`.
+
+## Fixpack-7 / MUST-5 — Explainable alarm/anomaly UI checks
+
+CHECK-WHY-01 target:
+- Anomaly/alarm view shows `Hva skjedde`, `Hvorfor uvanlig`, `Datagrunnlag`.
+
+CHECK-WHY-02 target:
+- Missing room context is shown explicitly as `rominfo mangler` and not inferred.
+
+Dev verification performed:
+- `POST /v1/anomalies/run_latest` => 200 OK
+- `GET /v1/anomalies/score?room=stue&bucket_start=2026-03-05T11:00:00Z` => 200 OK with explainability payload
+- Inserted dev-only `door` test events in same bucket, then ran deterministic anomalies job => persisted `YELLOW` anomaly episode
+- `GET /v1/anomalies?last=14d&limit=20` => returned persisted episode row
+- Inserted dev-only anomaly episode copy with empty `room` => runtime list contains missing-room case for UI rendering
+
+Suggested capture commands:
+- `curl -sS -H "X-API-Key: $API_KEY" "http://127.0.0.1:8000/v1/anomalies?last=14d&limit=20"`
+- `curl -sS -H "X-API-Key: $API_KEY" "http://127.0.0.1:8000/v1/anomalies/score?room=stue&bucket_start=2026-03-05T11:00:00Z"`
+- Open Console `anomalies.html`, select persisted episode, and verify the explainability panel text.
+
+NO_EVIDENCE in this container:
+- Browser screenshot/UI capture only.

@@ -76,7 +76,6 @@ def _get_latest_model_end(db: Session, scope: AuthScope) -> Optional[str]:
             SELECT model_end
             FROM baseline_model_status
             WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
-              AND stream_id = :stream_id
             ORDER BY model_end DESC
             LIMIT 1
             """
@@ -85,7 +84,6 @@ def _get_latest_model_end(db: Session, scope: AuthScope) -> Optional[str]:
                 "org_id": scope.org_id,
                 "home_id": scope.home_id,
                 "subject_id": scope.subject_id,
-                "stream_id": os.getenv("AGINGOS_STREAM_ID", "prod"),
             },
         )
         .mappings()
@@ -102,7 +100,7 @@ def _prev_room(db: Session, scope: AuthScope, bucket_start: datetime) -> Optiona
             text(
                 """
             SELECT room
-            FROM episodes
+            FROM anomaly_episodes
             WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
               AND end_ts IS NOT NULL AND end_ts <= :t
             ORDER BY end_ts DESC
@@ -137,10 +135,11 @@ def _observed_activity(
       (event_rate_per_min * overlap_minutes) * weight
     weight = p_human + pet_weight*p_pet + unknown_weight*p_unknown
     """
-    rows = (
-        db.execute(
-            text(
-                """
+    try:
+        rows = (
+            db.execute(
+                text(
+                    """
             SELECT
               start_ts, end_ts, event_rate_per_min,
               class, p_human, p_pet, p_unknown
@@ -152,19 +151,22 @@ def _observed_activity(
               AND end_ts > :start
             ORDER BY start_ts ASC
             """
-            ),
-            {
-                "room": room,
-                "start": start,
-                "end": end,
-                "org_id": scope.org_id,
-                "home_id": scope.home_id,
-                "subject_id": scope.subject_id,
-            },
+                ),
+                {
+                    "room": room,
+                    "start": start,
+                    "end": end,
+                    "org_id": scope.org_id,
+                    "home_id": scope.home_id,
+                    "subject_id": scope.subject_id,
+                },
+            )
+            .mappings()
+            .all()
         )
-        .mappings()
-        .all()
-    )
+    except Exception:
+        db.rollback()
+        rows = []
 
     total = 0.0
     used = 0
@@ -410,10 +412,11 @@ def score_room_bucket(
         )
 
     # Room-bucket baseline
-    b = (
-        db.execute(
-            text(
-                """
+    try:
+        b = (
+            db.execute(
+                text(
+                    """
             SELECT
               activity_median, activity_sigma, activity_support_n, sigma_floor,
               door_median, door_sigma, door_support_n
@@ -426,21 +429,24 @@ def score_room_bucket(
               AND bucket_idx = :bucket_idx
             LIMIT 1
             """
-            ),
-            {
-                "org_id": scope.org_id,
-                "home_id": scope.home_id,
-                "subject_id": scope.subject_id,
-                "model_end": model_end,
-                "dow": dow,
-                "is_weekend": is_weekend,
-                "room": room,
-                "bucket_idx": bucket_idx,
-            },
+                ),
+                {
+                    "org_id": scope.org_id,
+                    "home_id": scope.home_id,
+                    "subject_id": scope.subject_id,
+                    "model_end": model_end,
+                    "dow": dow,
+                    "is_weekend": is_weekend,
+                    "room": room,
+                    "bucket_idx": bucket_idx,
+                },
+            )
+            .mappings()
+            .first()
         )
-        .mappings()
-        .first()
-    )
+    except Exception:
+        db.rollback()
+        b = None
     if not b:
         reasons.append(
             {

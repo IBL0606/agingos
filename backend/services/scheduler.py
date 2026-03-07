@@ -955,7 +955,6 @@ def _anomaly_list_room_ids(db, *, scope: AuthScope) -> list[str]:
             SELECT DISTINCT room_id
             FROM baseline_room_bucket
             WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
-              AND model_end = :model_end
             ORDER BY room_id ASC
             """
             ),
@@ -963,7 +962,6 @@ def _anomaly_list_room_ids(db, *, scope: AuthScope) -> list[str]:
                 "org_id": scope.org_id,
                 "home_id": scope.home_id,
                 "subject_id": scope.subject_id,
-                "model_end": model_end,
             },
         )
         .mappings()

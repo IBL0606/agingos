@@ -611,3 +611,35 @@ Truth boundary:
 - No invented anti-spam system added
 - Verification is dev-only
 - No MiniPC/customer changes
+
+## Phase 4 — Fixpack-7 (MUST-5 explainable alarm UI "why") — 2026-03-07
+
+Scope: STRICTLY MUST-5 explainability on existing anomaly/alarm UI surface (dev-only).
+
+Implemented (repo truth):
+- Updated anomaly episode evidence panel in `services/console/anomalies.html` to render three explicit sections:
+  - `Hva skjedde`
+  - `Hvorfor uvanlig`
+  - `Datagrunnlag`
+- Explainability content is bounded to existing anomaly score payload (`score`, `reasons`, `details.observed`) and does not invent room/cause/baseline.
+- Added explicit missing-room handling text `rominfo mangler` in episode list action column and explanation panel room line.
+- Added events deep-link for supporting data using existing events query pattern when room + bucket exist.
+- Added minimal backend compatibility fixes required for MUST-5 runtime on current dev schema:
+  - `backend/services/anomaly_scoring.py`
+  - `backend/services/scheduler.py`
+- Updated docs truth pointers in `docs/v2/PILOT-ALARMS.md`, `docs/v2/README.md`, `docs/v2/TESTING.md`.
+- Added evidence-pack manifest path:
+  - `docs/audit/verification-2026-03-07-fixpack-7-must-5-explainability/00_manifest.md`
+
+CHECK-WHY status (repo + dev runtime):
+- CHECK-WHY-01: PASS.
+- CHECK-WHY-02: PASS.
+
+Dev runtime evidence:
+- `POST /v1/anomalies/run_latest` => 200 OK
+- `GET /v1/anomalies/score` => 200 OK with explainability payload
+- persisted `YELLOW` anomaly episode created and returned from `GET /v1/anomalies`
+- explicit missing-room runtime case created with empty `room` anomaly episode row
+
+NO_EVIDENCE in this container:
+- Browser screenshot/UI capture only.
