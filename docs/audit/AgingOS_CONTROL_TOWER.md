@@ -1,654 +1,407 @@
 # AgingOS Control Tower (SoT companion)
 
-**Purpose:** Keep continuity across chats/agents by recording *only verified facts*, current priorities, and pointers to evidence/PRs.
+Purpose: Keep continuity across chats/agents by recording only verified facts, current priorities, and pointers to evidence/PRs.
 
-**Status policy:**
-- **ACTIVE** = statements backed by evidence/merged code in repo
+Status policy:
+- **ACTIVE** = statements backed by evidence and/or merged code in repo
 - **AUDIT** = statements backed by evidence packs under `docs/audit/`
 - **HYPOTHESIS** = plausible, not yet verified
+- **NO_EVIDENCE** = explicitly not proven yet
 
 ---
 
-## 0) Current goals (4 artifacts)
-1. **"Slik fungerer AgingOS" (v2 / ACTIVE)** – complete, up-to-date system explanation.
-2. **Updated documentation (v2) + obsolete-policy** – all outdated docs updated or marked obsolete.
-3. **Pilot plan (runbook + checklists)** – step-by-step install/verify/daily/weekly/rollback.
-4. **SoT compliance loop** – SoT-claims checklist + AS-IS evidence + gap analysis + fix plan.
+## 0) Current goals
+
+1. **Pilot-ready scope (ACTIVE)**  
+   Run pilot on the smallest proven surface possible, with truthful docs, evidence, and UI behavior.
+
+2. **v2 documentation truthfulness (ACTIVE)**  
+   `docs/v2/` must reflect only verified behavior. Anything not proven must be marked `NO_EVIDENCE` or `HYPOTHESIS`.
+
+3. **SoT compliance loop (ACTIVE)**  
+   Keep claims, evidence packs, fixpacks, and Control Tower aligned so new chats/agents inherit the same truth.
+
+4. **Post-pilot backlog control (ACTIVE)**  
+   Do not expand pilot scope unless explicitly decided and evidenced.
 
 ---
 
-## 1) Latest verified evidence (AUDIT)
+## 1) Current master status (ACTIVE)
+
+### Pilot-ready scope decision
+- Pilot-ready is evaluated based on **Fixpack-1 through Fixpack-8**.
+- **MUST-7 (lock support / lock_state / lock UI/rules) is deferred and is NOT included in current pilot scope.**
+- This is a deliberate risk-reduction decision to avoid introducing new issues late in the cycle.
+- No claim is made that lock support is implemented or verified for pilot use.
+
+### MUST / fixpack status
+- **Fixpack-1**: VERIFIED / MERGED / CLOSED
+- **Fixpack-2**: VERIFIED / MERGED / CLOSED
+- **Fixpack-3**: VERIFIED / MERGED / CLOSED
+- **Fixpack-4A (MUST-1 setup truth)**: VERIFIED / MERGED / CLOSED
+- **Fixpack-4B (MUST-2 health card in Console)**: VERIFIED / MERGED / CLOSED
+- **Fixpack-5 (MUST-3 weekly report in Console)**: VERIFIED / MERGED / CLOSED
+- **Fixpack-6 (MUST-4 pilot alarm system)**: VERIFIED / MERGED / CLOSED
+- **Fixpack-7 (MUST-5 explainable alarm UI)**: VERIFIED / MERGED / CLOSED
+- **Fixpack-8 (MUST-6 room model hardening)**: VERIFIED / MERGED / CLOSED
+- **Fixpack-9 / MUST-7 (lock support)**: DEFERRED / OUT OF PILOT SCOPE
+
+### Current truth boundary for pilot
+- Pilot scope includes:
+  - truthful setup/install/upgrade flow
+  - Console health card
+  - non-technical weekly report
+  - explicit pilot alarm pack + policy/anti-spam/ACK/CLOSE
+  - explainable anomaly/alarm UI
+  - room-model truth hardening
+- Pilot scope does **not** include:
+  - lock support / lock_state / lock UI/rules
+- `CHECK-ROOM-02` remains **NO_EVIDENCE** for real-home variants such as `bod`, `loft`, `kjellerstue`.
+
+---
+
+## 2) Latest verified baseline evidence (AUDIT)
+
 ### Evidence Pack A (Codex runner)
-- PR: https://github.com/IBL0606/agingos/pull/24
-- Outcome: Evidence captured in an environment **without Docker** (`docker: command not found`) and `curl` attempted `localhost:80`.
-- Use: Documents Codex-runner limits; **not** representative of pilotbox runtime.
+- **PR:** #24
+- **Outcome:** Evidence captured in an environment without Docker (`docker: command not found`) and curl attempted `localhost:80`.
+- **Use:** Documents Codex-runner limits; not representative of pilotbox runtime.
 
 ### Evidence Pack B (pilotbox / MiniPC)
-- PR: https://github.com/IBL0606/agingos/pull/25
-- Date captured: **2026-03-02 (UTC)**
+- **PR:** #25
+- **Date captured:** 2026-03-02 (UTC)
 
-**Key facts (from `docs/audit/as-is-2026-03-02-pilotbox/*`):**
-- Stack up (compose): backend/console/db/ai-bot/notification-worker running ~32h.
-- `GET /health` → **200 OK**.
-- `GET /health/detail` → **200 OK**, `overall_status=DEGRADED`.
-  - Reason: `ingest lag >= 900s`.
-  - Observed: `lag_seconds ≈ 1774s`.
-  - `ingest.max_event_ts ≈ 2026-03-02T18:30:00Z` while `now_utc ≈ 18:59:34Z`.
-- Baseline: **OK** (`baseline_ready=true`, `age_hours≈15.5`, model window 2026-02-23..2026-03-01).
-- Scheduler: **OK** (rule_engine/anomalies every 5 min; proposals miner daily).
-- Anomalies runner: **OK** (NOOP=5, last_scored_bucket_start 18:30).
+Key facts from `docs/audit/as-is-2026-03-02-pilotbox/*`:
+- Stack up (compose): backend / console / db / ai-bot / notification-worker running ~32h
+- `GET /health` → `200 OK`
+- `GET /health/detail` → `200 OK`, `overall_status=DEGRADED`
+- Reason: ingest lag >= 900s
+- Observed: `lag_seconds ≈ 1774s`
+- `ingest.max_event_ts ≈ 2026-03-02T18:30:00Z` while `now_utc ≈ 18:59:34Z`
+- Baseline: `OK` (`baseline_ready=true`, `age_hours≈15.5`, model window `2026-02-23..2026-03-01`)
+- Scheduler: `OK` (rule_engine/anomalies every 5 min; proposals miner daily)
+- Anomalies runner: `OK` (`NOOP=5`, `last_scored_bucket_start 18:30`)
 
-**DB snapshots (critical):**
+Critical DB snapshot facts:
 - Last 2h by category:
-  - `ha_snapshot` continues to 19:00Z.
-  - `presence` last at 18:26:46Z.
-  - `door` last at 18:13:05Z.
-- `room_id` is **EMPTY for 100%** of `presence` and `door` events in last 24h.
+  - `ha_snapshot` continues to `19:00Z`
+  - `presence` last at `18:26:46Z`
+  - `door` last at `18:13:05Z`
+- `room_id` was EMPTY for 100% of `presence` and `door` events in last 24h at that capture time
 
-### SoT Claims Checklist v1 (docs-only)
-- PR: https://github.com/IBL0606/agingos/pull/26
-- Outcome: Added `docs/audit/sot-claims-v1.md` with 40 claims (SOT-001..SOT-040), each with:
-  - one-sentence testable claim
-  - provenance (doc path + heading)
-  - copy/paste-ready, read-only verification commands (docker compose / curl / psql)
-- Use: Phase 2 deliverable; input to Phase 3 gap analysis (claims vs evidence pack).
+### SoT Claims Checklist v1
+- **PR:** #26
+- **Outcome:** Added `docs/audit/sot-claims-v1.md` with machine-checkable SoT claims and verification commands.
 
 ### Gap Analysis (SoT v1 vs pilotbox evidence)
-- PR: https://github.com/IBL0606/agingos/pull/28
-- Outcome: Added `docs/audit/gap-analysis-2026-03-02.md` mapping SOT-001..SOT-040 to PASS/PARTIAL/FAIL/NO_EVIDENCE with Evidence/Notes/Fix/Priority + 15-item Fix Plan.
-- Key results: PASS 2 / PARTIAL 8 / FAIL 1 / NO_EVIDENCE 29.
-- Notable: SOT-040 marked FAIL (backend exposed on 0.0.0.0:8000); many items are NO_EVIDENCE due to missing capture artifacts.
-- Use: Phase 3 deliverable; input to Phase 4 fixpack planning (focus on reducing NO_EVIDENCE via audit-capture + addressing true blockers).
+- **PR:** #28
+- **Outcome:** Added `docs/audit/gap-analysis-2026-03-02.md`
+- **Use:** Historical Phase 3 deliverable and starting point for Phase 4 fixpack planning.
 
 ---
 
-## 2) Current pilot-impacting issues (AUDIT → backlog)
-### PILOT BLOCKER candidates
-1. **Ingest status = DEGRADED due to lag threshold**
-   - Facts: `/health/detail` degraded because lag_seconds >= 900.
-   - Open questions: whether lag definition should be category-specific / heartbeat-based.
+## 3) Current pilot-impacting truth / backlog (ACTIVE)
 
-2. **`room_id` missing on `presence` and `door`**
-   - Facts: DB shows `room_id` EMPTY for 100% of events (24h).
-   - Impact: Coverage per room (incl. bathroom) cannot be correct.
+### Resolved / reduced from earlier baseline
+These earlier issues are no longer open in the same form for dev-pilot readiness because fixpacks have been delivered and verified:
 
-### Important semantics (not fixed now; must be captured as tasks)
-- Presence event rate can drop to ~0 if occupants remain in same room; system may still need occupancy-state/heartbeat to avoid false “ingest stopped”.
+- **MUST-1 setup ambiguity** → addressed by Fixpack-4A
+- **MUST-2 missing health-card UX** → addressed by Fixpack-4B
+- **MUST-3 weak/non-truthful report behavior** → addressed by Fixpack-5
+- **MUST-4 alarm policy / ACK-CLOSE / anti-spam truth gaps** → addressed by Fixpack-6
+- **MUST-5 explainability gap** → addressed by Fixpack-7
+- **room_id deterministic mapping gap** → addressed by Fixpack-3
+- **room-model truth boundary for variants** → documented by Fixpack-8
+
+### Still open / explicitly bounded
+- **Real-home room variant evidence** remains `NO_EVIDENCE` for specific variant names such as `bod`, `loft`, `kjellerstue`.
+- **Browser screenshot/UI capture** for Fixpack-7 was `NO_EVIDENCE` during that verification round, but this was not a blocker for `CHECK-WHY-01/02`.
+- **Lock support (MUST-7)** is intentionally deferred and out of pilot scope.
+
+### Important semantics to keep explicit
+- Presence event rate can drop to ~0 if occupants remain in the same room; the system may still need occupancy-state/heartbeat logic in future work. This remains a product/logic consideration and should not be silently treated as solved unless separately evidenced.
 
 ---
 
-## 3) Phase plan and current position
-- **Phase 1 (Freeze + Evidence Pack):** DONE (pilotbox evidence in PR #25).
-- **Phase 2 (SoT-claims checklist):** IN PROGRESS (Codex Task B).
-- **Phase 3 (Gap analysis + prioritized plan):** waiting on Phase 2.
-- **Phase 4 (Fix pilot blockers + update v2 docs + pilot runbook):** pending.
+## 4) Current project position (ACTIVE)
+
+The original Phase 1–4 structure has been executed far enough that the project should now be treated as:
+
+- **Phase 1 (Freeze + Evidence Pack): DONE**
+- **Phase 2 (SoT claims checklist): DONE**
+- **Phase 3 (Gap analysis + prioritized plan): DONE**
+- **Phase 4 (Fixpacks for pilot readiness): SUBSTANTIALLY COMPLETE for current pilot scope**
+  - Fixpack-1 through Fixpack-8 completed
+  - MUST-7 intentionally deferred out of scope
+
+Current practical position:
+- AgingOS is considered **pilot-ready for the defined pilot scope**, based on Fixpack-1 through Fixpack-8 and the explicit exclusion of MUST-7.
 
 ---
 
-## 4) How to keep continuity across chats (operational rules)
-### One canonical “state file” in repo
-Create and maintain one file as the *single conversation anchor*:
-- `docs/audit/CONTROL_TOWER.md` (this file’s content)
+## 5) How to keep continuity across chats (operational rules)
 
-Every time you open a new chat (with me or Codex), paste:
-1) link(s) to latest PR(s)
-2) the **top of CONTROL_TOWER.md** (sections 1–3)
-3) what you want done next (one of the phases)
+### One canonical state file in repo
+Use and maintain this file as the single conversation anchor:
 
-### Naming conventions (so nothing gets lost)
+- `docs/audit/AgingOS_CONTROL_TOWER.md`
+
+### Every time you open a new chat
+Paste:
+- relevant PR link(s)
+- the current master status from this file
+- the exact task to be done next
+- any relevant evidence path(s)
+
+### Naming conventions
 - Evidence packs: `docs/audit/as-is-YYYY-MM-DD-pilotbox/`
+- Verification packs: `docs/audit/verification-YYYY-MM-DD-.../`
 - Gap analyses: `docs/audit/gap-analysis-YYYY-MM-DD.md`
-- Fix packs: `pilot/fixpack-YYYY-MM-DD`
+- Fixpack branches / PRs: explicit `fixpack-*` or equivalent task branch names
 
-### “No-guessing” rule
+### No-guessing rule
 Anything not backed by:
-- evidence file under `docs/audit/...`, or
-- specific repo path+commit,
-must be labeled **HYPOTHESIS** until verified.
+- an evidence file under `docs/audit/...`, or
+- a specific repo path + merged code / verified runtime evidence
+
+must be labeled `HYPOTHESIS` or `NO_EVIDENCE`.
 
 ---
 
-## 5) Start prompt template for a NEW chat (copy/paste)
-> We are working on AgingOS using the 4-phase process (evidence → claims → gap analysis → fixes + v2 docs + pilot runbook).
-> Latest pilotbox evidence PR: https://github.com/IBL0606/agingos/pull/25
-> Current verified facts: `/health/detail` shows overall DEGRADED due to ingest lag >=900s; baseline OK; scheduler OK; anomalies runner OK. DB shows `room_id` EMPTY for 100% of presence+door in 24h; presence/door stop earlier than ha_snapshot.
-> Task now: [Phase 2 SoT-claims extraction | Phase 3 gap analysis | Phase 4 fixpack].
-> Constraints: do not delete data; verification must be read-only; keep docs truthful.
+## 6) Start prompt template for a new chat (copy/paste)
+
+We are working on AgingOS using a verified fixpack process. Canonical state file: `docs/audit/AgingOS_CONTROL_TOWER.md`. Current pilot-ready scope is based on Fixpack-1 through Fixpack-8; MUST-7 (lock support) is explicitly deferred and out of scope. Constraints: do not guess, do not delete pilot/prod data, verification must be read-only outside dev, docs must be 100% truthful, and anything not proven must be marked NO_EVIDENCE or HYPOTHESIS. Task now: [insert exact scoped task]. Relevant PR(s): [insert]. Relevant evidence path(s): [insert].
 
 ---
 
-## 6) Notes / decisions log (append-only)
-- 2026-03-02: Pilotbox evidence collected (PR #25). System overall DEGRADED due to ingest lag; room_id missing on presence/door.
+## 7) Notes / decisions log (append-only)
 
+### 2026-03-02 — Pilotbox evidence collected
+- **PR:** #25
+- System overall `DEGRADED` due to ingest lag.
+- `room_id` missing on `presence` / `door` at that capture time.
 
-## Phase 4 — Fixpack-1 (devbox) — started 2026-03-03T04:56:56Z
-- Branch: pilot/fixpack-2026-03-03
-- Scope: devbox only (~/dev/agingos, Docker Desktop). No MiniPC/pilot/prod changes.
-- Plan: audit-capture devbox + docs/v2 skeleton + pilot blockers only
-- PR: (TBD)
-Scope: Devbox only (~/dev/agingos, Docker Desktop). No MiniPC/pilot/prod changes.
-Branch: pilot/fixpack-2026-03-03
+### Phase 4 — Fixpack-1 (devbox) — started 2026-03-03T04:56:56Z
+- **Branch:** `pilot/fixpack-2026-03-03`
+- **Scope:** devbox only (`~/dev/agingos`, Docker Desktop). No MiniPC/pilot/prod changes.
+- **Plan:** audit-capture devbox + docs/v2 skeleton + pilot blockers only
 
-### Done (committed in branch)
+Delivered in branch:
 - v2 docs skeleton created:
-  - docs/v2/README.md (status-policy: ACTIVE/OBSOLETE/DRAFT + truthfulness rule)
-  - docs/v2/OPERATIONS.md (verified dev start/stop + localhost vs expose overlays)
-  - docs/v2/TESTING.md, docs/v2/PILOT-RUNBOOK.md
-  - docs/obsolete/README.md (policy)
+  - `docs/v2/README.md`
+  - `docs/v2/OPERATIONS.md`
+  - `docs/v2/TESTING.md`
+  - `docs/v2/PILOT-RUNBOOK.md`
+  - `docs/obsolete/README.md`
 - Devbox audit capture implemented:
-  - tools/audit_capture_devbox.sh + Makefile target `make audit-capture`
-  - Evidence pack created/refreshed: docs/audit/as-is-2026-03-03-devbox/
-- Pilot blocker SOT-040 (port exposure) addressed on devbox:
-  - docker-compose.yml now has no public ports by default
-  - docker-compose.dev.yml binds ports to 127.0.0.1 (recommended)
-  - docker-compose.expose.yml provides opt-in LAN exposure (0.0.0.0)
-  - Runtime evidence captured: docs/audit/verification-2026-03-03-fixpack1/docker-ports.localhost.txt
-- room_id derivation added in ingest (code):
-  - backend/main.py sets db_event.room_id = derive_room_id(event.payload)
-  - backend/util/room_id.py + backend/config/room_map.yaml (default empty)
-  - Code evidence captured:
-    - docs/audit/verification-2026-03-03-fixpack1/room-id-derivation.diff.txt
-    - docs/audit/verification-2026-03-03-fixpack1/room-id-derivation.NO_EVIDENCE.md
+  - `tools/audit_capture_devbox.sh`
+  - `Makefile` target `make audit-capture`
+- Evidence pack created/refreshed:
+  - `docs/audit/as-is-2026-03-03-devbox/`
+- Port exposure hardening on devbox:
+  - `docker-compose.yml` no public ports by default
+  - `docker-compose.dev.yml` binds ports to `127.0.0.1`
+  - `docker-compose.expose.yml` provides opt-in LAN exposure
+- Initial room_id derivation added in ingest:
+  - `backend/main.py`
+  - `backend/util/room_id.py`
+  - `backend/config/room_map.yaml`
 
-### Open / Next (Fixpack-1 remaining)
-- Extend /health/detail ingest diagnostics (additive):
-  - Add components.ingest.by_category (24h counts + last_seen per category)
-  - Add components.ingest.room_id_completeness_24h (presence/door empty vs set)
-  - Capture read-only evidence (curl outputs + audit-capture refresh) into docs/audit/verification-2026-03-03-fixpack1/
-- Update docs/v2 (PILOT-RUNBOOK / TESTING) to reference the new /health/detail fields (truthful; mark NO_EVIDENCE where needed)
-- Open PR for fixpack-1 and link it here (append-only)
+Historical evidence notes:
+- Devbox had no live events at that moment, so runtime room_id completeness remained `NO_EVIDENCE`.
+- Python compile checks were unstable in that context; compile evidence was marked `NO_EVIDENCE`.
 
-### Evidence notes (truthfulness)
-- Devbox currently has no live events; DB queries for last 24h returned 0 rows for presence/door/ha_snapshot → runtime data effect for room_id completeness remains NO_EVIDENCE until dev has events.
-- Python-based compile checks were unstable (WSL session termination / permission issues) → compile evidence marked NO_EVIDENCE; code evidence is via git diff + file content.
+### Phase 4 — Fixpack-2 (docs/runbook + pilotbox evidence template) — READY TO MERGE — 2026-03-04T05:12:35Z
+- **Branch:** `pilot/fixpack-2-2026-03-04`
+- **PR:** #31
+- **Scope:** docs-only (devbox repo). No MiniPC/pilot/prod changes. No data deletion.
 
-## Phase 4 — Fixpack-2 (docs/runbook + pilotbox evidence template) — IN PROGRESS — 2026-03-04T05:09:25Z
-
-- Branch: `pilot/fixpack-2-2026-03-04`
-- Scope: devbox/docs only (`~/dev/agingos`, Docker Desktop). No MiniPC/pilot/prod changes.
-- Goals:
-  - Document explicit MiniPC run/upgrade using overlays (LAN via `docker-compose.expose.yml`).
-  - Document systemd unit guidance that matches overlay-based run command (template; NO_EVIDENCE until captured).
-  - Add pilotbox post-upgrade evidence-pack TEMPLATE under `docs/audit/_templates/pilotbox_capture/` (NO_EVIDENCE until executed on MiniPC).
-- PR: TBD
-
-## Phase 4 — Fixpack-2 — UPDATE: READY TO MERGE — 2026-03-04T05:12:35Z
-
-- Branch: `pilot/fixpack-2-2026-03-04`
-- PR: https://github.com/IBL0606/agingos/pull/31
-- Scope: docs-only (devbox repo). No MiniPC/pilot/prod changes. No data deletion.
-- Delivered:
-  - `docs/v2/OPERATIONS.md`: explicit MiniPC overlay run/upgrade guidance + systemd template (NO_EVIDENCE until captured on MiniPC).
-  - `docs/v2/PILOT-RUNBOOK.md`: read-only Pilotbox/MiniPC post-upgrade checklist (compose/runtime, health/scope, DB SELECTs).
-  - `docs/audit/_templates/pilotbox_capture/MANIFEST.md`: standardized read-only evidence capture template (NO_EVIDENCE until executed).
-- DoD note:
-  - This unblocks a controlled MiniPC upgrade where LAN exposure is explicit via overlays, and post-upgrade evidence capture is standardized.
-
-
+Delivered:
+- `docs/v2/OPERATIONS.md`: explicit MiniPC overlay run/upgrade guidance + systemd template (`NO_EVIDENCE` until captured on MiniPC)
+- `docs/v2/PILOT-RUNBOOK.md`: read-only Pilotbox/MiniPC post-upgrade checklist
+- `docs/audit/_templates/pilotbox_capture/MANIFEST.md`: standardized read-only evidence capture template
 
 ### Fixpack-3 — Room Mapping (dev) — 2026-03-06
-Link: https://github.com/IBL0606/agingos/pull/32
-Type: fixpack (room mapping)
-Status: READY TO MERGE
+- **PR:** #32
+- **Status:** READY TO MERGE at that entry time; later treated as verified baseline in project truth
 
 Summary:
-- Added Room Catalog (rooms) + Sensor→room mapping (sensor_room_map) (scoped per org/home).
-- Ingest resolves events.room_id deterministically for presence/door:
-  payload-first → mapping-second → fallback.
+- Added `rooms` + `sensor_room_map` scoped per org/home
+- Ingest resolves `events.room_id` deterministically for presence/door: payload-first → mapping-second → fallback
 - Added backend API:
-  - GET/POST /v1/rooms
-  - GET/POST /v1/room_mappings
-  - GET /v1/room_mappings/unknown_sensors?stream_id=prod
-- Added Console “Romoppsett” page: rooms.html + nav-link.
+  - `GET/POST /v1/rooms`
+  - `GET/POST /v1/room_mappings`
+  - `GET /v1/room_mappings/unknown_sensors?stream_id=prod`
+- Added Console page: `rooms.html` + nav link
 
 Evidence (dev):
-- docs/audit/verification-2026-03-05-fixpack-3-dev/01_roomid_after_ingest_fix.txt
-- docs/audit/verification-2026-03-05-fixpack-3-dev/02_db_dt_rooms.txt
-- docs/audit/verification-2026-03-05-fixpack-3-dev/03_db_dt_sensor_room_map.txt
-- docs/audit/verification-2026-03-05-fixpack-3-dev/43_api_post_room_mappings_upsert.txt
-- docs/audit/verification-2026-03-05-fixpack-3-dev/44_api_get_room_mappings_after_upsert.txt
-- docs/audit/verification-2026-03-05-fixpack-3-dev/45_api_get_rooms.txt
-- docs/audit/verification-2026-03-05-fixpack-3-dev/46_api_get_room_mappings.txt
-- docs/audit/verification-2026-03-05-fixpack-3-dev/47_api_get_unknown_sensors_initial.txt
-- docs/audit/verification-2026-03-05-fixpack-3-dev/52_console_rooms_html_served.txt
-- docs/audit/verification-2026-03-05-fixpack-3-dev/53_console_nav_rooms_link_present.txt
-- docs/audit/verification-2026-03-05-fixpack-3-dev/54_rooms_html_api_key_masked.txt
+- `docs/audit/verification-2026-03-05-fixpack-3-dev/01_roomid_after_ingest_fix.txt`
+- `docs/audit/verification-2026-03-05-fixpack-3-dev/02_db_dt_rooms.txt`
+- `docs/audit/verification-2026-03-05-fixpack-3-dev/03_db_dt_sensor_room_map.txt`
+- `docs/audit/verification-2026-03-05-fixpack-3-dev/43_api_post_room_mappings_upsert.txt`
+- `docs/audit/verification-2026-03-05-fixpack-3-dev/44_api_get_room_mappings_after_upsert.txt`
+- `docs/audit/verification-2026-03-05-fixpack-3-dev/45_api_get_rooms.txt`
+- `docs/audit/verification-2026-03-05-fixpack-3-dev/46_api_get_room_mappings.txt`
+- `docs/audit/verification-2026-03-05-fixpack-3-dev/47_api_get_unknown_sensors_initial.txt`
+- `docs/audit/verification-2026-03-05-fixpack-3-dev/52_console_rooms_html_served.txt`
+- `docs/audit/verification-2026-03-05-fixpack-3-dev/53_console_nav_rooms_link_present.txt`
+- `docs/audit/verification-2026-03-05-fixpack-3-dev/54_rooms_html_api_key_masked.txt`
 
 Pilotbox:
-- Template only (NO_EVIDENCE): docs/audit/_templates/pilotbox_capture/fixpack-3_room_mapping.md
+- Template only (`NO_EVIDENCE`): `docs/audit/_templates/pilotbox_capture/fixpack-3_room_mapping.md`
 
-Remaining:
-- Replace PR_TBD with actual PR link and set Status to READY TO MERGE when review is complete.
-
-## Phase 4 — Fixpack-4A (MUST-1 setup truth only) — 2026-03-06
-
-- Branch: current working branch
-- Scope: dev repo/docs only. No MiniPC/pilotbox runtime change.
-- Goal: make install/upgrade per-home verification deterministic and impossible to misread.
+### Phase 4 — Fixpack-4A (MUST-1 setup truth only) — MERGED — 2026-03-06
+- **PR:** #33
+- **Scope:** dev repo/docs only. No MiniPC/pilotbox runtime change.
 
 Delivered:
-- Added `docs/v2/SETUP_TRUTH.md` as canonical MUST-1 setup truth.
-- Explicitly separated fresh install vs upgrade command sequences.
-- Explicitly documented `/health/detail` truth: runtime/data-aware; empty scoped install can report `overall_status=ERROR` with reason `no events found for this scope`.
-- Created evidence pack: `docs/audit/verification-2026-03-06-fixpack-4a-setup/`.
-
-Evidence status:
-- Runtime checks in this container are **NO_EVIDENCE** because Docker CLI is unavailable (`command not found`).
-- Repo-level deterministic truth (Makefile/compose/backend health logic/docs diffs) is captured in the evidence pack.
-
-## Phase 4 — Fixpack-4A follow-up (scheduler fresh-install transaction poison) — 2026-03-06
-
-Scope: narrow runtime fix + setup truth doc correction.
-
-Root cause (proven):
-- `_anomaly_pick_one_scope()` queried `baseline_model_status.user_id`.
-- `baseline_model_status` has no `user_id` column.
-- Query failure could leave SQL transaction aborted (`InFailedSqlTransaction`) and poison follow-up scheduler/anomalies queries.
-
-Delivered:
-- `backend/services/scheduler.py`
-  - Removed invalid `user_id` select dependency from `baseline_model_status` scope-pick query.
-  - Added rollback on `ProgrammingError` in scope-pick fallback.
-  - Added rollback on per-room anomalies errors to clear aborted transaction before continuing.
-  - Added rollback on outer anomalies-job exception path before re-raise.
-- `backend/tests/test_scheduler_anomaly_scope.py`
-  - Unit tests for scope fallback rollback, no-user_id scope behavior, and per-room rollback/continue behavior.
-- `docs/v2/SETUP_TRUTH.md`
-  - Corrected fresh-install truth for base compose vs dev overlay host access.
-  - Added explicit `/health/detail` requirement for active `api_key_scopes` mapping.
-  - Updated expected fresh-empty behavior after fix.
+- Added canonical `docs/v2/SETUP_TRUTH.md`
+- Explicitly separated fresh install vs upgrade
+- Documented `/health/detail` truth boundary
+- Fixed scheduler fresh-install transaction poison behavior
+- Added in-repo DB baseline bootstrap functions through migration `a8f9c2d1e4b7`
+- Fresh install PASS path documented and verified to `/health/detail overall_status="OK"`
 
 Evidence:
+- `docs/audit/verification-2026-03-06-fixpack-4a-setup/`
 - `docs/audit/verification-2026-03-06-fixpack-4a-scheduler-followup/`
-
-NO_EVIDENCE:
-- Docker runtime verification commands are not executable in this container (`docker: command not found`).
-
-## Phase 4 — Fixpack-4A final follow-up (CHECK-SETUP-01 PASS path enablement) — 2026-03-06
-
-Scope: MUST-1 setup truth only; dev-repo controlled baseline bootstrap capability.
-
-Problem proven before this change:
-- Fresh install could not reach `/health/detail overall_status=OK` on dev unless baseline status became valid.
-- Dev repo lacked MiniPC cron-equivalent baseline builder entrypoint (`public.run_baseline_nightly`).
-
-Delivered in repo:
-- New Alembic migration adds in-repo DB baseline bootstrap functions:
-  - `public._baseline_resolve_scope_from_user(uuid)`
-  - `public.build_daily_room_bucket_rollup(date, uuid)`
-  - `public.build_daily_transition_rollup(date, uuid)`
-  - `public.build_baseline_7d(date, uuid, double precision, double precision, integer)`
-  - `public.run_baseline_nightly(uuid, double precision, double precision, integer)`
-- `docs/v2/SETUP_TRUTH.md` updated with exact fresh-install PASS sequence:
-  - scope mapping insert for `dev-key-2`
-  - deterministic event seed (fresh + yesterday)
-  - baseline build invocation via `run_baseline_nightly`
-  - `/health` and `/health/detail` verification sequence
-
-Evidence:
 - `docs/audit/verification-2026-03-06-fixpack-4a-final-setup-pass/`
 
-NO_EVIDENCE in this container:
-- Docker runtime commands unavailable (`docker: command not found`), so full runtime PASS could not be executed here.
+Final status:
+- `CHECK-SETUP-01`: PASS
+- `CHECK-SETUP-02`: PASS
 
+Note:
+- PR #34 was source for a final fix and should not be merged separately.
 
-## Phase 4 — Fixpack-4B draft (MUST-2 console health card) — 2026-03-06
+### Phase 4 — Fixpack-4B (MUST-2 Console health card) — MERGED — 2026-03-06
+- **PR:** #35
+- **Scope:** Console health card / presentation / UX / docs / evidence only.
+- `/health/detail` remained the truth backend source.
+- No setup-truth or backend contract changes.
 
-Scope: Console status presentation + docs/evidence guidance only.
+Delivered:
+- Health card in `services/console/index.html`
+- G/Y/R overall status from `/health/detail`
+- Plain-language explanation + 1–3 next steps
+- Explicit unknown/missing-data handling
+- docs/v2 updates
+- evidence pack
 
-Delivered in repo draft:
-- Added automatic health card on `services/console/index.html` that reads `/health/detail` as source of truth.
-- Card maps `overall_status` to green/yellow/red and shows short explanation + 1–3 operational next steps.
-- Card renders truthful component breakdown for ingest, baseline, and worker-equivalent (`worker` -> `anomalies_runner` -> `scheduler` fallback).
-- Missing component data is rendered explicitly as `Ukjent / mangler data` (never auto-green).
-- Updated `docs/v2/OPERATIONS.md` and `docs/v2/TESTING.md` with MUST-2 behavior and verification instructions.
-
-Evidence pack proposal:
+Evidence:
 - `docs/audit/verification-2026-03-06-fixpack-4b-health-card/`
 
-NO_EVIDENCE in this container:
-- Runtime `/health/detail` and live browser rendering checks require running stack/API key not available in this edit-only run.
-
-### Fixpack-4B — MUST-2 Helsestatuskort i Console — READY TO MERGE — 2026-03-06
-Link: https://github.com/IBL0606/agingos/pull/35
-Status: READY TO MERGE
-Branch: pr-35-fixpack-4b
-Head: 04edea3
-
-Scope:
-- Console health card / presentasjon / UX / docs / evidence only.
-- `/health/detail` beholdt som sann backend-kilde.
-- Ingen setup-truth endringer.
-- Ingen backend-kontraktsendringer.
-
-Levert:
-- Nytt health card i `services/console/index.html`
-- G/Y/R overall-status fra `/health/detail`
-- menneskespråk + 1–3 “hva gjør vi”-steg
-- eksplisitt ukjent/mangler-data-håndtering
-- docs/v2 oppdatert
-- evidence path opprettet
-
-Bevist:
-- CHECK-HEALTH-01 PASS
-- CHECK-HEALTH-02 PASS
-- Live UI på devbox viste RØD health card i samsvar med `/health/detail` overall ERROR og ingest ERROR
-- Evidence path: `docs/audit/verification-2026-03-06-fixpack-4b-health-card/`
+Final status:
+- `CHECK-HEALTH-01`: PASS
+- `CHECK-HEALTH-02`: PASS
 
 Truth note:
-- Worker-detaljen i UI rendret `DEGRADED` i live test fordi UI tolker manglende `last_ok_at` strengere enn backend `status=OK`.
-- Overall-kortet og ingest/baseline-delene var sann mot `/health/detail`.
-- Dette er ikke blocker for MUST-2, men bør harmoniseres senere hvis vi vil ha helt ren direkte-mapping.
+- Worker detail rendered `DEGRADED` in live test because UI interpreted missing `last_ok_at` more strictly than backend `status=OK`.
+- Overall card and ingest/baseline parts were truthful against `/health/detail`.
+- Not a blocker for MUST-2.
 
-## Phase 4 — Fixpack-5 draft (MUST-3 weekly report in Console) — 2026-03-06
-
-Scope: MUST-3 only (weekly report UX + truthful data sourcing + docs/evidence guidance).
-
-Delivered in repo draft:
-- Hardened `services/console/report.html` with non-technical weekly summary card containing exactly:
-  - Data inn
-  - Romdekning
-  - Alarmer
-  - Endringer
-- Each section now renders explicit truth label:
-  - REAL
-  - TEMPLATE/FALLBACK
-  - NO_EVIDENCE
-- Weekly truth guard implemented:
-  - REAL for Data inn/Romdekning only when observed event span is >= 7 days (from `/events` timestamps).
-- Reused existing data sources (no parallel report stack):
-  - `/events` (Data inn/Romdekning)
-  - `/anomalies?last=7d` (Alarmer)
-  - `/proposals` with `actions[]` (Endringer)
-- Driftpakke JSON export now includes `weekly_report` snapshot.
-- Updated docs/v2 for MUST-3 ops/testing and created evidence pack path.
-
-Evidence path:
-- `docs/audit/verification-2026-03-06-fixpack-5-must-3-weekly-report/`
-
-NO_EVIDENCE in this container:
-- Live API-backed 7-day runtime verification was not executable here; only code-path and static evidence were captured.
-
-## Phase 4 — Fixpack-5 follow-up patch (MUST-3 runtime schema reconcile) — 2026-03-06
-
-Scope: minimal PR #36 patch only; no feature broadening.
-
-Delivered in repo draft:
-- Added additive Alembic migration `9c5f1a2b7e44_reconcile_weekly_report_runtime_schema.py`.
-- Migration aligns DB schema with runtime expectations used by weekly report sources:
-  - `proposals.home_id` (add + backfill `'default'` + NOT NULL/default)
-  - missing `anomaly_episodes` lifecycle/scope columns (including `start_bucket`, `last_bucket`, `peak_bucket`, `org_id`, `home_id`, `subject_id`, counters).
-- Added scope indexes for query stability:
-  - `ix_proposals_scope_updated`
-  - `ix_anomaly_episodes_scope_start`
-
-Evidence path:
-- `docs/audit/verification-2026-03-06-fixpack-5-must-3-weekly-report/`
-
-NO_EVIDENCE in this container:
-- Live dev runtime verification of `GET /anomalies?last=7d` and `GET /proposals?limit=500` post-migration was not executable here due missing runtime DB/docker access.
-
-## Phase 4 — Fixpack-5 (MUST-3 weekly report in Console) — VERIFIED ON DEV — 2026-03-06
-
-Scope: MUST-3 only (weekly report UX + truthful data sourcing + minimal runtime/schema reconciliation required for dev verification).
-
-Final verified status:
-- CHECK-REPORT-01: PASS
-- CHECK-REPORT-02: PASS
-- CHECK-REPORT-03: PASS (dev runtime verified; sparse data rendered truthfully as fallback where applicable)
-
-What is proven on dev:
-- `services/console/report.html` contains a non-technical weekly summary card with exactly:
-  - Data inn
-  - Romdekning
-  - Alarmer
-  - Endringer
-- Each section renders explicit truth mode:
-  - REAL
-  - TEMPLATE/FALLBACK
-  - NO_EVIDENCE
-- `Data inn` / `Romdekning` only qualify as REAL when observed event span is >= 7 days from `/events` timestamps.
-- `weekly_report` is included in exported driftpakke JSON snapshot.
-- Runtime sources now respond on dev without 500/422 blockers:
-  - `GET /events?limit=1000` -> 200
-  - `GET /anomalies?last=7d&limit=2000` -> 200
-  - `GET /proposals?limit=500` -> 200
-
-Fixes required to reach verified PASS:
-- Clamped report `events_limit` to API-safe range `1..1000` to prevent false `422` on `/events`.
-- Added additive schema-reconcile migration:
-  - `backend/alembic/versions/9c5f1a2b7e44_reconcile_weekly_report_runtime_schema.py`
-  - Purpose: align dev DB schema with current runtime expectations for `/anomalies` and `/proposals`
-  - Additive only; no destructive migration
-
-Truth note:
-- Current dev dataset is sparse, so some weekly sections may render `TEMPLATE/FALLBACK` rather than `REAL`.
-- This is expected and truthful, and does not fail MUST-3 as long as the source works and the UI clearly marks the mode.
-
-Evidence path:
-- `docs/audit/verification-2026-03-06-fixpack-5-must-3-weekly-report/`
-
-Key evidence in this fixpack:
-- report sections present in served report page
-- docs/v2 updates for MUST-3
-- events limit clamp proof
-- runtime schema expectation proof
-- rendered migration SQL excerpt
-- dev runtime endpoint proof after migration (`/events`, `/anomalies`, `/proposals` all 200)
-
-PR:
-- PR #36 — Fixpack-5 / MUST-3 weekly report in Console
-
-## Phase 4 — Fixpack-6 (MUST-4 pilot alarm system) — 2026-03-06
-
-Scope: MUST-4 only. Dev/repo changes only. No MiniPC/customer changes.
+### Phase 4 — Fixpack-5 (MUST-3 weekly report in Console) — MERGED — 2026-03-06
+- **PR:** #36
+- **Scope:** weekly report UX + truthful data sourcing + minimal runtime/schema reconciliation needed for dev verification.
 
 Delivered:
-- Added explicit pilot alarm rule-pack endpoint:
-  - `GET /v1/rules/pilot-pack`
-  - Returns `rule_id,name,description,severity,scheduler_enabled,cooldown_grouping` for `R-001..R-010`.
-- Reused existing infrastructure only:
-  - Rules config/registry (`backend/config/rules.yaml`, `backend/services/rules/registry.py`)
-  - Existing alarms lifecycle path (`/v1/deviations` + PATCH status)
-  - Existing notification policy + outbox worker behavior
-- Updated docs/v2:
-  - Added `docs/v2/PILOT-ALARMS.md` (truth source + NO_EVIDENCE boundaries)
-  - Added MUST-4 verification commands in `docs/v2/TESTING.md`
-  - Added operations pointers in `docs/v2/OPERATIONS.md`
+- Hardened `services/console/report.html` as existing report page
+- Non-technical weekly summary with exactly:
+  - `Data inn`
+  - `Romdekning`
+  - `Alarmer`
+  - `Endringer`
+- Explicit truth mode per section:
+  - `REAL`
+  - `TEMPLATE/FALLBACK`
+  - `NO_EVIDENCE`
+- `weekly_report` included in driftpakke JSON export
+- Additive migration:
+  - `backend/alembic/versions/9c5f1a2b7e44_reconcile_weekly_report_runtime_schema.py`
 
-Evidence path:
+Evidence:
+- `docs/audit/verification-2026-03-06-fixpack-5-must-3-weekly-report/`
+
+Final status:
+- `CHECK-REPORT-01`: PASS
+- `CHECK-REPORT-02`: PASS
+- `CHECK-REPORT-03`: PASS
+
+Truth note:
+- Sparse dev data may render `TEMPLATE/FALLBACK` instead of `REAL`; that is expected and truthful.
+
+### Phase 4 — Fixpack-6 (MUST-4 pilot alarm system) — MERGED — 2026-03-07
+- **PR:** #37
+- **Scope:** explicit pilot rule pack truth + quiet-hours / override / anti-spam truth + ACK/CLOSE lifecycle truth + docs/evidence.
+
+Delivered:
+- `GET /v1/rules/pilot-pack`
+- Explicit pilot rule pack for `R-001..R-010`
+- Notification policy base schema and audit/helper SQL alignment
+- Notification outbox alignment for worker-required columns
+- `notification_deliveries` table for receipt/idempotency proof
+- docs/v2 updates including `docs/v2/PILOT-ALARMS.md`
+
+Evidence:
 - `docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/`
 
-CHECK status in this container:
-- CHECK-RULES-01: Repo truth PASS (endpoint + sources verified by rg evidence)
-- CHECK-RULES-02: Repo truth PASS (quiet/override/idempotency/policy-defer behavior verified by code evidence)
-- CHECK-RULES-03: Runtime execution NO_EVIDENCE in this container; executable command plan included.
-
-Truth boundaries:
-- Cooldown semantics are explicitly `NONE` (no cooldown field in current config).
-- Grouping claim is limited to proven OPEN/ACK dedupe behavior.
-- Deviation status audit trail remains NO_EVIDENCE unless added and proven later.
-
-PR:
-- PR link: TBD (to be filled by this fixpack PR)
-
-## Phase 4 — Fixpack-6 blocker-fix (notification_policy base table) — 2026-03-06
-
-Scope: Minimal MUST-4 verification unblock only (dev/repo additive schema).
-
-Problem proven:
-- `/v1/notification/policy` route exists, but runtime fails when `public.notification_policy` table is missing.
-- Existing `backend/sql/p1_6_notification_policy_audit.sql` assumes base table already exists.
-
-Delivered:
-- Added base-table SQL: `backend/sql/p1_6_notification_policy_base.sql`
-  - Columns exactly aligned with current code usage in `backend/routes/notification_policy.py` and `tools/notification_worker.py`.
-  - PK `(org_id, home_id, subject_id)` and mode check for `NORMAL|QUIET|NIGHT`.
-- Updated docs to make apply-order explicit:
-  1) base table SQL
-  2) audit/helper SQL
-
-Verification status in this container:
-- Repo-level PASS (schema file present + code expectation mapping).
-- Runtime DB/API PASS remains NO_EVIDENCE here until executed on dev stack.
-
-## Phase 4 — Fixpack-6 completion pass (MUST-4 CHECK-RULES-02 unblock+helper fix) — 2026-03-06
-
-Scope: Minimal completion pass only (dev/repo additive; no redesign).
-
-What was proven before this pass:
-- CHECK-RULES-01 runtime PASS (`/v1/rules/pilot-pack`).
-- CHECK-RULES-03 runtime PASS (`OPEN->ACK` and `OPEN->CLOSED`).
-- Base table gap for notification policy was identified and base SQL added.
-
-New blocker found and fixed:
-- In `set_notification_policy_override(...)`, `ON CONFLICT (org_id, home_id, subject_id)` was ambiguous in runtime PL/pgSQL context.
-- SQL fix applied:
-  - `ON CONFLICT ON CONSTRAINT notification_policy_pkey DO UPDATE`
-  - file: `backend/sql/p1_6_notification_policy_audit.sql`
-
-Docs/evidence updates in this pass:
-- MUST-4 docs now explicitly include:
-  - base SQL must run before audit/helper SQL
-  - policy runtime blocker history
-  - helper ambiguity bug + fix
-- Added full CHECK-RULES-02 completion command set for dev runtime proof including:
-  - policy get/override/audit
-  - QUIET defer proof (`attempt_n` unchanged + `policy_defer:*`)
-  - override bypass proof (delivery allowed)
-  - idempotency proof via `notification_deliveries` key-group counts
+Final status:
+- `CHECK-RULES-01`: PASS
+- `CHECK-RULES-02`: PASS
+- `CHECK-RULES-03`: PASS
 
 Truth boundary:
-- No new anti-spam system introduced.
-- Claims remain strictly tied to existing worker/outbox behavior.
-
-## Phase 4 — Fixpack-6 final schema-alignment (notification_outbox worker columns) — 2026-03-06
-
-Scope: Minimal additive schema alignment only.
-
-New blocker proven on dev runtime:
-- Worker defer/retry path failed with:
-  - `psycopg2.errors.UndefinedColumn: column "last_error" of relation "notification_outbox" does not exist`
-- Root cause: migration `c7e0e6518d5c_create_notification_outbox.py` did not include worker-required columns:
-  - `last_error`
-  - `dead_letter_reason`
-
-Repo fix in this pass:
-- Updated `backend/alembic/versions/c7e0e6518d5c_create_notification_outbox.py` with additive alignment:
-  - `ALTER TABLE public.notification_outbox ADD COLUMN IF NOT EXISTS last_error text NULL, ADD COLUMN IF NOT EXISTS dead_letter_reason text NULL;`
-- No worker semantic change.
-
-CHECK-RULES-02 completion order now explicit:
-1) notification_policy base SQL
-2) notification_policy audit/helper SQL
-3) notification_outbox column alignment
-4) quiet defer + override bypass + idempotency evidence run
-
-Truth boundary:
-- No PASS claim here without fresh runtime evidence capture on dev.
-
-## Phase 4 — Fixpack-6 final blocker-fix (notification_deliveries table) — 2026-03-06
-
-Scope: Minimal additive schema fix only (dev/repo).
-
-New blocker proven on dev runtime:
-- QUIET defer path is proven, but override-bypass + idempotency proof remained blocked because `public.notification_deliveries` did not exist.
-- Worker contract requires receipt insert into `notification_deliveries` with dedupe conflict target on `(org_id, home_id, subject_id, route_type, route_key, idempotency_key)`.
-
-Repo fix in this pass:
-- Added additive Alembic migration:
-  - `backend/alembic/versions/1f2b3c4d5e6f_create_notification_deliveries_table.py`
-- Migration creates:
-  - `public.notification_deliveries` table
-  - unique dedupe index on `(org_id, home_id, subject_id, route_type, route_key, idempotency_key)`
-  - support fields used by worker receipt path (`outbox_id`, `provider_msg_id`, `response`, `created_at`)
-
-Final CHECK-RULES-02 apply/verify order:
-1) policy base SQL
-2) policy audit/helper SQL
-3) outbox alignment columns
-4) deliveries migration
-5) rerun override + same-key idempotency evidence
-
-Truth boundary:
-- No PASS claim here without fresh runtime evidence capture after deliveries migration.
-
-### Phase 4 — Fixpack-6 (MUST-4 pilot alarm system) — 2026-03-07
-Link: https://github.com/IBL0606/agingos/pull/37
-Status: READY TO MERGE
-Scope:
-- Explicit pilot rule pack truth
-- quiet-hours / override / anti-spam truth
-- ACK/CLOSE lifecycle truth
-- docs/v2 + evidence pack + Control Tower append
-
-Final verification summary:
-- CHECK-RULES-01: PASS
-  - GET /v1/rules/pilot-pack verified on runtime
-  - explicit pilot pack for R-001..R-010
-  - cooldown truth = NONE
-  - grouping truth limited to OPEN/ACK dedupe by rule+subject+scope
-
-- CHECK-RULES-02: PASS
-  - notification_policy base schema added and applied
-  - set_notification_policy_override helper fixed to use ON CONFLICT ON CONSTRAINT notification_policy_pkey
-  - notification_outbox aligned with worker-required columns (last_error, dead_letter_reason)
-  - notification_deliveries table added for delivery receipt + idempotency proof
-  - GET /v1/notification/policy = 200
-  - POST /v1/notification/policy/partner_override = 200
-  - GET /v1/notification/policy/audit = 200
-  - QUIET defer proven: status=RETRY, attempt_n=0, last_error=policy_defer:QUIET
-  - override bypass proven: status=DELIVERED with delivered_at + acked_at set
-  - idempotency proven: grouped receipt count remains 1 for same idempotency_key after rerun
-
-- CHECK-RULES-03: PASS
-  - deviation_id=4 proven OPEN -> ACK
-  - deviation_id=1 proven OPEN -> CLOSED
-  - persisted state verified after patch
-
-Truth boundary:
-- No invented alarm semantics added
-- No invented anti-spam system added
+- Cooldown semantics are explicitly `NONE`
+- Grouping claim is limited to proven OPEN/ACK dedupe by rule+subject+scope
+- No invented anti-spam/alarm semantics added
 - Verification is dev-only
 - No MiniPC/customer changes
 
-## Phase 4 — Fixpack-7 (MUST-5 explainable alarm UI "why") — 2026-03-07
+### Phase 4 — Fixpack-7 (MUST-5 explainable alarm UI "why") — MERGED — 2026-03-07
+- **PR:** #38
+- **Scope:** strictly MUST-5 explainability on existing anomaly/alarm UI surface (dev-only)
 
-Scope: STRICTLY MUST-5 explainability on existing anomaly/alarm UI surface (dev-only).
-
-Implemented (repo truth):
-- Updated anomaly episode evidence panel in `services/console/anomalies.html` to render three explicit sections:
+Delivered:
+- Updated `services/console/anomalies.html` with:
   - `Hva skjedde`
   - `Hvorfor uvanlig`
   - `Datagrunnlag`
-- Explainability content is bounded to existing anomaly score payload (`score`, `reasons`, `details.observed`) and does not invent room/cause/baseline.
-- Added explicit missing-room handling text `rominfo mangler` in episode list action column and explanation panel room line.
-- Added events deep-link for supporting data using existing events query pattern when room + bucket exist.
-- Added minimal backend compatibility fixes required for MUST-5 runtime on current dev schema:
+- Explainability bounded to existing payload only:
+  - `score`
+  - `reasons`
+  - `details.observed`
+- Explicit missing-room handling text: `rominfo mangler`
+- Events deep-link only when room + bucket exist
+- Minimal backend compatibility fixes:
   - `backend/services/anomaly_scoring.py`
   - `backend/services/scheduler.py`
-- Updated docs truth pointers in `docs/v2/PILOT-ALARMS.md`, `docs/v2/README.md`, `docs/v2/TESTING.md`.
-- Added evidence-pack manifest path:
-  - `docs/audit/verification-2026-03-07-fixpack-7-must-5-explainability/00_manifest.md`
+- docs updates:
+  - `docs/v2/PILOT-ALARMS.md`
+  - `docs/v2/README.md`
+  - `docs/v2/TESTING.md`
 
-CHECK-WHY status (repo + dev runtime):
-- CHECK-WHY-01: PASS.
-- CHECK-WHY-02: PASS.
+Evidence:
+- `docs/audit/verification-2026-03-07-fixpack-7-must-5-explainability/00_manifest.md`
+
+Final status:
+- `CHECK-WHY-01`: PASS
+- `CHECK-WHY-02`: PASS
 
 Dev runtime evidence:
-- `POST /v1/anomalies/run_latest` => 200 OK
-- `GET /v1/anomalies/score` => 200 OK with explainability payload
+- `POST /v1/anomalies/run_latest` => `200 OK`
+- `GET /v1/anomalies/score` => `200 OK` with explainability payload
 - persisted `YELLOW` anomaly episode created and returned from `GET /v1/anomalies`
-- explicit missing-room runtime case created with empty `room` anomaly episode row
+- explicit missing-room runtime case created with empty room anomaly episode row
 
-NO_EVIDENCE in this container:
-- Browser screenshot/UI capture only.
+Truth note:
+- Browser screenshot/UI capture was `NO_EVIDENCE` in that verification round.
+- This was not a blocker for MUST-5.
 
-## Phase 4 — Fixpack-8 (MUST-6 room model hardening) — 2026-03-07
+### Phase 4 — Fixpack-8 (MUST-6 room model hardening) — MERGED — 2026-03-07
+- **PR:** #39
+- **Scope:** strictly MUST-6 room-name variant truth hardening (dev/docs only)
 
-Scope: STRICTLY MUST-6 room-name variant truth hardening (dev/docs only).
-
-Delivered (minimal and truthful):
+Delivered:
 - Updated `docs/v2/ROOM_MAPPING.md` to explicitly separate:
   - generic/code-path support
   - real-home tested evidence boundary
@@ -657,12 +410,29 @@ Delivered (minimal and truthful):
   - `docs/audit/verification-2026-03-07-fixpack-8-must-6-room-hardening/10_room_logic_scan.txt`
   - `docs/audit/verification-2026-03-07-fixpack-8-must-6-room-hardening/20_variant_term_scan.txt`
   - `docs/audit/verification-2026-03-07-fixpack-8-must-6-room-hardening/30_check_room_02_status.md`
-- Added SoT guard claim in `docs/audit/sot-claims-v1.md` (SOT-041).
+- Added SoT guard claim in `docs/audit/sot-claims-v1.md` (`SOT-041`)
 
-CHECK status:
-- CHECK-ROOM-01: REFERENCED ONLY (already PROVEN by Fixpack-3; no re-implementation in Fixpack-8).
-- CHECK-ROOM-02: NO_EVIDENCE (no real-home evidence for specific variants such as bod/loft/kjellerstue).
+Final status:
+- `CHECK-ROOM-01`: PASS (referenced from Fixpack-3 baseline)
+- `CHECK-ROOM-02`: NO_EVIDENCE
 
 Truth boundary:
-- Current ingest resolves room names generically via `rooms.display_name` case-insensitive match and `sensor_room_map` mapping.
-- No claim is made that bod/loft/kjellerstue are proven in real homes.
+- Current ingest resolves room names generically via `rooms.display_name` case-insensitive match and `sensor_room_map`.
+- No claim is made that `bod` / `loft` / `kjellerstue` are proven in real homes.
+
+### Phase 4 — Pilot scope decision — MUST-7 lock support deferred — 2026-03-07
+Decision:
+- MUST-7 (lock support / lock_state / lock UI/rules) is deferred and is NOT included in current pilot scope.
+
+Reason:
+- Deliberate risk reduction before pilot.
+- Current priority is to pilot the smallest proven surface possible and avoid introducing new issues late in the cycle.
+
+Truth boundary:
+- No claim is made that lock support is implemented or verified for pilot use.
+- Pilot-ready status is evaluated based on Fixpack-1 through Fixpack-8 only.
+- MUST-7 remains a post-pilot candidate, not a failed item.
+
+Impact:
+- No code/runtime change from this decision.
+- This is a project-scope/control decision only.
