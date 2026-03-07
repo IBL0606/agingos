@@ -25,3 +25,6 @@ This Phase 4 fixpack is **Devbox-only**.
 ## Setup truth (Fixpack-4A)
 - Canonical MUST-1 setup truth: `docs/v2/SETUP_TRUTH.md`
 - This document separates **fresh install** vs **upgrade** and defines deterministic verification commands.
+
+## Pilot alarm system truth (Fixpack-6 / MUST-4)
+- Canonical MUST-4 pilot alarm truth: `docs/v2/PILOT-ALARMS.md`

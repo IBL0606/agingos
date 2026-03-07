@@ -438,3 +438,36 @@ Key evidence in this fixpack:
 
 PR:
 - PR #36 — Fixpack-5 / MUST-3 weekly report in Console
+
+## Phase 4 — Fixpack-6 (MUST-4 pilot alarm system) — 2026-03-06
+
+Scope: MUST-4 only. Dev/repo changes only. No MiniPC/customer changes.
+
+Delivered:
+- Added explicit pilot alarm rule-pack endpoint:
+  - `GET /v1/rules/pilot-pack`
+  - Returns `rule_id,name,description,severity,scheduler_enabled,cooldown_grouping` for `R-001..R-010`.
+- Reused existing infrastructure only:
+  - Rules config/registry (`backend/config/rules.yaml`, `backend/services/rules/registry.py`)
+  - Existing alarms lifecycle path (`/v1/deviations` + PATCH status)
+  - Existing notification policy + outbox worker behavior
+- Updated docs/v2:
+  - Added `docs/v2/PILOT-ALARMS.md` (truth source + NO_EVIDENCE boundaries)
+  - Added MUST-4 verification commands in `docs/v2/TESTING.md`
+  - Added operations pointers in `docs/v2/OPERATIONS.md`
+
+Evidence path:
+- `docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/`
+
+CHECK status in this container:
+- CHECK-RULES-01: Repo truth PASS (endpoint + sources verified by rg evidence)
+- CHECK-RULES-02: Repo truth PASS (quiet/override/idempotency/policy-defer behavior verified by code evidence)
+- CHECK-RULES-03: Runtime execution NO_EVIDENCE in this container; executable command plan included.
+
+Truth boundaries:
+- Cooldown semantics are explicitly `NONE` (no cooldown field in current config).
+- Grouping claim is limited to proven OPEN/ACK dedupe behavior.
+- Deviation status audit trail remains NO_EVIDENCE unless added and proven later.
+
+PR:
+- PR link: TBD (to be filled by this fixpack PR)

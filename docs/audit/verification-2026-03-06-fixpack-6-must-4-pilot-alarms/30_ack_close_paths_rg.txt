@@ -1,0 +1,40 @@
+services/console/alarms.html:85:            <span class="pill">Kilde: <code>/v1/deviations</code> via <code>/api</code></span>
+services/console/alarms.html:117:            <span class="chip"><span class="dot bad"></span><span id="cntOpen">OPEN: 0</span></span>
+services/console/alarms.html:118:            <span class="chip"><span class="dot warn"></span><span id="cntAck">ACK: 0</span></span>
+services/console/alarms.html:119:            <span class="chip"><span class="dot good"></span><span id="cntClosed">CLOSED: 0</span></span>
+services/console/alarms.html:223:  async function setStatus(id, status){
+services/console/alarms.html:228:    const r = await apiPatch(`/v1/deviations/${id}`, {status});
+services/console/alarms.html:261:      const stDot  = (st==="OPEN") ? "bad" : (st==="ACK" ? "warn" : "good");
+services/console/alarms.html:283:            <button class="btn small" onclick="setStatus(${id},'ACK')" ${st==='ACK' || st==='CLOSED' ? 'disabled' : ''}>ACK</button>
+services/console/alarms.html:284:            <button class="btn small secondary" onclick="setStatus(${id},'CLOSED')" ${st==='CLOSED' ? 'disabled' : ''}>CLOSE</button>
+services/console/alarms.html:297:      rows = rows.filter(r => String(r.status||"").toUpperCase() !== "CLOSED");
+services/console/alarms.html:315:    const open = all.filter(r => st(r.status)==="OPEN").length;
+services/console/alarms.html:316:    const ack  = all.filter(r => st(r.status)==="ACK").length;
+services/console/alarms.html:317:    const clo  = all.filter(r => st(r.status)==="CLOSED").length;
+services/console/alarms.html:319:    document.getElementById("cntOpen").textContent  = `OPEN: ${open}`;
+services/console/alarms.html:320:    document.getElementById("cntAck").textContent   = `ACK: ${ack}`;
+services/console/alarms.html:321:    document.getElementById("cntClosed").textContent= `CLOSED: ${clo}`;
+services/console/alarms.html:332:    const open = all.filter(r => st(r.status)==="OPEN");
+services/console/alarms.html:333:    const ack  = all.filter(r => st(r.status)==="ACK");
+services/console/alarms.html:334:    const active = all.filter(r => st(r.status)!=="CLOSED");
+services/console/alarms.html:358:      title.textContent = `⚠️ ${openHigh} HIGH OPEN alarm${openHigh===1?"":"er"}`;
+services/console/alarms.html:362:      title.textContent = `⚠️ ${openMed} MEDIUM OPEN alarm${openMed===1?"":"er"}`;
+services/console/alarms.html:366:      title.textContent = `⚠️ ${open.length} OPEN alarm${open.length===1?"":"er"}`;
+services/console/alarms.html:369:      title.textContent = `Aktive alarmer: ${active.length} (ingen OPEN)`;
+services/console/alarms.html:374:    parts.push(`OPEN: ${open.length} (H:${openHigh} M:${openMed} L:${openLow})`);
+services/console/alarms.html:375:    parts.push(`ACK: ${ack.length}`);
+services/console/alarms.html:403:    const r = await apiFetch("/v1/deviations?limit=200");
+backend/routes/deviations.py:8:from models.deviation import Deviation, DeviationStatus
+backend/routes/deviations.py:17:router = APIRouter(prefix="/deviations", tags=["deviations"])
+backend/routes/deviations.py:54:        status_val = str(status_val) if status_val is not None else "OPEN"
+backend/routes/deviations.py:98:    status: DeviationStatus | None = Query(None),
+backend/routes/deviations.py:139:@router.patch("/{deviation_id}", response_model=DeviationPersisted)
+backend/routes/deviations.py:147:            dev.status = DeviationStatus(payload["status"])
+backend/models/deviation.py:10:class DeviationStatus(str, enum.Enum):
+backend/models/deviation.py:11:    OPEN = "OPEN"
+backend/models/deviation.py:12:    ACK = "ACK"
+backend/models/deviation.py:13:    CLOSED = "CLOSED"
+backend/models/deviation.py:23:    status: Mapped[DeviationStatus] = mapped_column(
+backend/models/deviation.py:24:        Enum(DeviationStatus, name="deviation_status"),
+backend/models/deviation.py:26:        default=DeviationStatus.OPEN,
+backend/models/deviation.py:59:    postgresql_where=Deviation.status.in_([DeviationStatus.OPEN, DeviationStatus.ACK]),

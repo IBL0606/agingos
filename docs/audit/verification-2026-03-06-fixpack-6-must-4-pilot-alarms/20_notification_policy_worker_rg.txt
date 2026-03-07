@@ -1,0 +1,22 @@
+tools/notification_worker.py:11:- policy: NORMAL / QUIET / NIGHT + override_until + bypass_policy
+tools/notification_worker.py:52:        SELECT mode, quiet_start_local, quiet_end_local, tz, override_until
+tools/notification_worker.py:92:    # Important: do NOT bump attempt_n for policy deferrals.
+tools/notification_worker.py:131:          o.message_type, o.severity, o.idempotency_key, o.payload,
+tools/notification_worker.py:199:          route_type, route_key, idempotency_key,
+tools/notification_worker.py:204:          %(route_type)s, %(route_key)s, %(idempotency_key)s,
+tools/notification_worker.py:207:        ON CONFLICT (org_id, home_id, subject_id, route_type, route_key, idempotency_key)
+tools/notification_worker.py:217:            "idempotency_key": row["idempotency_key"],
+tools/notification_worker.py:251:    override_until = pol.get("override_until")
+tools/notification_worker.py:253:    if override_until and override_until > utcnow():
+tools/notification_worker.py:256:    if mode not in ("QUIET", "NIGHT"):
+tools/notification_worker.py:269:        defer_due_to_policy(cur, int(row["id"]), next_utc, f"policy_defer:{mode}")
+backend/routes/notification_policy.py:41:    override_until: Optional[str] = None
+backend/routes/notification_policy.py:47:    override_until_utc: datetime
+backend/routes/notification_policy.py:60:                           override_until, updated_at, updated_by
+backend/routes/notification_policy.py:80:                override_until=None,
+backend/routes/notification_policy.py:93:            override_until=_iso(row.get("override_until")),
+backend/routes/notification_policy.py:105:    require_utc_aware(body.override_until_utc, "override_until_utc")
+backend/routes/notification_policy.py:115:                SELECT org_id, home_id, subject_id, override_until, updated_at, updated_by
+backend/routes/notification_policy.py:123:                "until_ts": body.override_until_utc,
+backend/routes/notification_policy.py:135:                           override_until, updated_at, updated_by
+backend/routes/notification_policy.py:160:            override_until=_iso(row.get("override_until")),

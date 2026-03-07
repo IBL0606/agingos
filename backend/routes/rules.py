@@ -9,8 +9,75 @@ from db import get_db
 from config.rule_config import load_rule_config
 from models.rule import Rule
 from models.rule import RuleType
+from services.rules.registry import RULE_REGISTRY
 
 router = APIRouter(prefix="/rules", tags=["rules"])
+
+
+def _severity_label(score: int) -> str:
+    return {1: "LOW", 2: "MEDIUM", 3: "HIGH"}.get(int(score or 2), "MEDIUM")
+
+
+def _pilot_pack_row(rule_id: str, db_rule: Rule | None, yaml_rule: dict) -> dict:
+    spec = RULE_REGISTRY.get(rule_id)
+    severity_score = int(getattr(db_rule, "severity", 2) or 2)
+    return {
+        "rule_id": rule_id,
+        "name": (spec.description if spec is not None else "NO_EVIDENCE"),
+        "description": (
+            spec.description
+            if spec is not None
+            else "NO_EVIDENCE: missing RuleSpec in RULE_REGISTRY"
+        ),
+        "severity": {
+            "score": severity_score,
+            "label": _severity_label(severity_score),
+            "source": "rules.severity" if db_rule is not None else "default=2",
+        },
+        "scheduler_enabled": bool(yaml_rule.get("enabled_in_scheduler", False)),
+        "cooldown_grouping": {
+            "cooldown": "NONE",
+            "grouping": "OPEN/ACK dedupe by rule+subject+scope in scheduler upsert",
+            "evidence": [
+                "services.scheduler._upsert_open_deviation filters existing OPEN/ACK by rule_id + subject_key + org/home/subject",
+                "models.deviation unique partial index enforces one active row per rule_id + subject_key for OPEN/ACK",
+            ],
+        },
+    }
+
+
+@router.get("/pilot-pack")
+def get_pilot_pack(db: Session = Depends(get_db)):
+    """
+    MUST-4 explicit pilot alarm rule pack for R-001..R-010.
+
+    Truth policy:
+    - cooldown is reported as NONE because no rule cooldown field exists in rules.yaml.
+    - grouping reports only proven scheduler/deviation active-dedupe behavior.
+    """
+    cfg = load_rule_config()
+    yaml_rules = (cfg.raw.get("rules", {}) if isinstance(cfg.raw, dict) else {}) or {}
+    db_rows = db.query(Rule).all()
+    by_name = {r.name: r for r in db_rows if getattr(r, "name", None)}
+
+    out = []
+    for rule_id in sorted(yaml_rules.keys()):
+        out.append(
+            _pilot_pack_row(
+                rule_id,
+                by_name.get(rule_id),
+                dict(yaml_rules[rule_id] or {}),
+            )
+        )
+
+    return {
+        "pack": "MUST-4-pilot-alarm-rules",
+        "rules": out,
+        "notes": [
+            "cooldown is NONE for all rules (no cooldown setting in backend/config/rules.yaml)",
+            "grouping reflects scheduler/deviation active dedupe only; notification anti-spam is handled in outbox worker",
+        ],
+    }
 
 
 def _utc_now_iso() -> str:

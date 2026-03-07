@@ -66,3 +66,36 @@ Required captures:
 - Open `/report.html`, press `Oppdater rapport`, and verify each section shows exactly one truth label: `REAL`, `TEMPLATE/FALLBACK`, or `NO_EVIDENCE`.
 - Export `Last ned driftpakke (JSON)` and verify `weekly_report` exists in exported JSON.
 - If runtime stack is unavailable, record `NO_EVIDENCE` explicitly.
+
+## MUST-4 pilot alarms verification (Fixpack-6)
+Evidence pack proposal:
+- `docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/`
+
+### CHECK-RULES-01 (explicit pilot rule pack)
+- `curl -sS http://127.0.0.1:8000/v1/rules/pilot-pack -H "X-API-Key: $API_KEY" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/10_rules_pilot_pack.json`
+- `jq '.rules[] | {rule_id,name,description,severity,scheduler_enabled,cooldown_grouping}' docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/10_rules_pilot_pack.json | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/11_rules_pilot_pack_focus.json`
+
+Truth checks:
+- cooldown must be explicit (`NONE` if absent; no inferred cooldown)
+- grouping must match existing active dedupe only
+
+### CHECK-RULES-02 (quiet hours / override / anti-spam)
+- `curl -sS http://127.0.0.1:8000/v1/notification/policy -H "X-API-Key: $API_KEY" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/20_policy_get.json`
+- `curl -sS http://127.0.0.1:8000/v1/notification/policy/audit -H "X-API-Key: $API_KEY" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/21_policy_audit.json`
+- `rg -n "policy_defer|override_until|idempotency_key|ON CONFLICT|do NOT bump attempt_n|mode not in" tools/notification_worker.py | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/22_worker_policy_truth_rg.txt`
+
+If runtime outbox exercise is available on dev, add SQL before/after proving:
+- policy defer keeps `attempt_n` unchanged
+- duplicate idempotency insert does not create duplicate delivery rows
+
+If unavailable, mark runtime proof as NO_EVIDENCE.
+
+### CHECK-RULES-03 (ACK/CLOSE lifecycle for at least 2 alarms)
+- `curl -sS "http://127.0.0.1:8000/v1/deviations?status=OPEN&limit=50" -H "X-API-Key: $API_KEY" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/30_deviations_open_before.json`
+- Choose two `deviation_id` values: A and B from the open list.
+- `curl -sS -X PATCH "http://127.0.0.1:8000/v1/deviations/<A>" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" -d '{"status":"ACK"}' | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/31_deviation_A_ack.json`
+- `curl -sS -X PATCH "http://127.0.0.1:8000/v1/deviations/<B>" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" -d '{"status":"CLOSED"}' | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/32_deviation_B_closed.json`
+- `curl -sS "http://127.0.0.1:8000/v1/deviations?limit=50" -H "X-API-Key: $API_KEY" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/33_deviations_after.json`
+
+Truth rule:
+- If dedicated deviation status audit/history is absent, explicitly record `NO_EVIDENCE`.
