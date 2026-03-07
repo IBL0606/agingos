@@ -436,3 +436,75 @@ Truth boundary:
 Impact:
 - No code/runtime change from this decision.
 - This is a project-scope/control decision only.
+
+### MiniPC Pilot Upgrade — CONTROLLED UPGRADE WITH FULL BACKUP FIRST — 2026-03-07
+
+Status: COMPLETED ON PILOTBOX (operational evidence captured under `_handoff` and copied off-host)
+
+Scope:
+- Controlled MiniPC/pilotbox upgrade to current `origin/main`
+- Full backup before writes
+- Read-only preflight
+- Runtime upgrade + DB migration
+- Post-upgrade verification
+- No derived-data rebuild unless evidence required it
+
+What was done:
+- Full DB backup + schema-only backup taken before any upgrade writes
+- Data-only backups taken for critical tables:
+  - `events`
+  - `episodes`
+  - `episodes_svc`
+  - `anomaly_episodes`
+  - `deviations`
+  - `proposals`
+  - `proposal_links`
+  - `proposal_feedback`
+  - `baseline_model_status`
+  - `baseline_room_bucket`
+  - `baseline_transition`
+  - `notification_outbox`
+  - `notification_deliveries`
+  - `notification_policy`
+  - `api_key_scopes`
+- Off-host backup copy verified on laptop
+- MiniPC preflight captured runtime, auth/scope, OpenAPI, schema snapshots, counts/freshness
+- MiniPC moved from old audit branch to current `origin/main` (`1dcf9ec`)
+- Runtime restarted/rebuilt
+- Alembic migration completed to head `1f2b3c4d5e6f`
+
+Migration repairs required (evidence-backed, minimal):
+- Removed redundant ancestor row `5d205e6bbb78` from `alembic_version` after extra backup
+- Stamped `16675adff372` because its schema effects were already materially present on MiniPC
+- Backed up and dropped 3 conflicting baseline functions with incompatible return type before re-running Alembic:
+  - `build_daily_room_bucket_rollup(date, uuid)`
+  - `build_daily_transition_rollup(date, uuid)`
+  - `build_baseline_7d(date, uuid, double precision, double precision, integer)`
+
+Post-upgrade outcome:
+- Base compose alone lost host/LAN reachability as documented
+- LAN pilot reachability restored with `docker-compose.expose.yml`
+- Host `/health` and `/health/detail` returned `200` after overlay recovery
+- Ingest temporarily degraded during restart window, then recovered
+- Final `/health/detail` returned `overall_status = OK`
+- Key APIs verified post-upgrade:
+  - `/v1/events`
+  - `/v1/anomalies`
+  - `/v1/deviations`
+  - `/v1/proposals`
+  - `/v1/rules/pilot-pack`
+  - `/v1/notification/policy`
+
+Rebuild decision:
+- baseline rebuild: NO
+- anomalies rerun: NO
+- episodes_svc build: not required by evidence
+- proposals re-mine: NO
+
+Important residual note:
+- `room_id` materialization is improved on new events, but historical completeness is not retroactively fixed by this upgrade
+- This was not treated as a reason to rebuild derived data
+
+Evidence:
+- `/opt/agingos/_handoff/minipc_upgrade/20260307T170203Z/`
+- off-host copy: `~/agingos-minipc-backups/20260307T170203Z`
