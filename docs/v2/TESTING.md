@@ -202,3 +202,19 @@ Rerun same idempotency_key and prove grouped count stays 1:
 Expected outputs:
 - override rerun case: outbox row is `DELIVERED` with non-null `delivered_at`/`acked_at`, and one grouped receipt row (`n=1`).
 - same-key rerun case: grouped receipt row count remains `n=1`.
+
+## Fixpack-7 / MUST-5 — Explainable alarm/anomaly UI checks
+
+CHECK-WHY-01 target:
+- Anomaly/alarm view shows `Hva skjedde`, `Hvorfor uvanlig`, `Datagrunnlag`.
+
+CHECK-WHY-02 target:
+- Missing room context is shown explicitly as `rominfo mangler` and not inferred.
+
+Suggested dev verification commands:
+- `curl -sS -H 'X-API-Key: dev-key-2' 'http://localhost:8000/v1/anomalies?last=14d&limit=20'`
+- `curl -sS -H 'X-API-Key: dev-key-2' 'http://localhost:8000/v1/anomalies/score?room=<ROOM>&bucket_start=<ISO_BUCKET>'`
+- Open `http://localhost:3000/anomalies.html` (or console proxy path) and verify explainability panel text.
+
+NO_EVIDENCE in this container:
+- Runtime stack/browser validation for these commands and UI assertions.

@@ -125,3 +125,27 @@ Final apply/verify order for CHECK-RULES-02 completion:
 3. apply notification_outbox column alignment
 4. apply notification_deliveries migration
 5. run quiet defer + override receipt + idempotency rerun verification
+
+## 8) Explainable alarm/anomaly UI (Fixpack-7 / MUST-5)
+Scope truth:
+- Primary UI surface is anomaly episode evidence panel in `services/console/anomalies.html`.
+- This fixpack adds explicit explainability sections:
+  - `Hva skjedde`
+  - `Hvorfor uvanlig`
+  - `Datagrunnlag`
+
+Proven behavior (repo evidence):
+- Explainability text uses anomaly score payload fields only:
+  - summary from episode/score fields
+  - why-text from reason codes (`reasons`)
+  - data basis from `details.observed`
+- If reason/baseline explanation is missing in response, UI states this explicitly instead of inferring cause.
+- If room context is unavailable for episode row/action, UI explicitly shows `rominfo mangler`.
+- Event support link reuses existing events deep-link pattern (`events.html?auto=1&since=...&until=...&room=...`) when room + bucket are available.
+
+CHECK-WHY mapping:
+- CHECK-WHY-01: Implemented in anomalies explainability panel (three required sections).
+- CHECK-WHY-02: Implemented via explicit `rominfo mangler` handling; no room inference when missing.
+
+NO_EVIDENCE:
+- Live-stack runtime verification of MUST-5 in this container is NO_EVIDENCE until executed against running backend/UI stack.

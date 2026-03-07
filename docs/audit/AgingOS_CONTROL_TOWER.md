@@ -611,3 +611,26 @@ Truth boundary:
 - No invented anti-spam system added
 - Verification is dev-only
 - No MiniPC/customer changes
+
+## Phase 4 — Fixpack-7 (MUST-5 explainable alarm UI "why") — 2026-03-07
+
+Scope: STRICTLY MUST-5 explainability on existing anomaly/alarm UI surface (dev-only).
+
+Implemented (repo truth):
+- Updated anomaly episode evidence panel in `services/console/anomalies.html` to render three explicit sections:
+  - `Hva skjedde`
+  - `Hvorfor uvanlig`
+  - `Datagrunnlag`
+- Explainability content is bounded to existing anomaly score payload (`score`, `reasons`, `details.observed`) and does not invent room/cause/baseline.
+- Added explicit missing-room handling text `rominfo mangler` in episode list action column and explanation panel room line.
+- Added events deep-link for supporting data using existing events query pattern when room + bucket exist.
+- Updated docs truth pointers in `docs/v2/PILOT-ALARMS.md`, `docs/v2/README.md`, `docs/v2/TESTING.md`.
+- Added evidence-pack manifest path:
+  - `docs/audit/verification-2026-03-07-fixpack-7-must-5-explainability/00_manifest.md`
+
+CHECK-WHY status (repo evidence):
+- CHECK-WHY-01: PASS in code (required three sections present in anomalies explainability panel).
+- CHECK-WHY-02: PASS in code (explicit `rominfo mangler`; no room inference path added).
+
+NO_EVIDENCE in this container:
+- Live runtime/browser validation against running backend data is NO_EVIDENCE until dev stack execution/capture.

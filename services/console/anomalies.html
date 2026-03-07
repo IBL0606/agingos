@@ -335,12 +335,23 @@
       </div>
 
       <div class="card" style="flex:1">
-        <h2>Bevis (valgt episode)</h2>
+        <h2>Forklaring (valgt episode)</h2>
         <div class="muted" id="evMsg">Velg en episode og trykk <b>Bevis</b>.</div>
 
         <div style="margin-top:10px">
-          <div class="muted" style="margin-bottom:6px">Kort forklaring (deterministisk)</div>
+          <div class="muted" style="margin-bottom:6px">Hva skjedde</div>
+          <pre id="evWhat" style="white-space:pre-wrap; margin:0">{}</pre>
+        </div>
+
+        <div style="margin-top:10px">
+          <div class="muted" style="margin-bottom:6px">Hvorfor uvanlig</div>
+          <pre id="evWhy" style="white-space:pre-wrap; margin:0">{}</pre>
+        </div>
+
+        <div style="margin-top:10px">
+          <div class="muted" style="margin-bottom:6px">Datagrunnlag</div>
           <pre id="evSummary" style="white-space:pre-wrap; margin:0">{}</pre>
+          <div id="evLinks" class="muted" style="margin-top:6px"></div>
         </div>
 
         <details class="details" style="margin-top:10px">
@@ -660,13 +671,14 @@
 
         const esc = (x) => String(x ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
         const mkBtn = (room, bucket, id) => {
-          if (!room || !bucket) return "";
+          if (!room || !bucket) return "<span class=\"muted\">rominfo mangler</span>";
           return `<button class="smallbtn" type="button" data-action="evidence" data-room="${esc(room)}" data-bucket="${esc(bucket)}" data-id="${esc(id)}">Bevis</button>`;
         };
 
         for (const a of items) {
           const id = a.id ?? "";
           const room = a.room ?? "";
+          const roomLabel = String(room || "").trim() ? room : "rominfo mangler";
           const level = a.level ?? "";
           const active = _truthy(a.active);
           const start = a.start_ts ?? "";
@@ -677,7 +689,7 @@
           const tr = document.createElement("tr");
           tr.innerHTML = `
             <td>${esc(id)}</td>
-            <td>${esc(room)}</td>
+            <td>${esc(roomLabel)}</td>
             <td>${esc(level)}</td>
             <td>${active ? "true" : "false"}</td>
             <td>${esc(start)}</td>
@@ -690,12 +702,41 @@
         }
       }
 
+      function _roomText(room) {
+        return String(room || "").trim() ? String(room).trim() : "rominfo mangler";
+      }
+
+      function _eventsLink(room, bucketStart) {
+        if (!room || !bucketStart) return "";
+        const s = String(bucketStart).trim();
+        if (!s) return "";
+        let startIso = "";
+        try {
+          const d = new Date(s);
+          if (!Number.isNaN(d.getTime())) startIso = d.toISOString();
+        } catch(_) {}
+        if (!startIso) return "";
+        const endIso = new Date(new Date(startIso).getTime() + 15 * 60 * 1000).toISOString();
+        const q = new URLSearchParams();
+        q.set("auto", "1");
+        q.set("since", startIso);
+        q.set("until", endIso);
+        q.set("room", String(room));
+        return "./events.html?" + q.toString();
+      }
+
       async function loadEvidence(room, bucketStart, anomId) {
         const evMsg = $("evMsg");
         const evJson = $("evJson");
         const evSummary = $("evSummary");
+        const evWhat = $("evWhat");
+        const evWhy = $("evWhy");
+        const evLinks = $("evLinks");
         if (evMsg) evMsg.textContent = "Henter bevis...";
+        if (evWhat) evWhat.textContent = "{}";
+        if (evWhy) evWhy.textContent = "{}";
         if (evSummary) evSummary.textContent = "{}";
+        if (evLinks) evLinks.innerHTML = "";
         if (evJson) evJson.textContent = "{}";
 
         if (!room || !bucketStart) throw new Error("Mangler room/bucket_start for bevis");
@@ -706,10 +747,27 @@
         const details = payload.details || {};
         const obs = (details && details.observed) ? details.observed : {};
         const reasons = Array.isArray(payload.reasons) ? payload.reasons : [];
-        const lines = [];
-        lines.push(`Episode: id=${anomId || "—"} rom=${room}`);
-        lines.push(`Peak bucket: ${bucketStart}`);
 
+        const roomText = _roomText(room);
+        const whatLines = [];
+        whatLines.push(`Episode: id=${anomId || "—"}`);
+        whatLines.push(`Rom: ${roomText}`);
+        whatLines.push(`Peak bucket: ${bucketStart}`);
+        if (payload && payload.score && payload.score.total != null) {
+          whatLines.push(`Score total: ${payload.score.total}`);
+        }
+        if (payload && payload.score && payload.score.level != null) {
+          whatLines.push(`Nivå: ${payload.score.level}`);
+        }
+
+        const whyLines = [];
+        if (reasons.length) {
+          for (const r of reasons) whyLines.push("• " + _rcHuman(r, obs));
+        } else {
+          whyLines.push("Baseline-/årsaksforklaring er ikke tilgjengelig i score-responsen for denne episoden.");
+        }
+
+        const dataLines = [];
         if (obs && typeof obs === "object") {
           const parts = [];
           if (obs.door_obs != null) parts.push(`door_obs=${obs.door_obs}`);
@@ -717,21 +775,29 @@
           if (obs.prev_room != null) parts.push(`prev_room=${obs.prev_room}`);
           if (obs.pet_weight != null) parts.push(`pet_weight=${obs.pet_weight}`);
           if (obs.unknown_weight != null) parts.push(`unknown_weight=${obs.unknown_weight}`);
-          if (parts.length) lines.push("Observasjoner: " + parts.join(", "));
+          if (parts.length) dataLines.push("Observasjoner i score-detaljer: " + parts.join(", "));
+        }
+        if (!dataLines.length) {
+          dataLines.push("Datagrunnlag i score-responsen er begrenset (ingen observerte felt i details.observed).");
         }
 
-        lines.push("");
-        if (reasons.length) {
-            lines.push("Hvorfor (reason_codes):");
-            for (const r of reasons) lines.push("• " + _rcHuman(r, obs));
+        if (evWhat) evWhat.textContent = whatLines.join("\n");
+        if (evWhy) evWhy.textContent = whyLines.join("\n");
+        if (evSummary) evSummary.textContent = dataLines.join("\n");
+
+        const link = _eventsLink(room, bucketStart);
+        if (evLinks) {
+          if (link) {
+            evLinks.innerHTML = `Underliggende hendelser (deep-link): <a href="${link}">Åpne Events filtrert på rom og peak-bucket</a>`;
           } else {
-          lines.push("Hvorfor: (ingen reason_codes i score-responsen)");
+            evLinks.textContent = "Underliggende hendelser: ingen deep-link tilgjengelig for denne episoden.";
+          }
         }
 
-        if (evSummary) evSummary.textContent = lines.join("\n");
         if (evJson) evJson.textContent = JSON.stringify(payload, null, 2);
         if (evMsg) evMsg.textContent = "OK: bevis hentet.";
       }
+
 
       window.addEventListener("DOMContentLoaded", () => {
       loadSettings();

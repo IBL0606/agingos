@@ -28,3 +28,6 @@ This Phase 4 fixpack is **Devbox-only**.
 
 ## Pilot alarm system truth (Fixpack-6 / MUST-4)
 - Canonical MUST-4 pilot alarm truth: `docs/v2/PILOT-ALARMS.md`
+
+## Explainable alarm UI truth (Fixpack-7 / MUST-5)
+- Canonical MUST-5 explainability truth: `docs/v2/PILOT-ALARMS.md` (section 8).
