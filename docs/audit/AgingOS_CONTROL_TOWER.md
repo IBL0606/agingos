@@ -643,3 +643,26 @@ Dev runtime evidence:
 
 NO_EVIDENCE in this container:
 - Browser screenshot/UI capture only.
+
+## Phase 4 — Fixpack-8 (MUST-6 room model hardening) — 2026-03-07
+
+Scope: STRICTLY MUST-6 room-name variant truth hardening (dev/docs only).
+
+Delivered (minimal and truthful):
+- Updated `docs/v2/ROOM_MAPPING.md` to explicitly separate:
+  - generic/code-path support
+  - real-home tested evidence boundary
+- Added dev evidence pack:
+  - `docs/audit/verification-2026-03-07-fixpack-8-must-6-room-hardening/00_manifest.md`
+  - `docs/audit/verification-2026-03-07-fixpack-8-must-6-room-hardening/10_room_logic_scan.txt`
+  - `docs/audit/verification-2026-03-07-fixpack-8-must-6-room-hardening/20_variant_term_scan.txt`
+  - `docs/audit/verification-2026-03-07-fixpack-8-must-6-room-hardening/30_check_room_02_status.md`
+- Added SoT guard claim in `docs/audit/sot-claims-v1.md` (SOT-041).
+
+CHECK status:
+- CHECK-ROOM-01: REFERENCED ONLY (already PROVEN by Fixpack-3; no re-implementation in Fixpack-8).
+- CHECK-ROOM-02: NO_EVIDENCE (no real-home evidence for specific variants such as bod/loft/kjellerstue).
+
+Truth boundary:
+- Current ingest resolves room names generically via `rooms.display_name` case-insensitive match and `sensor_room_map` mapping.
+- No claim is made that bod/loft/kjellerstue are proven in real homes.

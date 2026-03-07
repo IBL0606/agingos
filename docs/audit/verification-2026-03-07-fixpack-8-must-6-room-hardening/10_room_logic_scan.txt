@@ -1,0 +1,28 @@
+backend/routes/rooms.py:22:    display_name: str = Field(..., min_length=1)
+backend/routes/rooms.py:46:                SELECT org_id, home_id, room_id, display_name, room_type, created_at, updated_at
+backend/routes/rooms.py:67:    display_name = _norm(body.display_name)
+backend/routes/rooms.py:72:    if not display_name:
+backend/routes/rooms.py:73:        raise HTTPException(status_code=400, detail="display_name is required")
+backend/routes/rooms.py:79:                INSERT INTO public.rooms (org_id, home_id, room_id, display_name, room_type)
+backend/routes/rooms.py:80:                VALUES (:org_id, :home_id, :room_id, :display_name, :room_type)
+backend/routes/rooms.py:83:                  display_name = EXCLUDED.display_name,
+backend/routes/rooms.py:86:                RETURNING org_id, home_id, room_id, display_name, room_type, created_at, updated_at
+backend/routes/rooms.py:93:                "display_name": display_name,
+backend/util/room_id.py:36:      1) payload.room_id
+backend/util/room_id.py:37:      2) payload.room
+backend/util/room_id.py:38:      3) payload.area
+backend/util/room_id.py:39:      4) room_map[entity_id] fallback
+backend/util/room_id.py:64:def derive_room_id_scoped(db: Any, scope: Any, payload: Mapping[str, Any]) -> Optional[str]:
+backend/util/room_id.py:69:      1) payload.room_id (must exist in rooms for scope)
+backend/util/room_id.py:70:      2) payload.room or payload.area (match rooms.display_name case-insensitive)
+backend/util/room_id.py:71:      3) sensor_room_map lookup by payload.entity_id (active=true)
+backend/util/room_id.py:72:      4) fallback to derive_room_id(payload) (payload-only + yaml)
+backend/util/room_id.py:87:        # Can't scope safely → fallback to payload-only
+backend/util/room_id.py:92:    # 1) payload.room_id (validate exists)
+backend/util/room_id.py:109:    # 2) payload.room / payload.area → match display_name
+backend/util/room_id.py:118:                  AND lower(display_name) = lower(:display_name)
+backend/util/room_id.py:123:            {**params_base, "display_name": name},
+backend/util/room_id.py:135:                FROM public.sensor_room_map
+backend/util/room_id.py:146:    # 4) fallback (payload-only + yaml)
+backend/main.py:656:        # pydantic v1 fallback
+backend/main.py:708:    # Prefer DATABASE_URL if set; fallback to local docker-compose defaults.
