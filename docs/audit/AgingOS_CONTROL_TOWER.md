@@ -546,3 +546,29 @@ CHECK-RULES-02 completion order now explicit:
 
 Truth boundary:
 - No PASS claim here without fresh runtime evidence capture on dev.
+
+## Phase 4 — Fixpack-6 final blocker-fix (notification_deliveries table) — 2026-03-06
+
+Scope: Minimal additive schema fix only (dev/repo).
+
+New blocker proven on dev runtime:
+- QUIET defer path is proven, but override-bypass + idempotency proof remained blocked because `public.notification_deliveries` did not exist.
+- Worker contract requires receipt insert into `notification_deliveries` with dedupe conflict target on `(org_id, home_id, subject_id, route_type, route_key, idempotency_key)`.
+
+Repo fix in this pass:
+- Added additive Alembic migration:
+  - `backend/alembic/versions/1f2b3c4d5e6f_create_notification_deliveries_table.py`
+- Migration creates:
+  - `public.notification_deliveries` table
+  - unique dedupe index on `(org_id, home_id, subject_id, route_type, route_key, idempotency_key)`
+  - support fields used by worker receipt path (`outbox_id`, `provider_msg_id`, `response`, `created_at`)
+
+Final CHECK-RULES-02 apply/verify order:
+1) policy base SQL
+2) policy audit/helper SQL
+3) outbox alignment columns
+4) deliveries migration
+5) rerun override + same-key idempotency evidence
+
+Truth boundary:
+- No PASS claim here without fresh runtime evidence capture after deliveries migration.

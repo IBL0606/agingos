@@ -106,3 +106,22 @@ Dev apply/verify order for CHECK-RULES-02 completion:
 2. apply notification policy audit/helper SQL
 3. apply outbox schema alignment (alembic upgrade or explicit ALTER)
 4. run quiet defer + override/idempotency verification commands
+
+
+## 7) Final table blocker for override/idempotency proof
+Fourth blocker found on dev runtime after defer-path fix:
+- `public.notification_deliveries` table was missing, blocking override-bypass receipt insert and idempotency proof.
+
+Repo fix:
+- Added additive Alembic migration:
+  - `backend/alembic/versions/1f2b3c4d5e6f_create_notification_deliveries_table.py`
+- Table/constraint aligned to worker contract in `tools/notification_worker.py`:
+  - columns: `outbox_id`, `org_id`, `home_id`, `subject_id`, `route_type`, `route_key`, `idempotency_key`, `provider_msg_id`, `response`, `created_at`
+  - dedupe uniqueness: `(org_id, home_id, subject_id, route_type, route_key, idempotency_key)`
+
+Final apply/verify order for CHECK-RULES-02 completion:
+1. apply notification_policy base SQL
+2. apply notification_policy audit/helper SQL
+3. apply notification_outbox column alignment
+4. apply notification_deliveries migration
+5. run quiet defer + override receipt + idempotency rerun verification

@@ -178,3 +178,27 @@ Expected outputs remain:
 - defer case => `status='RETRY'`, `attempt_n=0`, `last_error` starts with `policy_defer:`
 - override case => `status='DELIVERED'` with non-null `delivered_at` and `acked_at`
 - idempotency case => grouped delivery count stays `1` for same `idempotency_key`
+
+### CHECK-RULES-02 final table step (notification_deliveries)
+Fourth blocker history addition:
+- (d) missing `public.notification_deliveries` blocked override-bypass receipt insert and grouped idempotency proof.
+
+Apply delivery schema on dev:
+- `docker compose exec -T backend alembic upgrade head | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/63_alembic_upgrade_for_deliveries.txt`
+- `docker compose exec -T db psql -U agingos -d agingos -c "\d public.notification_deliveries" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/64_deliveries_schema_after_migration.txt`
+
+Rerun override case (same flow, explicit capture):
+- `docker compose exec -T db psql -U agingos -d agingos -c "UPDATE public.notification_policy SET override_until = now() + interval '2 hours', updated_at=now(), updated_by='dev:test-override2' WHERE org_id='default' AND home_id='default' AND subject_id='default';" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/65_policy_set_override_future_rerun.txt`
+- `docker compose exec -T db psql -U agingos -d agingos -c "INSERT INTO public.notification_outbox(org_id,home_id,subject_id,route_type,route_key,destination,message_type,severity,idempotency_key,payload,bypass_policy,status,next_attempt_at,attempt_n,max_attempts) VALUES ('default','default','default','db','dev-route','dev-dest','MUST4_TEST','INFO','must4-override-002','{}'::jsonb,false,'PENDING',now(),0,5) RETURNING id,attempt_n,status;" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/66_outbox_insert_override_case_2.txt`
+- `docker compose exec -T backend python /workspace/tools/notification_worker.py 1 | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/67_worker_run_override_case_2.txt`
+- `docker compose exec -T db psql -U agingos -d agingos -c "SELECT id,status,attempt_n,delivered_at,acked_at,last_error FROM public.notification_outbox WHERE idempotency_key='must4-override-002';" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/68_outbox_after_override_case_2.txt`
+- `docker compose exec -T db psql -U agingos -d agingos -c "SELECT outbox_id,org_id,home_id,subject_id,route_type,route_key,idempotency_key,COUNT(*) AS n FROM public.notification_deliveries WHERE idempotency_key='must4-override-002' GROUP BY 1,2,3,4,5,6,7;" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/69_delivery_rows_override_case_2.txt`
+
+Rerun same idempotency_key and prove grouped count stays 1:
+- `docker compose exec -T db psql -U agingos -d agingos -c "UPDATE public.notification_outbox SET status='PENDING', next_attempt_at=now(), locked_at=NULL, locked_by=NULL WHERE idempotency_key='must4-override-002';" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/70_force_reprocess_same_key.txt`
+- `docker compose exec -T backend python /workspace/tools/notification_worker.py 1 | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/71_worker_rerun_same_key.txt`
+- `docker compose exec -T db psql -U agingos -d agingos -c "SELECT outbox_id,org_id,home_id,subject_id,route_type,route_key,idempotency_key,COUNT(*) AS n FROM public.notification_deliveries WHERE idempotency_key='must4-override-002' GROUP BY 1,2,3,4,5,6,7;" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/72_delivery_rows_after_same_key_rerun.txt`
+
+Expected outputs:
+- override rerun case: outbox row is `DELIVERED` with non-null `delivered_at`/`acked_at`, and one grouped receipt row (`n=1`).
+- same-key rerun case: grouped receipt row count remains `n=1`.

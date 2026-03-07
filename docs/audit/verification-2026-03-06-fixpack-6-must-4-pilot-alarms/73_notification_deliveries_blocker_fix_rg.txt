@@ -1,0 +1,39 @@
+docs/audit/AgingOS_CONTROL_TOWER.md:469:- Grouping claim is limited to proven OPEN/ACK dedupe behavior.
+docs/audit/AgingOS_CONTROL_TOWER.md:519:  - idempotency proof via `notification_deliveries` key-group counts
+docs/audit/AgingOS_CONTROL_TOWER.md:550:## Phase 4 — Fixpack-6 final blocker-fix (notification_deliveries table) — 2026-03-06
+docs/audit/AgingOS_CONTROL_TOWER.md:555:- QUIET defer path is proven, but override-bypass + idempotency proof remained blocked because `public.notification_deliveries` did not exist.
+docs/audit/AgingOS_CONTROL_TOWER.md:556:- Worker contract requires receipt insert into `notification_deliveries` with dedupe conflict target on `(org_id, home_id, subject_id, route_type, route_key, idempotency_key)`.
+docs/audit/AgingOS_CONTROL_TOWER.md:560:  - `backend/alembic/versions/1f2b3c4d5e6f_create_notification_deliveries_table.py`
+docs/audit/AgingOS_CONTROL_TOWER.md:562:  - `public.notification_deliveries` table
+docs/audit/AgingOS_CONTROL_TOWER.md:563:  - unique dedupe index on `(org_id, home_id, subject_id, route_type, route_key, idempotency_key)`
+docs/v2/TESTING.md:80:- grouping must match existing active dedupe only
+docs/v2/TESTING.md:114:- `docker compose exec -T db psql -U agingos -d agingos -c "\d public.notification_deliveries" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/28_notification_deliveries_schema.txt`
+docs/v2/TESTING.md:148:- `docker compose exec -T db psql -U agingos -d agingos -c "SELECT outbox_id,org_id,home_id,subject_id,route_type,route_key,idempotency_key,COUNT(*) AS n FROM public.notification_deliveries WHERE idempotency_key='must4-override-001' GROUP BY 1,2,3,4,5,6,7;" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/55_delivery_rows_override_case.txt`
+docs/v2/TESTING.md:150:- `docker compose exec -T db psql -U agingos -d agingos -c "SELECT outbox_id,org_id,home_id,subject_id,route_type,route_key,idempotency_key,COUNT(*) AS n FROM public.notification_deliveries WHERE idempotency_key='must4-override-001' GROUP BY 1,2,3,4,5,6,7;" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/57_delivery_rows_after_rerun.txt`
+docs/v2/TESTING.md:182:### CHECK-RULES-02 final table step (notification_deliveries)
+docs/v2/TESTING.md:184:- (d) missing `public.notification_deliveries` blocked override-bypass receipt insert and grouped idempotency proof.
+docs/v2/TESTING.md:188:- `docker compose exec -T db psql -U agingos -d agingos -c "\d public.notification_deliveries" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/64_deliveries_schema_after_migration.txt`
+docs/v2/TESTING.md:195:- `docker compose exec -T db psql -U agingos -d agingos -c "SELECT outbox_id,org_id,home_id,subject_id,route_type,route_key,idempotency_key,COUNT(*) AS n FROM public.notification_deliveries WHERE idempotency_key='must4-override-002' GROUP BY 1,2,3,4,5,6,7;" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/69_delivery_rows_override_case_2.txt`
+docs/v2/TESTING.md:197:Rerun same idempotency_key and prove grouped count stays 1:
+docs/v2/TESTING.md:200:- `docker compose exec -T db psql -U agingos -d agingos -c "SELECT outbox_id,org_id,home_id,subject_id,route_type,route_key,idempotency_key,COUNT(*) AS n FROM public.notification_deliveries WHERE idempotency_key='must4-override-002' GROUP BY 1,2,3,4,5,6,7;" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/72_delivery_rows_after_same_key_rerun.txt`
+docs/v2/PILOT-ALARMS.md:28:- `grouping` is reported as active OPEN/ACK dedupe by rule+subject scope because this is what scheduler/deviation model proves.
+docs/v2/PILOT-ALARMS.md:52:- No new claim that policy creates/open-dedupes alarms themselves; this path is for outbox delivery behavior.
+docs/v2/PILOT-ALARMS.md:63:- Active dedupe exists for OPEN/ACK rows per `(rule_id, subject_key)` (partial unique index).
+docs/v2/PILOT-ALARMS.md:92:- Quiet-hours and anti-spam claims remain limited to observed worker/outbox behavior (`policy_defer`, `override_until` bypass, delivery idempotency key dedupe).
+docs/v2/PILOT-ALARMS.md:113:- `public.notification_deliveries` table was missing, blocking override-bypass receipt insert and idempotency proof.
+docs/v2/PILOT-ALARMS.md:117:  - `backend/alembic/versions/1f2b3c4d5e6f_create_notification_deliveries_table.py`
+docs/v2/PILOT-ALARMS.md:120:  - dedupe uniqueness: `(org_id, home_id, subject_id, route_type, route_key, idempotency_key)`
+docs/v2/PILOT-ALARMS.md:126:4. apply notification_deliveries migration
+backend/alembic/versions/1f2b3c4d5e6f_create_notification_deliveries_table.py:1:"""create notification_deliveries table
+backend/alembic/versions/1f2b3c4d5e6f_create_notification_deliveries_table.py:3:Revision ID: 1f2b3c4d5e6f
+backend/alembic/versions/1f2b3c4d5e6f_create_notification_deliveries_table.py:14:revision: str = '1f2b3c4d5e6f'
+backend/alembic/versions/1f2b3c4d5e6f_create_notification_deliveries_table.py:23:        CREATE TABLE IF NOT EXISTS public.notification_deliveries (
+backend/alembic/versions/1f2b3c4d5e6f_create_notification_deliveries_table.py:37:        CREATE UNIQUE INDEX IF NOT EXISTS ux_notification_deliveries_dedupe
+backend/alembic/versions/1f2b3c4d5e6f_create_notification_deliveries_table.py:38:          ON public.notification_deliveries (
+backend/alembic/versions/1f2b3c4d5e6f_create_notification_deliveries_table.py:42:        CREATE INDEX IF NOT EXISTS ix_notification_deliveries_outbox
+backend/alembic/versions/1f2b3c4d5e6f_create_notification_deliveries_table.py:43:          ON public.notification_deliveries (outbox_id);
+backend/alembic/versions/1f2b3c4d5e6f_create_notification_deliveries_table.py:51:        DROP INDEX IF EXISTS public.ix_notification_deliveries_outbox;
+backend/alembic/versions/1f2b3c4d5e6f_create_notification_deliveries_table.py:52:        DROP INDEX IF EXISTS public.ux_notification_deliveries_dedupe;
+backend/alembic/versions/1f2b3c4d5e6f_create_notification_deliveries_table.py:53:        DROP TABLE IF EXISTS public.notification_deliveries;
+tools/notification_worker.py:9:- idempotent delivery via notification_deliveries unique index
+tools/notification_worker.py:197:        INSERT INTO notification_deliveries (
