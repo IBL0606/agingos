@@ -375,3 +375,13 @@ Assumptions for commands below (pilotbox style):
     # From disallowed segment
     curl -m 3 -sS -o /dev/null -w '%{http_code}\n' "http://<MINIPC>:8000/health" || true
     ```
+
+41. **Claim ID: SOT-041**  
+    **Claim:** Room-name variant support is generic (display-name/mapping based) and must not be reported as real-home support for specific variants (e.g., `bod`, `loft`, `kjellerstue`) without direct evidence.  
+    **Where stated:** `docs/v2/ROOM_MAPPING.md` → `MUST-6: romnavn-varianter (truthful hardening)`  
+    **How to verify:**  
+    ```bash
+    cd /opt/agingos
+    sed -n '/MUST-6: romnavn-varianter/,/CHECK-status/p' docs/v2/ROOM_MAPPING.md
+    rg -n '\\bbod\\b|\\bloft\\b|kjellerstue' docs/audit/verification-2026-03-07-fixpack-8-must-6-room-hardening/20_variant_term_scan.txt
+    ```

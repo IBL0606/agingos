@@ -26,6 +26,19 @@ Rekkefølge:
 3) fallback
 - legacy derive (payload/yaml) brukes kun hvis ingen av over treffer
 
+MUST-6: romnavn-varianter (truthful hardening)
+- Systemstøtte (generisk kode-path):
+  - `payload.room`/`payload.area` matches bare `rooms.display_name` case-insensitivt.
+  - Det finnes **ikke** egen synonym-/aliasnormalisering i kode for ord som `bod`, `loft`, `kjellerstue`.
+  - Variantstøtte oppnås derfor per hjem ved at operator registrerer ønsket `display_name` i `rooms`, eller via `sensor_room_map` på `entity_id`.
+- Reell hjemmetesting (pilot/customer):
+  - Ingen dokumentert real-home evidens i repo for spesifikke varianter (`bod`/`loft`/`kjellerstue`) per 2026-03-07.
+  - Påstander om disse variantene skal derfor merkes `NO_EVIDENCE` inntil pilotbox/home-capture foreligger.
+
+CHECK-status (MUST-6 scope)
+- CHECK-ROOM-01: Referanse til Fixpack-3 (allerede PROVEN; ikke re-implementert her).
+- CHECK-ROOM-02: `NO_EVIDENCE` per nå (generisk kode-path støttes, men ingen real-home variantbevis).
+
 Backend API (v1)
 - GET  /v1/rooms
 - POST /v1/rooms (upsert)
