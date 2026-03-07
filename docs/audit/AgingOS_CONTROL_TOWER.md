@@ -572,3 +572,42 @@ Final CHECK-RULES-02 apply/verify order:
 
 Truth boundary:
 - No PASS claim here without fresh runtime evidence capture after deliveries migration.
+
+### Phase 4 — Fixpack-6 (MUST-4 pilot alarm system) — 2026-03-07
+Link: https://github.com/IBL0606/agingos/pull/37
+Status: READY TO MERGE
+Scope:
+- Explicit pilot rule pack truth
+- quiet-hours / override / anti-spam truth
+- ACK/CLOSE lifecycle truth
+- docs/v2 + evidence pack + Control Tower append
+
+Final verification summary:
+- CHECK-RULES-01: PASS
+  - GET /v1/rules/pilot-pack verified on runtime
+  - explicit pilot pack for R-001..R-010
+  - cooldown truth = NONE
+  - grouping truth limited to OPEN/ACK dedupe by rule+subject+scope
+
+- CHECK-RULES-02: PASS
+  - notification_policy base schema added and applied
+  - set_notification_policy_override helper fixed to use ON CONFLICT ON CONSTRAINT notification_policy_pkey
+  - notification_outbox aligned with worker-required columns (last_error, dead_letter_reason)
+  - notification_deliveries table added for delivery receipt + idempotency proof
+  - GET /v1/notification/policy = 200
+  - POST /v1/notification/policy/partner_override = 200
+  - GET /v1/notification/policy/audit = 200
+  - QUIET defer proven: status=RETRY, attempt_n=0, last_error=policy_defer:QUIET
+  - override bypass proven: status=DELIVERED with delivered_at + acked_at set
+  - idempotency proven: grouped receipt count remains 1 for same idempotency_key after rerun
+
+- CHECK-RULES-03: PASS
+  - deviation_id=4 proven OPEN -> ACK
+  - deviation_id=1 proven OPEN -> CLOSED
+  - persisted state verified after patch
+
+Truth boundary:
+- No invented alarm semantics added
+- No invented anti-spam system added
+- Verification is dev-only
+- No MiniPC/customer changes
