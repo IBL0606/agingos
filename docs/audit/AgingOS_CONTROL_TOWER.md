@@ -663,6 +663,25 @@ CHECK status:
 - CHECK-ROOM-01: REFERENCED ONLY (already PROVEN by Fixpack-3; no re-implementation in Fixpack-8).
 - CHECK-ROOM-02: NO_EVIDENCE (no real-home evidence for specific variants such as bod/loft/kjellerstue).
 
+
+### Phase 4 — Pilot scope decision — MUST-7 lock support deferred — 2026-03-07
+
+Decision:
+- MUST-7 (lock support / lock_state / lock UI/rules) is deferred and is NOT included in current pilot scope.
+
+Reason:
+- Deliberate risk reduction before pilot.
+- Current priority is to pilot the smallest proven surface possible and avoid introducing new issues late in the cycle.
+
+Truth boundary:
+- No claim is made that lock support is implemented or verified for pilot use.
+- Pilot-ready status is evaluated based on Fixpack-1 through Fixpack-8 only.
+- MUST-7 remains a post-pilot candidate, not a failed item.
+
+Impact:
+- No code/runtime change from this decision.
+- This is a project-scope/control decision only.
+
 Truth boundary:
 - Current ingest resolves room names generically via `rooms.display_name` case-insensitive match and `sensor_room_map` mapping.
 - No claim is made that bod/loft/kjellerstue are proven in real homes.
