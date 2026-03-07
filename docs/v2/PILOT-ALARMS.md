@@ -134,18 +134,25 @@ Scope truth:
   - `Hvorfor uvanlig`
   - `Datagrunnlag`
 
-Proven behavior (repo evidence):
+Proven behavior (repo + dev runtime evidence):
 - Explainability text uses anomaly score payload fields only:
   - summary from episode/score fields
   - why-text from reason codes (`reasons`)
   - data basis from `details.observed`
 - If reason/baseline explanation is missing in response, UI states this explicitly instead of inferring cause.
 - If room context is unavailable for episode row/action, UI explicitly shows `rominfo mangler`.
-- Event support link reuses existing events deep-link pattern (`events.html?auto=1&since=...&until=...&room=...`) when room + bucket are available.
+- Event support link reuses existing events deep-link pattern (`events.html?auto=1&since=...&until=...&room=...`) when room + bucket exist.
+- Dev runtime verification proved:
+  - `POST /v1/anomalies/run_latest` returns 200
+  - `GET /v1/anomalies/score` returns 200 with explainability payload
+  - `GET /v1/anomalies` returns persisted anomaly episode rows
+- Fixpack-7 also includes minimal backend compatibility fixes required for truthful MUST-5 runtime on current dev schema:
+  - `backend/services/anomaly_scoring.py`
+  - `backend/services/scheduler.py`
 
 CHECK-WHY mapping:
-- CHECK-WHY-01: Implemented in anomalies explainability panel (three required sections).
-- CHECK-WHY-02: Implemented via explicit `rominfo mangler` handling; no room inference when missing.
+- CHECK-WHY-01: PASS (repo + dev runtime).
+- CHECK-WHY-02: PASS (repo + dev runtime; explicit missing-room episode row tested with empty `room` persisted value).
 
 NO_EVIDENCE:
-- Live-stack runtime verification of MUST-5 in this container is NO_EVIDENCE until executed against running backend/UI stack.
+- Browser screenshot/UI capture is still NO_EVIDENCE unless captured explicitly from running Console.
