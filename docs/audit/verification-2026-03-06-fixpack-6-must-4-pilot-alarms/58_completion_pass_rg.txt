@@ -1,0 +1,23 @@
+docs/audit/AgingOS_CONTROL_TOWER.md:61:- Use: Phase 3 deliverable; input to Phase 4 fixpack planning (focus on reducing NO_EVIDENCE via audit-capture + addressing true blockers).
+docs/audit/AgingOS_CONTROL_TOWER.md:84:- **Phase 4 (Fix pilot blockers + update v2 docs + pilot runbook):** pending.
+docs/audit/AgingOS_CONTROL_TOWER.md:127:- Plan: audit-capture devbox + docs/v2 skeleton + pilot blockers only
+docs/audit/AgingOS_CONTROL_TOWER.md:141:- Pilot blocker SOT-040 (port exposure) addressed on devbox:
+docs/audit/AgingOS_CONTROL_TOWER.md:341:- Dette er ikke blocker for MUST-2, men bør harmoniseres senere hvis vi vil ha helt ren direkte-mapping.
+docs/audit/AgingOS_CONTROL_TOWER.md:412:- Runtime sources now respond on dev without 500/422 blockers:
+docs/audit/AgingOS_CONTROL_TOWER.md:475:## Phase 4 — Fixpack-6 blocker-fix (notification_policy base table) — 2026-03-06
+docs/audit/AgingOS_CONTROL_TOWER.md:484:- Added base-table SQL: `backend/sql/p1_6_notification_policy_base.sql`
+docs/audit/AgingOS_CONTROL_TOWER.md:504:New blocker found and fixed:
+docs/audit/AgingOS_CONTROL_TOWER.md:505:- In `set_notification_policy_override(...)`, `ON CONFLICT (org_id, home_id, subject_id)` was ambiguous in runtime PL/pgSQL context.
+docs/audit/AgingOS_CONTROL_TOWER.md:507:  - `ON CONFLICT ON CONSTRAINT notification_policy_pkey DO UPDATE`
+docs/audit/AgingOS_CONTROL_TOWER.md:513:  - policy runtime blocker history
+docs/v2/PILOT-ALARMS.md:74:- Base table SQL (additive): `backend/sql/p1_6_notification_policy_base.sql`.
+docs/v2/PILOT-ALARMS.md:84:## 5) CHECK-RULES-02 blocker and helper-fix truth
+docs/v2/PILOT-ALARMS.md:86:- Blocker-fix added: `backend/sql/p1_6_notification_policy_base.sql`.
+docs/v2/PILOT-ALARMS.md:88:- Helper-fix: `set_notification_policy_override(...)` now uses `ON CONFLICT ON CONSTRAINT notification_policy_pkey DO UPDATE`.
+backend/sql/p1_6_notification_policy_audit.sql:50:CREATE OR REPLACE FUNCTION public.set_notification_policy_override(
+backend/sql/p1_6_notification_policy_audit.sql:70:  ON CONFLICT ON CONSTRAINT notification_policy_pkey DO UPDATE
+docs/v2/TESTING.md:105:- `docker compose exec -T db psql -U agingos -d agingos -f /workspace/backend/sql/p1_6_notification_policy_base.sql | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/23_apply_notification_policy_base_sql.txt`
+docs/v2/TESTING.md:119:### CHECK-RULES-02 completion pass (base schema + helper conflict fix)
+docs/v2/TESTING.md:122:- Helper function conflict target ambiguity was fixed by using `ON CONFLICT ON CONSTRAINT notification_policy_pkey` in `set_notification_policy_override(...)`.
+docs/v2/TESTING.md:127:- `docker compose exec -T db psql -U agingos -d agingos -f /workspace/backend/sql/p1_6_notification_policy_base.sql | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/42_apply_base.sql.txt`
+docs/v2/TESTING.md:136:- `docker compose exec -T db psql -U agingos -d agingos -c "INSERT INTO public.notification_policy(org_id,home_id,subject_id,mode,quiet_start_local,quiet_end_local,tz,updated_by) VALUES ('default','default','default','QUIET','00:00','23:59','Europe/Oslo','dev:test') ON CONFLICT ON CONSTRAINT notification_policy_pkey DO UPDATE SET mode=EXCLUDED.mode, quiet_start_local=EXCLUDED.quiet_start_local, quiet_end_local=EXCLUDED.quiet_end_local, tz=EXCLUDED.tz, override_until=NULL, updated_by=EXCLUDED.updated_by, updated_at=now();" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/47_policy_set_quiet_full_day.txt`

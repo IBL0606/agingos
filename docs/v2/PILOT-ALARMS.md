@@ -80,3 +80,13 @@ Apply order on dev:
 
 NO_EVIDENCE:
 - Runtime PASS must be proven in a live dev stack after applying both SQL files.
+
+## 5) CHECK-RULES-02 blocker and helper-fix truth
+- Blocker found on dev runtime: `/v1/notification/policy` could fail when `public.notification_policy` did not exist.
+- Blocker-fix added: `backend/sql/p1_6_notification_policy_base.sql`.
+- Additional bug found on dev runtime in helper function upsert conflict target.
+- Helper-fix: `set_notification_policy_override(...)` now uses `ON CONFLICT ON CONSTRAINT notification_policy_pkey DO UPDATE`.
+
+Truth statement:
+- Policy/override/audit runtime is expected to be verifiable on dev after applying base SQL first, then audit/helper SQL.
+- Quiet-hours and anti-spam claims remain limited to observed worker/outbox behavior (`policy_defer`, `override_until` bypass, delivery idempotency key dedupe).

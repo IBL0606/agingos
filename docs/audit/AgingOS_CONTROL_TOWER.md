@@ -491,3 +491,33 @@ Delivered:
 Verification status in this container:
 - Repo-level PASS (schema file present + code expectation mapping).
 - Runtime DB/API PASS remains NO_EVIDENCE here until executed on dev stack.
+
+## Phase 4 — Fixpack-6 completion pass (MUST-4 CHECK-RULES-02 unblock+helper fix) — 2026-03-06
+
+Scope: Minimal completion pass only (dev/repo additive; no redesign).
+
+What was proven before this pass:
+- CHECK-RULES-01 runtime PASS (`/v1/rules/pilot-pack`).
+- CHECK-RULES-03 runtime PASS (`OPEN->ACK` and `OPEN->CLOSED`).
+- Base table gap for notification policy was identified and base SQL added.
+
+New blocker found and fixed:
+- In `set_notification_policy_override(...)`, `ON CONFLICT (org_id, home_id, subject_id)` was ambiguous in runtime PL/pgSQL context.
+- SQL fix applied:
+  - `ON CONFLICT ON CONSTRAINT notification_policy_pkey DO UPDATE`
+  - file: `backend/sql/p1_6_notification_policy_audit.sql`
+
+Docs/evidence updates in this pass:
+- MUST-4 docs now explicitly include:
+  - base SQL must run before audit/helper SQL
+  - policy runtime blocker history
+  - helper ambiguity bug + fix
+- Added full CHECK-RULES-02 completion command set for dev runtime proof including:
+  - policy get/override/audit
+  - QUIET defer proof (`attempt_n` unchanged + `policy_defer:*`)
+  - override bypass proof (delivery allowed)
+  - idempotency proof via `notification_deliveries` key-group counts
+
+Truth boundary:
+- No new anti-spam system introduced.
+- Claims remain strictly tied to existing worker/outbox behavior.

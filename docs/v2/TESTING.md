@@ -115,3 +115,41 @@ Anti-spam evidence (existing worker/outbox scope):
 - `docker compose exec -T db psql -U agingos -d agingos -c "SELECT id, status, attempt_n, next_attempt_at, last_error, idempotency_key FROM public.notification_outbox ORDER BY id DESC LIMIT 20;" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/29_outbox_recent.txt`
 
 If docker compose service names/paths differ on dev, capture equivalent command output and mark adaptation explicitly.
+
+### CHECK-RULES-02 completion pass (base schema + helper conflict fix)
+Problem/fix truth:
+- Runtime was previously blocked by missing `public.notification_policy`.
+- Helper function conflict target ambiguity was fixed by using `ON CONFLICT ON CONSTRAINT notification_policy_pkey` in `set_notification_policy_override(...)`.
+
+Exact dev commands (full verification):
+
+1) Apply schema + helper/audit SQL in order
+- `docker compose exec -T db psql -U agingos -d agingos -f /workspace/backend/sql/p1_6_notification_policy_base.sql | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/42_apply_base.sql.txt`
+- `docker compose exec -T db psql -U agingos -d agingos -f /workspace/backend/sql/p1_6_notification_policy_audit.sql | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/43_apply_audit_helper.sql.txt`
+
+2) Verify policy endpoints
+- `curl -sS http://127.0.0.1:8000/v1/notification/policy -H "X-API-Key: $API_KEY" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/44_policy_get.json`
+- `curl -sS -X POST http://127.0.0.1:8000/v1/notification/policy/partner_override -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" -d '{"override_until_utc":"2030-01-01T00:00:00Z"}' | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/45_partner_override.json`
+- `curl -sS http://127.0.0.1:8000/v1/notification/policy/audit -H "X-API-Key: $API_KEY" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/46_policy_audit.json`
+
+3) Prove QUIET/NIGHT defer does not bump attempt_n
+- `docker compose exec -T db psql -U agingos -d agingos -c "INSERT INTO public.notification_policy(org_id,home_id,subject_id,mode,quiet_start_local,quiet_end_local,tz,updated_by) VALUES ('default','default','default','QUIET','00:00','23:59','Europe/Oslo','dev:test') ON CONFLICT ON CONSTRAINT notification_policy_pkey DO UPDATE SET mode=EXCLUDED.mode, quiet_start_local=EXCLUDED.quiet_start_local, quiet_end_local=EXCLUDED.quiet_end_local, tz=EXCLUDED.tz, override_until=NULL, updated_by=EXCLUDED.updated_by, updated_at=now();" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/47_policy_set_quiet_full_day.txt`
+- `docker compose exec -T db psql -U agingos -d agingos -c "INSERT INTO public.notification_outbox(org_id,home_id,subject_id,route_type,route_key,destination,message_type,severity,idempotency_key,payload,bypass_policy,status,next_attempt_at,attempt_n,max_attempts) VALUES ('default','default','default','db','dev-route','dev-dest','MUST4_TEST','INFO','must4-defer-001','{}'::jsonb,false,'PENDING',now(),0,5) RETURNING id,attempt_n,status,next_attempt_at;" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/48_outbox_insert_defer_case.txt`
+- `docker compose exec -T backend python /workspace/tools/notification_worker.py 1 | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/49_worker_run_defer_case.txt`
+- `docker compose exec -T db psql -U agingos -d agingos -c "SELECT id,status,attempt_n,last_error,next_attempt_at FROM public.notification_outbox WHERE idempotency_key='must4-defer-001';" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/50_outbox_after_defer_case.txt`
+
+4) Prove override_until bypasses quiet defer
+- `docker compose exec -T db psql -U agingos -d agingos -c "UPDATE public.notification_policy SET override_until = now() + interval '2 hours', updated_at=now(), updated_by='dev:test-override' WHERE org_id='default' AND home_id='default' AND subject_id='default';" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/51_policy_set_override_future.txt`
+- `docker compose exec -T db psql -U agingos -d agingos -c "INSERT INTO public.notification_outbox(org_id,home_id,subject_id,route_type,route_key,destination,message_type,severity,idempotency_key,payload,bypass_policy,status,next_attempt_at,attempt_n,max_attempts) VALUES ('default','default','default','db','dev-route','dev-dest','MUST4_TEST','INFO','must4-override-001','{}'::jsonb,false,'PENDING',now(),0,5) RETURNING id,attempt_n,status;" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/52_outbox_insert_override_case.txt`
+- `docker compose exec -T backend python /workspace/tools/notification_worker.py 1 | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/53_worker_run_override_case.txt`
+- `docker compose exec -T db psql -U agingos -d agingos -c "SELECT id,status,attempt_n,delivered_at,acked_at,last_error FROM public.notification_outbox WHERE idempotency_key='must4-override-001';" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/54_outbox_after_override_case.txt`
+
+5) Anti-spam/idempotency evidence (existing implementation only)
+- `docker compose exec -T db psql -U agingos -d agingos -c "SELECT outbox_id,org_id,home_id,subject_id,route_type,route_key,idempotency_key,COUNT(*) AS n FROM public.notification_deliveries WHERE idempotency_key='must4-override-001' GROUP BY 1,2,3,4,5,6,7;" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/55_delivery_rows_override_case.txt`
+- `docker compose exec -T backend python /workspace/tools/notification_worker.py 1 | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/56_worker_rerun_idempotency_case.txt`
+- `docker compose exec -T db psql -U agingos -d agingos -c "SELECT outbox_id,org_id,home_id,subject_id,route_type,route_key,idempotency_key,COUNT(*) AS n FROM public.notification_deliveries WHERE idempotency_key='must4-override-001' GROUP BY 1,2,3,4,5,6,7;" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/57_delivery_rows_after_rerun.txt`
+
+Expected evidence outputs:
+- defer case: `status='RETRY'`, `attempt_n=0`, `last_error` starts with `policy_defer:`.
+- override case: `status='DELIVERED'` with non-null `delivered_at`/`acked_at`.
+- idempotency case: grouped delivery row count remains `1` for the same idempotency key.
