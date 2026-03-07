@@ -521,3 +521,28 @@ Docs/evidence updates in this pass:
 Truth boundary:
 - No new anti-spam system introduced.
 - Claims remain strictly tied to existing worker/outbox behavior.
+
+## Phase 4 — Fixpack-6 final schema-alignment (notification_outbox worker columns) — 2026-03-06
+
+Scope: Minimal additive schema alignment only.
+
+New blocker proven on dev runtime:
+- Worker defer/retry path failed with:
+  - `psycopg2.errors.UndefinedColumn: column "last_error" of relation "notification_outbox" does not exist`
+- Root cause: migration `c7e0e6518d5c_create_notification_outbox.py` did not include worker-required columns:
+  - `last_error`
+  - `dead_letter_reason`
+
+Repo fix in this pass:
+- Updated `backend/alembic/versions/c7e0e6518d5c_create_notification_outbox.py` with additive alignment:
+  - `ALTER TABLE public.notification_outbox ADD COLUMN IF NOT EXISTS last_error text NULL, ADD COLUMN IF NOT EXISTS dead_letter_reason text NULL;`
+- No worker semantic change.
+
+CHECK-RULES-02 completion order now explicit:
+1) notification_policy base SQL
+2) notification_policy audit/helper SQL
+3) notification_outbox column alignment
+4) quiet defer + override bypass + idempotency evidence run
+
+Truth boundary:
+- No PASS claim here without fresh runtime evidence capture on dev.

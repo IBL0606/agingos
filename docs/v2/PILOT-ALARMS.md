@@ -90,3 +90,19 @@ NO_EVIDENCE:
 Truth statement:
 - Policy/override/audit runtime is expected to be verifiable on dev after applying base SQL first, then audit/helper SQL.
 - Quiet-hours and anti-spam claims remain limited to observed worker/outbox behavior (`policy_defer`, `override_until` bypass, delivery idempotency key dedupe).
+
+## 6) Final schema-alignment blocker for CHECK-RULES-02
+Additional blocker found on dev runtime during defer path:
+- `notification_outbox.last_error` (and dead-letter path `dead_letter_reason`) were used by worker but missing from table schema created by migration `c7e0e6518d5c`.
+
+Repo fix:
+- `backend/alembic/versions/c7e0e6518d5c_create_notification_outbox.py` now adds:
+  - `last_error text NULL`
+  - `dead_letter_reason text NULL`
+- Added via `ALTER TABLE ... ADD COLUMN IF NOT EXISTS ...` to keep alignment additive for existing dev DBs.
+
+Dev apply/verify order for CHECK-RULES-02 completion:
+1. apply notification policy base SQL
+2. apply notification policy audit/helper SQL
+3. apply outbox schema alignment (alembic upgrade or explicit ALTER)
+4. run quiet defer + override/idempotency verification commands

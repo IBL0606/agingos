@@ -1,0 +1,26 @@
+docs/v2/TESTING.md:115:- `docker compose exec -T db psql -U agingos -d agingos -c "SELECT id, status, attempt_n, next_attempt_at, last_error, idempotency_key FROM public.notification_outbox ORDER BY id DESC LIMIT 20;" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/29_outbox_recent.txt`
+docs/v2/TESTING.md:139:- `docker compose exec -T db psql -U agingos -d agingos -c "SELECT id,status,attempt_n,last_error,next_attempt_at FROM public.notification_outbox WHERE idempotency_key='must4-defer-001';" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/50_outbox_after_defer_case.txt`
+docs/v2/TESTING.md:145:- `docker compose exec -T db psql -U agingos -d agingos -c "SELECT id,status,attempt_n,delivered_at,acked_at,last_error FROM public.notification_outbox WHERE idempotency_key='must4-override-001';" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/54_outbox_after_override_case.txt`
+docs/v2/TESTING.md:153:- defer case: `status='RETRY'`, `attempt_n=0`, `last_error` starts with `policy_defer:`.
+docs/v2/TESTING.md:157:### CHECK-RULES-02 final schema-alignment step (notification_outbox)
+docs/v2/TESTING.md:158:Third blocker history in order:
+docs/v2/TESTING.md:161:- (c) missing `notification_outbox.last_error` / `dead_letter_reason` columns required by worker defer/retry/dead-letter paths
+docs/v2/TESTING.md:167:  - `docker compose exec -T db psql -U agingos -d agingos -c "ALTER TABLE public.notification_outbox ADD COLUMN IF NOT EXISTS last_error text NULL, ADD COLUMN IF NOT EXISTS dead_letter_reason text NULL;" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/60_outbox_align_alter.txt`
+docs/v2/TESTING.md:170:- `docker compose exec -T db psql -U agingos -d agingos -c "SELECT column_name,data_type FROM information_schema.columns WHERE table_schema='public' AND table_name='notification_outbox' AND column_name IN ('last_error','dead_letter_reason') ORDER BY column_name;" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/61_outbox_columns_check.txt`
+docs/v2/TESTING.md:178:- defer case => `status='RETRY'`, `attempt_n=0`, `last_error` starts with `policy_defer:`
+backend/alembic/versions/c7e0e6518d5c_create_notification_outbox.py:3:Revision ID: c7e0e6518d5c
+backend/alembic/versions/c7e0e6518d5c_create_notification_outbox.py:15:revision: str = 'c7e0e6518d5c'
+backend/alembic/versions/c7e0e6518d5c_create_notification_outbox.py:73:          ADD COLUMN IF NOT EXISTS last_error text NULL,
+backend/alembic/versions/c7e0e6518d5c_create_notification_outbox.py:74:          ADD COLUMN IF NOT EXISTS dead_letter_reason text NULL;
+docs/v2/PILOT-ALARMS.md:96:- `notification_outbox.last_error` (and dead-letter path `dead_letter_reason`) were used by worker but missing from table schema created by migration `c7e0e6518d5c`.
+docs/v2/PILOT-ALARMS.md:99:- `backend/alembic/versions/c7e0e6518d5c_create_notification_outbox.py` now adds:
+docs/v2/PILOT-ALARMS.md:100:  - `last_error text NULL`
+docs/v2/PILOT-ALARMS.md:101:  - `dead_letter_reason text NULL`
+docs/v2/PILOT-ALARMS.md:102:- Added via `ALTER TABLE ... ADD COLUMN IF NOT EXISTS ...` to keep alignment additive for existing dev DBs.
+docs/audit/AgingOS_CONTROL_TOWER.md:525:## Phase 4 — Fixpack-6 final schema-alignment (notification_outbox worker columns) — 2026-03-06
+docs/audit/AgingOS_CONTROL_TOWER.md:531:  - `psycopg2.errors.UndefinedColumn: column "last_error" of relation "notification_outbox" does not exist`
+docs/audit/AgingOS_CONTROL_TOWER.md:532:- Root cause: migration `c7e0e6518d5c_create_notification_outbox.py` did not include worker-required columns:
+docs/audit/AgingOS_CONTROL_TOWER.md:533:  - `last_error`
+docs/audit/AgingOS_CONTROL_TOWER.md:534:  - `dead_letter_reason`
+docs/audit/AgingOS_CONTROL_TOWER.md:537:- Updated `backend/alembic/versions/c7e0e6518d5c_create_notification_outbox.py` with additive alignment:
+docs/audit/AgingOS_CONTROL_TOWER.md:538:  - `ALTER TABLE public.notification_outbox ADD COLUMN IF NOT EXISTS last_error text NULL, ADD COLUMN IF NOT EXISTS dead_letter_reason text NULL;`

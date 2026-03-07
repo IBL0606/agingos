@@ -153,3 +153,28 @@ Expected evidence outputs:
 - defer case: `status='RETRY'`, `attempt_n=0`, `last_error` starts with `policy_defer:`.
 - override case: `status='DELIVERED'` with non-null `delivered_at`/`acked_at`.
 - idempotency case: grouped delivery row count remains `1` for the same idempotency key.
+
+### CHECK-RULES-02 final schema-alignment step (notification_outbox)
+Third blocker history in order:
+- (a) missing `notification_policy` base table
+- (b) helper upsert conflict ambiguity
+- (c) missing `notification_outbox.last_error` / `dead_letter_reason` columns required by worker defer/retry/dead-letter paths
+
+Apply outbox alignment on dev (pick one):
+- Preferred (migration path):
+  - `docker compose exec -T backend alembic upgrade head | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/59_alembic_upgrade_head.txt`
+- Explicit SQL patch path (if DB already at head but missing cols):
+  - `docker compose exec -T db psql -U agingos -d agingos -c "ALTER TABLE public.notification_outbox ADD COLUMN IF NOT EXISTS last_error text NULL, ADD COLUMN IF NOT EXISTS dead_letter_reason text NULL;" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/60_outbox_align_alter.txt`
+
+Verify aligned columns exist:
+- `docker compose exec -T db psql -U agingos -d agingos -c "SELECT column_name,data_type FROM information_schema.columns WHERE table_schema='public' AND table_name='notification_outbox' AND column_name IN ('last_error','dead_letter_reason') ORDER BY column_name;" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/61_outbox_columns_check.txt`
+
+Re-run runtime proof sequence after alignment:
+- QUIET defer case commands: files `47`..`50` above.
+- Override bypass commands: files `51`..`54` above.
+- Idempotency re-run/grouped count commands: files `55`..`57` above.
+
+Expected outputs remain:
+- defer case => `status='RETRY'`, `attempt_n=0`, `last_error` starts with `policy_defer:`
+- override case => `status='DELIVERED'` with non-null `delivered_at` and `acked_at`
+- idempotency case => grouped delivery count stays `1` for same `idempotency_key`
