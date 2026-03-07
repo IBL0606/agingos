@@ -99,3 +99,19 @@ If unavailable, mark runtime proof as NO_EVIDENCE.
 
 Truth rule:
 - If dedicated deviation status audit/history is absent, explicitly record `NO_EVIDENCE`.
+
+### CHECK-RULES-02 runtime unblock (notification_policy base table)
+Apply on dev DB before policy runtime checks:
+- `docker compose exec -T db psql -U agingos -d agingos -f /workspace/backend/sql/p1_6_notification_policy_base.sql | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/23_apply_notification_policy_base_sql.txt`
+- `docker compose exec -T db psql -U agingos -d agingos -f /workspace/backend/sql/p1_6_notification_policy_audit.sql | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/24_apply_notification_policy_audit_sql.txt`
+
+Then verify API/runtime:
+- `curl -sS http://127.0.0.1:8000/v1/notification/policy -H "X-API-Key: $API_KEY" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/25_policy_get_after_base.json`
+- `curl -sS -X POST http://127.0.0.1:8000/v1/notification/policy/partner_override -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" -d '{"override_until_utc":"2030-01-01T00:00:00Z"}' | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/26_partner_override_post.json`
+- `curl -sS http://127.0.0.1:8000/v1/notification/policy/audit -H "X-API-Key: $API_KEY" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/27_policy_audit_after_override.json`
+
+Anti-spam evidence (existing worker/outbox scope):
+- `docker compose exec -T db psql -U agingos -d agingos -c "\d public.notification_deliveries" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/28_notification_deliveries_schema.txt`
+- `docker compose exec -T db psql -U agingos -d agingos -c "SELECT id, status, attempt_n, next_attempt_at, last_error, idempotency_key FROM public.notification_outbox ORDER BY id DESC LIMIT 20;" | tee docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/29_outbox_recent.txt`
+
+If docker compose service names/paths differ on dev, capture equivalent command output and mark adaptation explicitly.

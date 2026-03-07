@@ -66,3 +66,17 @@ Proven behavior:
 NO_EVIDENCE / not claimed:
 - Automatic reopen semantics as a standalone API transition are not claimed here.
 - Dedicated ACK/CLOSE audit trail table for deviations is NO_EVIDENCE in current repo.
+
+
+## 4) Schema dependency for notification policy runtime
+Runtime dependency (dev/repo truth):
+- `GET /v1/notification/policy` and partner override require base table `public.notification_policy`.
+- Base table SQL (additive): `backend/sql/p1_6_notification_policy_base.sql`.
+- Audit/override helpers remain in: `backend/sql/p1_6_notification_policy_audit.sql`.
+
+Apply order on dev:
+1. base table SQL
+2. audit/helper SQL
+
+NO_EVIDENCE:
+- Runtime PASS must be proven in a live dev stack after applying both SQL files.

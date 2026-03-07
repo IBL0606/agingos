@@ -471,3 +471,23 @@ Truth boundaries:
 
 PR:
 - PR link: TBD (to be filled by this fixpack PR)
+
+## Phase 4 — Fixpack-6 blocker-fix (notification_policy base table) — 2026-03-06
+
+Scope: Minimal MUST-4 verification unblock only (dev/repo additive schema).
+
+Problem proven:
+- `/v1/notification/policy` route exists, but runtime fails when `public.notification_policy` table is missing.
+- Existing `backend/sql/p1_6_notification_policy_audit.sql` assumes base table already exists.
+
+Delivered:
+- Added base-table SQL: `backend/sql/p1_6_notification_policy_base.sql`
+  - Columns exactly aligned with current code usage in `backend/routes/notification_policy.py` and `tools/notification_worker.py`.
+  - PK `(org_id, home_id, subject_id)` and mode check for `NORMAL|QUIET|NIGHT`.
+- Updated docs to make apply-order explicit:
+  1) base table SQL
+  2) audit/helper SQL
+
+Verification status in this container:
+- Repo-level PASS (schema file present + code expectation mapping).
+- Runtime DB/API PASS remains NO_EVIDENCE here until executed on dev stack.
