@@ -129,3 +129,19 @@ For install/upgrade verification commands and expected truth, use:
 - `docs/v2/SETUP_TRUTH.md`
 
 Do not assume `/health/detail overall_status=OK` on fresh empty installs; verify actual output.
+
+## Pilot alarms (Fixpack-6 / MUST-4)
+- Explicit pilot rule pack endpoint:
+  - `GET /v1/rules/pilot-pack`
+- Alarm lifecycle endpoints used by Console Alarmer:
+  - `GET /v1/deviations`
+  - `PATCH /v1/deviations/{id}` with status `OPEN|ACK|CLOSED`
+- Notification policy endpoints reused for quiet/override behavior:
+  - `GET /v1/notification/policy`
+  - `POST /v1/notification/policy/partner_override`
+  - `GET /v1/notification/policy/audit`
+
+Truth guardrails:
+- No cooldown semantics beyond what is explicit in config are allowed.
+- Outbox anti-spam truth is idempotency-key based delivery dedupe, not alarm-generation dedupe.
+- If deviation status history/audit is required, it is currently NO_EVIDENCE unless a concrete table/endpoint is introduced and verified.

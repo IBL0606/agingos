@@ -1,0 +1,50 @@
+backend/config/rules.yaml:2:  lookback_minutes: 60
+backend/config/rules.yaml:3:  expire_after_minutes: 180
+backend/config/rules.yaml:5:  R-001:
+backend/config/rules.yaml:6:    enabled_in_scheduler: true
+backend/config/rules.yaml:7:    lookback_minutes: 180
+backend/config/rules.yaml:8:    expire_after_minutes: 360
+backend/config/rules.yaml:9:  R-002:
+backend/config/rules.yaml:10:    enabled_in_scheduler: true
+backend/config/rules.yaml:11:    lookback_minutes: 240
+backend/config/rules.yaml:12:    expire_after_minutes: 720
+backend/config/rules.yaml:16:  R-003:
+backend/config/rules.yaml:17:    enabled_in_scheduler: true
+backend/config/rules.yaml:18:    lookback_minutes: 240
+backend/config/rules.yaml:19:    expire_after_minutes: 720
+backend/config/rules.yaml:20:  R-004:
+backend/config/rules.yaml:21:    enabled_in_scheduler: true
+backend/config/rules.yaml:22:  R-005:
+backend/config/rules.yaml:23:    enabled_in_scheduler: true
+backend/config/rules.yaml:24:  R-006:
+backend/config/rules.yaml:25:    enabled_in_scheduler: true
+backend/config/rules.yaml:26:  R-007:
+backend/config/rules.yaml:27:    enabled_in_scheduler: true
+backend/config/rules.yaml:28:  R-008:
+backend/config/rules.yaml:29:    enabled_in_scheduler: true
+backend/config/rules.yaml:30:  R-009:
+backend/config/rules.yaml:31:    enabled_in_scheduler: true
+backend/config/rules.yaml:37:  R-010:
+backend/config/rules.yaml:38:    enabled_in_scheduler: true
+backend/config/rules.yaml:42:R-002:
+backend/config/rules.yaml:46:R-001:
+backend/services/rules/registry.py:30:    "R-001": RuleSpec(
+backend/services/rules/registry.py:31:        id="R-001",
+backend/services/rules/registry.py:37:    "R-002": RuleSpec(
+backend/services/rules/registry.py:38:        id="R-002",
+backend/services/rules/registry.py:44:    "R-003": RuleSpec(
+backend/services/rules/registry.py:45:        id="R-003",
+backend/services/rules/registry.py:51:    "R-004": RuleSpec(
+backend/services/rules/registry.py:52:        id="R-004",
+backend/services/rules/registry.py:58:    "R-005": RuleSpec(
+backend/services/rules/registry.py:59:        id="R-005",
+backend/services/rules/registry.py:65:    "R-006": RuleSpec(
+backend/services/rules/registry.py:66:        id="R-006",
+backend/services/rules/registry.py:72:    "R-007": RuleSpec(
+backend/services/rules/registry.py:73:        id="R-007",
+backend/services/rules/registry.py:79:    "R-008": RuleSpec(
+backend/services/rules/registry.py:80:        id="R-008",
+backend/services/rules/registry.py:86:    "R-009": RuleSpec(
+backend/services/rules/registry.py:87:        id="R-009",
+backend/services/rules/registry.py:93:    "R-010": RuleSpec(
+backend/services/rules/registry.py:94:        id="R-010",

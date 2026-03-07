@@ -1,0 +1,6 @@
+12:from services.rules.registry import RULE_REGISTRY
+22:    spec = RULE_REGISTRY.get(rule_id)
+30:            else "NO_EVIDENCE: missing RuleSpec in RULE_REGISTRY"
+37:        "scheduler_enabled": bool(yaml_rule.get("enabled_in_scheduler", False)),
+38:        "cooldown_grouping": {
+50:def get_pilot_pack(db: Session = Depends(get_db)):

@@ -438,3 +438,176 @@ Key evidence in this fixpack:
 
 PR:
 - PR #36 — Fixpack-5 / MUST-3 weekly report in Console
+
+## Phase 4 — Fixpack-6 (MUST-4 pilot alarm system) — 2026-03-06
+
+Scope: MUST-4 only. Dev/repo changes only. No MiniPC/customer changes.
+
+Delivered:
+- Added explicit pilot alarm rule-pack endpoint:
+  - `GET /v1/rules/pilot-pack`
+  - Returns `rule_id,name,description,severity,scheduler_enabled,cooldown_grouping` for `R-001..R-010`.
+- Reused existing infrastructure only:
+  - Rules config/registry (`backend/config/rules.yaml`, `backend/services/rules/registry.py`)
+  - Existing alarms lifecycle path (`/v1/deviations` + PATCH status)
+  - Existing notification policy + outbox worker behavior
+- Updated docs/v2:
+  - Added `docs/v2/PILOT-ALARMS.md` (truth source + NO_EVIDENCE boundaries)
+  - Added MUST-4 verification commands in `docs/v2/TESTING.md`
+  - Added operations pointers in `docs/v2/OPERATIONS.md`
+
+Evidence path:
+- `docs/audit/verification-2026-03-06-fixpack-6-must-4-pilot-alarms/`
+
+CHECK status in this container:
+- CHECK-RULES-01: Repo truth PASS (endpoint + sources verified by rg evidence)
+- CHECK-RULES-02: Repo truth PASS (quiet/override/idempotency/policy-defer behavior verified by code evidence)
+- CHECK-RULES-03: Runtime execution NO_EVIDENCE in this container; executable command plan included.
+
+Truth boundaries:
+- Cooldown semantics are explicitly `NONE` (no cooldown field in current config).
+- Grouping claim is limited to proven OPEN/ACK dedupe behavior.
+- Deviation status audit trail remains NO_EVIDENCE unless added and proven later.
+
+PR:
+- PR link: TBD (to be filled by this fixpack PR)
+
+## Phase 4 — Fixpack-6 blocker-fix (notification_policy base table) — 2026-03-06
+
+Scope: Minimal MUST-4 verification unblock only (dev/repo additive schema).
+
+Problem proven:
+- `/v1/notification/policy` route exists, but runtime fails when `public.notification_policy` table is missing.
+- Existing `backend/sql/p1_6_notification_policy_audit.sql` assumes base table already exists.
+
+Delivered:
+- Added base-table SQL: `backend/sql/p1_6_notification_policy_base.sql`
+  - Columns exactly aligned with current code usage in `backend/routes/notification_policy.py` and `tools/notification_worker.py`.
+  - PK `(org_id, home_id, subject_id)` and mode check for `NORMAL|QUIET|NIGHT`.
+- Updated docs to make apply-order explicit:
+  1) base table SQL
+  2) audit/helper SQL
+
+Verification status in this container:
+- Repo-level PASS (schema file present + code expectation mapping).
+- Runtime DB/API PASS remains NO_EVIDENCE here until executed on dev stack.
+
+## Phase 4 — Fixpack-6 completion pass (MUST-4 CHECK-RULES-02 unblock+helper fix) — 2026-03-06
+
+Scope: Minimal completion pass only (dev/repo additive; no redesign).
+
+What was proven before this pass:
+- CHECK-RULES-01 runtime PASS (`/v1/rules/pilot-pack`).
+- CHECK-RULES-03 runtime PASS (`OPEN->ACK` and `OPEN->CLOSED`).
+- Base table gap for notification policy was identified and base SQL added.
+
+New blocker found and fixed:
+- In `set_notification_policy_override(...)`, `ON CONFLICT (org_id, home_id, subject_id)` was ambiguous in runtime PL/pgSQL context.
+- SQL fix applied:
+  - `ON CONFLICT ON CONSTRAINT notification_policy_pkey DO UPDATE`
+  - file: `backend/sql/p1_6_notification_policy_audit.sql`
+
+Docs/evidence updates in this pass:
+- MUST-4 docs now explicitly include:
+  - base SQL must run before audit/helper SQL
+  - policy runtime blocker history
+  - helper ambiguity bug + fix
+- Added full CHECK-RULES-02 completion command set for dev runtime proof including:
+  - policy get/override/audit
+  - QUIET defer proof (`attempt_n` unchanged + `policy_defer:*`)
+  - override bypass proof (delivery allowed)
+  - idempotency proof via `notification_deliveries` key-group counts
+
+Truth boundary:
+- No new anti-spam system introduced.
+- Claims remain strictly tied to existing worker/outbox behavior.
+
+## Phase 4 — Fixpack-6 final schema-alignment (notification_outbox worker columns) — 2026-03-06
+
+Scope: Minimal additive schema alignment only.
+
+New blocker proven on dev runtime:
+- Worker defer/retry path failed with:
+  - `psycopg2.errors.UndefinedColumn: column "last_error" of relation "notification_outbox" does not exist`
+- Root cause: migration `c7e0e6518d5c_create_notification_outbox.py` did not include worker-required columns:
+  - `last_error`
+  - `dead_letter_reason`
+
+Repo fix in this pass:
+- Updated `backend/alembic/versions/c7e0e6518d5c_create_notification_outbox.py` with additive alignment:
+  - `ALTER TABLE public.notification_outbox ADD COLUMN IF NOT EXISTS last_error text NULL, ADD COLUMN IF NOT EXISTS dead_letter_reason text NULL;`
+- No worker semantic change.
+
+CHECK-RULES-02 completion order now explicit:
+1) notification_policy base SQL
+2) notification_policy audit/helper SQL
+3) notification_outbox column alignment
+4) quiet defer + override bypass + idempotency evidence run
+
+Truth boundary:
+- No PASS claim here without fresh runtime evidence capture on dev.
+
+## Phase 4 — Fixpack-6 final blocker-fix (notification_deliveries table) — 2026-03-06
+
+Scope: Minimal additive schema fix only (dev/repo).
+
+New blocker proven on dev runtime:
+- QUIET defer path is proven, but override-bypass + idempotency proof remained blocked because `public.notification_deliveries` did not exist.
+- Worker contract requires receipt insert into `notification_deliveries` with dedupe conflict target on `(org_id, home_id, subject_id, route_type, route_key, idempotency_key)`.
+
+Repo fix in this pass:
+- Added additive Alembic migration:
+  - `backend/alembic/versions/1f2b3c4d5e6f_create_notification_deliveries_table.py`
+- Migration creates:
+  - `public.notification_deliveries` table
+  - unique dedupe index on `(org_id, home_id, subject_id, route_type, route_key, idempotency_key)`
+  - support fields used by worker receipt path (`outbox_id`, `provider_msg_id`, `response`, `created_at`)
+
+Final CHECK-RULES-02 apply/verify order:
+1) policy base SQL
+2) policy audit/helper SQL
+3) outbox alignment columns
+4) deliveries migration
+5) rerun override + same-key idempotency evidence
+
+Truth boundary:
+- No PASS claim here without fresh runtime evidence capture after deliveries migration.
+
+### Phase 4 — Fixpack-6 (MUST-4 pilot alarm system) — 2026-03-07
+Link: https://github.com/IBL0606/agingos/pull/37
+Status: READY TO MERGE
+Scope:
+- Explicit pilot rule pack truth
+- quiet-hours / override / anti-spam truth
+- ACK/CLOSE lifecycle truth
+- docs/v2 + evidence pack + Control Tower append
+
+Final verification summary:
+- CHECK-RULES-01: PASS
+  - GET /v1/rules/pilot-pack verified on runtime
+  - explicit pilot pack for R-001..R-010
+  - cooldown truth = NONE
+  - grouping truth limited to OPEN/ACK dedupe by rule+subject+scope
+
+- CHECK-RULES-02: PASS
+  - notification_policy base schema added and applied
+  - set_notification_policy_override helper fixed to use ON CONFLICT ON CONSTRAINT notification_policy_pkey
+  - notification_outbox aligned with worker-required columns (last_error, dead_letter_reason)
+  - notification_deliveries table added for delivery receipt + idempotency proof
+  - GET /v1/notification/policy = 200
+  - POST /v1/notification/policy/partner_override = 200
+  - GET /v1/notification/policy/audit = 200
+  - QUIET defer proven: status=RETRY, attempt_n=0, last_error=policy_defer:QUIET
+  - override bypass proven: status=DELIVERED with delivered_at + acked_at set
+  - idempotency proven: grouped receipt count remains 1 for same idempotency_key after rerun
+
+- CHECK-RULES-03: PASS
+  - deviation_id=4 proven OPEN -> ACK
+  - deviation_id=1 proven OPEN -> CLOSED
+  - persisted state verified after patch
+
+Truth boundary:
+- No invented alarm semantics added
+- No invented anti-spam system added
+- Verification is dev-only
+- No MiniPC/customer changes

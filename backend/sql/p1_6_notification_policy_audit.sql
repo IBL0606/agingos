@@ -67,7 +67,7 @@ AS $$
 BEGIN
   INSERT INTO public.notification_policy(org_id, home_id, subject_id, override_until, updated_by)
   VALUES (p_org, p_home, p_subject, p_override_until, p_updated_by)
-  ON CONFLICT (org_id, home_id, subject_id) DO UPDATE
+  ON CONFLICT ON CONSTRAINT notification_policy_pkey DO UPDATE
   SET override_until = EXCLUDED.override_until,
       updated_at = now(),
       updated_by = EXCLUDED.updated_by;

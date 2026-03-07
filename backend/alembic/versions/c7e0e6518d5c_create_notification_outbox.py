@@ -68,6 +68,10 @@ def upgrade() -> None:
         CREATE UNIQUE INDEX IF NOT EXISTS ux_notification_outbox_idempotency_key
           ON public.notification_outbox (idempotency_key)
           WHERE idempotency_key IS NOT NULL AND idempotency_key <> '';
+        
+        ALTER TABLE public.notification_outbox
+          ADD COLUMN IF NOT EXISTS last_error text NULL,
+          ADD COLUMN IF NOT EXISTS dead_letter_reason text NULL;
         """
     )
 

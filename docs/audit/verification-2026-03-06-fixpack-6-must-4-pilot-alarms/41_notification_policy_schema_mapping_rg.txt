@@ -1,0 +1,102 @@
+backend/sql/p1_6_notification_policy_base.sql:3:CREATE TABLE IF NOT EXISTS public.notification_policy (
+backend/sql/p1_6_notification_policy_base.sql:7:  mode text NOT NULL DEFAULT 'NORMAL'
+backend/sql/p1_6_notification_policy_base.sql:8:    CHECK (mode IN ('NORMAL','QUIET','NIGHT')),
+backend/sql/p1_6_notification_policy_base.sql:9:  quiet_start_local time NULL,
+backend/sql/p1_6_notification_policy_base.sql:10:  quiet_end_local time NULL,
+backend/sql/p1_6_notification_policy_base.sql:11:  tz text NOT NULL DEFAULT 'Europe/Oslo',
+backend/sql/p1_6_notification_policy_base.sql:12:  override_until timestamptz NULL,
+backend/sql/p1_6_notification_policy_base.sql:13:  updated_at timestamptz NOT NULL DEFAULT now(),
+backend/sql/p1_6_notification_policy_base.sql:14:  updated_by text NULL,
+backend/routes/notification_policy.py:37:    mode: str
+backend/routes/notification_policy.py:38:    quiet_start_local: Optional[str] = None
+backend/routes/notification_policy.py:39:    quiet_end_local: Optional[str] = None
+backend/routes/notification_policy.py:40:    tz: str
+backend/routes/notification_policy.py:41:    override_until: Optional[str] = None
+backend/routes/notification_policy.py:42:    updated_at: Optional[str] = None
+backend/routes/notification_policy.py:43:    updated_by: Optional[str] = None
+backend/routes/notification_policy.py:47:    override_until_utc: datetime
+backend/routes/notification_policy.py:50:@router.get("/policy", response_model=PolicyOut)
+backend/routes/notification_policy.py:59:                           mode, quiet_start_local, quiet_end_local, tz,
+backend/routes/notification_policy.py:60:                           override_until, updated_at, updated_by
+backend/routes/notification_policy.py:61:                    FROM notification_policy
+backend/routes/notification_policy.py:76:                mode="NORMAL",
+backend/routes/notification_policy.py:77:                quiet_start_local=None,
+backend/routes/notification_policy.py:78:                quiet_end_local=None,
+backend/routes/notification_policy.py:79:                tz="Europe/Oslo",
+backend/routes/notification_policy.py:80:                override_until=None,
+backend/routes/notification_policy.py:81:                updated_at=None,
+backend/routes/notification_policy.py:82:                updated_by=None,
+backend/routes/notification_policy.py:89:            mode=row.get("mode") or "NORMAL",
+backend/routes/notification_policy.py:90:            quiet_start_local=_iso(row.get("quiet_start_local")),
+backend/routes/notification_policy.py:91:            quiet_end_local=_iso(row.get("quiet_end_local")),
+backend/routes/notification_policy.py:92:            tz=row.get("tz") or "Europe/Oslo",
+backend/routes/notification_policy.py:93:            override_until=_iso(row.get("override_until")),
+backend/routes/notification_policy.py:94:            updated_at=_iso(row.get("updated_at")),
+backend/routes/notification_policy.py:95:            updated_by=row.get("updated_by"),
+backend/routes/notification_policy.py:101:@router.post("/policy/partner_override", response_model=PolicyOut)
+backend/routes/notification_policy.py:105:    require_utc_aware(body.override_until_utc, "override_until_utc")
+backend/routes/notification_policy.py:115:                SELECT org_id, home_id, subject_id, override_until, updated_at, updated_by
+backend/routes/notification_policy.py:116:                FROM set_notification_policy_override(:org, :home, :sub, :until_ts, :updated_by)
+backend/routes/notification_policy.py:123:                "until_ts": body.override_until_utc,
+backend/routes/notification_policy.py:124:                "updated_by": actor,
+backend/routes/notification_policy.py:134:                           mode, quiet_start_local, quiet_end_local, tz,
+backend/routes/notification_policy.py:135:                           override_until, updated_at, updated_by
+backend/routes/notification_policy.py:136:                    FROM notification_policy
+backend/routes/notification_policy.py:147:                "partner_override failed: notification_policy row missing after upsert"
+backend/routes/notification_policy.py:156:            mode=row.get("mode") or "NORMAL",
+backend/routes/notification_policy.py:157:            quiet_start_local=_iso(row.get("quiet_start_local")),
+backend/routes/notification_policy.py:158:            quiet_end_local=_iso(row.get("quiet_end_local")),
+backend/routes/notification_policy.py:159:            tz=row.get("tz") or "Europe/Oslo",
+backend/routes/notification_policy.py:160:            override_until=_iso(row.get("override_until")),
+backend/routes/notification_policy.py:161:            updated_at=_iso(row.get("updated_at")),
+backend/routes/notification_policy.py:162:            updated_by=row.get("updated_by"),
+backend/routes/notification_policy.py:180:@router.get("/policy/audit", response_model=list[AuditEventOut])
+backend/routes/notification_policy.py:192:                    FROM notification_policy_events
+backend/sql/p1_6_notification_policy_audit.sql:3:-- 1) Audit table for notification_policy (P1-6-2)
+backend/sql/p1_6_notification_policy_audit.sql:4:CREATE TABLE IF NOT EXISTS public.notification_policy_events (
+backend/sql/p1_6_notification_policy_audit.sql:10:  changed_at timestamptz NOT NULL DEFAULT now(),
+backend/sql/p1_6_notification_policy_audit.sql:16:CREATE INDEX IF NOT EXISTS notification_policy_events_scope_ts_idx
+backend/sql/p1_6_notification_policy_audit.sql:17:  ON public.notification_policy_events (org_id, home_id, subject_id, changed_at DESC);
+backend/sql/p1_6_notification_policy_audit.sql:20:CREATE OR REPLACE FUNCTION public.trg_notification_policy_audit()
+backend/sql/p1_6_notification_policy_audit.sql:26:    INSERT INTO public.notification_policy_events(org_id,home_id,subject_id,action,actor,prev,next)
+backend/sql/p1_6_notification_policy_audit.sql:27:    VALUES (NEW.org_id, NEW.home_id, NEW.subject_id, 'INSERT', NEW.updated_by, NULL, to_jsonb(NEW));
+backend/sql/p1_6_notification_policy_audit.sql:30:    INSERT INTO public.notification_policy_events(org_id,home_id,subject_id,action,actor,prev,next)
+backend/sql/p1_6_notification_policy_audit.sql:31:    VALUES (NEW.org_id, NEW.home_id, NEW.subject_id, 'UPDATE', NEW.updated_by, to_jsonb(OLD), to_jsonb(NEW));
+backend/sql/p1_6_notification_policy_audit.sql:34:    INSERT INTO public.notification_policy_events(org_id,home_id,subject_id,action,actor,prev,next)
+backend/sql/p1_6_notification_policy_audit.sql:35:    VALUES (OLD.org_id, OLD.home_id, OLD.subject_id, 'DELETE', OLD.updated_by, to_jsonb(OLD), NULL);
+backend/sql/p1_6_notification_policy_audit.sql:42:DROP TRIGGER IF EXISTS notification_policy_audit_trg ON public.notification_policy;
+backend/sql/p1_6_notification_policy_audit.sql:43:CREATE TRIGGER notification_policy_audit_trg
+backend/sql/p1_6_notification_policy_audit.sql:44:AFTER INSERT OR UPDATE OR DELETE ON public.notification_policy
+backend/sql/p1_6_notification_policy_audit.sql:46:EXECUTE FUNCTION public.trg_notification_policy_audit();
+backend/sql/p1_6_notification_policy_audit.sql:48:-- 3) Helper for "partner override" (P1-6-1) = set override_until safely via upsert
+backend/sql/p1_6_notification_policy_audit.sql:49:-- (worker støtter allerede override_until)
+backend/sql/p1_6_notification_policy_audit.sql:50:CREATE OR REPLACE FUNCTION public.set_notification_policy_override(
+backend/sql/p1_6_notification_policy_audit.sql:54:  p_override_until timestamptz,
+backend/sql/p1_6_notification_policy_audit.sql:55:  p_updated_by text
+backend/sql/p1_6_notification_policy_audit.sql:61:  override_until timestamptz,
+backend/sql/p1_6_notification_policy_audit.sql:62:  updated_at timestamptz,
+backend/sql/p1_6_notification_policy_audit.sql:63:  updated_by text
+backend/sql/p1_6_notification_policy_audit.sql:68:  INSERT INTO public.notification_policy(org_id, home_id, subject_id, override_until, updated_by)
+backend/sql/p1_6_notification_policy_audit.sql:69:  VALUES (p_org, p_home, p_subject, p_override_until, p_updated_by)
+backend/sql/p1_6_notification_policy_audit.sql:71:  SET override_until = EXCLUDED.override_until,
+backend/sql/p1_6_notification_policy_audit.sql:72:      updated_at = now(),
+backend/sql/p1_6_notification_policy_audit.sql:73:      updated_by = EXCLUDED.updated_by;
+backend/sql/p1_6_notification_policy_audit.sql:76:  SELECT np.org_id, np.home_id, np.subject_id, np.override_until, np.updated_at, np.updated_by
+backend/sql/p1_6_notification_policy_audit.sql:77:  FROM public.notification_policy np
+tools/notification_worker.py:11:- policy: NORMAL / QUIET / NIGHT + override_until + bypass_policy
+tools/notification_worker.py:52:        SELECT mode, quiet_start_local, quiet_end_local, tz, override_until
+tools/notification_worker.py:53:        FROM notification_policy
+tools/notification_worker.py:101:            updated_at=now()
+tools/notification_worker.py:125:            updated_at = now()
+tools/notification_worker.py:151:            updated_at=now()
+tools/notification_worker.py:170:            updated_at=now()
+tools/notification_worker.py:187:            updated_at=now()
+tools/notification_worker.py:249:    mode = pol.get("mode")
+tools/notification_worker.py:250:    tzname = pol.get("tz") or "Europe/Oslo"
+tools/notification_worker.py:251:    override_until = pol.get("override_until")
+tools/notification_worker.py:253:    if override_until and override_until > utcnow():
+tools/notification_worker.py:256:    if mode not in ("QUIET", "NIGHT"):
+tools/notification_worker.py:263:    now_local = utcnow().astimezone(ZoneInfo(tzname))
+tools/notification_worker.py:265:        now_local, pol.get("quiet_start_local"), pol.get("quiet_end_local")
+tools/notification_worker.py:267:        next_local = compute_next_allowed_local(now_local, pol.get("quiet_end_local"))
+tools/notification_worker.py:269:        defer_due_to_policy(cur, int(row["id"]), next_utc, f"policy_defer:{mode}")
