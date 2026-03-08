@@ -2,446 +2,140 @@
 <html lang="no">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AgingOS Console — Alarmer</title>
-  <style>
-    :root{
-      --bg:#0b1220; --panel:#0f1b2d; --panel2:#0c1728; --text:#e6eefc; --muted:#9fb0cc;
-      --line:#1f3352; --chip:#142746; --good:#39d98a; --warn:#ffb020; --bad:#ff5d5d; --info:#4da3ff;
-    }
-    *{box-sizing:border-box}
-    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial; background:var(--bg); color:var(--text);}
-    a{color:var(--text); text-decoration:none}
-    .wrap{max-width:1200px; margin:0 auto; padding:18px;}
-    .topbar{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; border:1px solid var(--line); background:linear-gradient(180deg,var(--panel2),transparent); border-radius:14px;}
-    .nav{display:flex; gap:14px; flex-wrap:wrap; align-items:center}
-    .nav a{opacity:.9}
-    .nav a.active{opacity:1; text-decoration:underline}
-    .pill{padding:6px 10px; border:1px solid var(--line); background:var(--chip); border-radius:999px; font-size:12px; color:var(--muted)}
-    .grid{display:grid; grid-template-columns:1fr; gap:14px; margin-top:14px;}
-    .card{border:1px solid var(--line); background:var(--panel); border-radius:14px; padding:14px;}
-    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between}
-    .row .left{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
-    .h1{font-size:22px; font-weight:700; margin:0}
-    .muted{color:var(--muted)}
-    .btn{cursor:pointer; border:1px solid var(--line); background:#12325c; color:var(--text); padding:8px 12px; border-radius:10px; font-weight:600}
-    .btn:active{transform:translateY(1px)}
-    .btn.secondary{background:transparent}
-    .btn.small{padding:6px 10px; font-size:12px}
-    .inputs{display:grid; grid-template-columns:140px 1fr auto; gap:10px; align-items:center; margin-top:10px}
-    input,select{width:100%; padding:10px 10px; border-radius:10px; border:1px solid var(--line); background:#0b1730; color:var(--text)}
-    table{width:100%; border-collapse:collapse; margin-top:10px; overflow:hidden; border-radius:12px; border:1px solid var(--line)}
-    th,td{padding:10px 10px; border-bottom:1px solid var(--line); vertical-align:top; font-size:13px}
-    th{color:var(--muted); font-weight:700; text-align:left; background:rgba(0,0,0,.15)}
-    tr:hover td{background:rgba(255,255,255,.03)}
-    .chip{display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; border:1px solid var(--line); background:var(--chip); font-size:12px}
-    .dot{width:8px; height:8px; border-radius:999px; background:var(--muted)}
-    .dot.good{background:var(--good)} .dot.warn{background:var(--warn)} .dot.bad{background:var(--bad)} .dot.info{background:var(--info)}
-    details{border:1px solid var(--line); border-radius:12px; padding:10px; background:rgba(0,0,0,.12)}
-    pre{margin:8px 0 0 0; white-space:pre-wrap; word-break:break-word; color:var(--text)}
-    .notice{margin-top:8px; color:var(--muted); font-size:13px}
-  
-    .banner{
-      margin-top:12px;
-      border:1px solid var(--line);
-      border-radius:14px;
-      padding:12px 14px;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      background: rgba(0,0,0,.12);
-    }
-    .banner.hidden{ display:none; }
-    .banner .left{ display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
-    .banner .title{ font-weight:800; }
-    .banner .meta{ color:var(--muted); font-size:13px; }
-    .banner.bad{ border-color: rgba(255,93,93,.55); background: rgba(255,93,93,.08); }
-    .banner.warn{ border-color: rgba(255,176,32,.55); background: rgba(255,176,32,.08); }
-
-  </style>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Varsler</title>
+  <link rel="stylesheet" href="./console_shared.css" />
 </head>
 <body>
   <div class="wrap">
-    <div class="topbar">
-      <div class="nav">
-        <div style="font-weight:800">AgingOS Console</div>
-        <a class="navlink" href="./index.html">Status</a>
-        <a class="navlink" href="./events.html">Events</a>
-        <a class="navlink" href="./anomalies.html">Anomalier</a>
-        <a class="navlink active" href="./alarms.html">Alarmer</a>
-        <a class="navlink" href="./proposals.html">Proposals</a>
-        <a class="navlink" href="./report.html">Rapport</a>
-  <a href="./rooms.html">Romoppsett</a>
-      </div>
-      <div class="pill" id="authPill">API: ? | key: ?</div>
-    </div>
-
-    <div class="grid">
-      <div class="card">
-        <div class="row">
-          <div class="left">
-            <div class="h1">Alarmer (regler / deviations)</div>
-            <span class="pill">Kilde: <code>/v1/deviations</code> via <code>/api</code></span>
-          </div>
-          <div class="left">
-            <button class="btn secondary" id="btnRefresh">Refresh</button>
-          </div>
-        </div>
-
-        
-        <div class="banner hidden" id="alarmBanner">
-          <div class="left">
-            <span class="chip"><span class="dot bad" id="alarmDot"></span><span class="title" id="alarmTitle">—</span></span>
-            <span class="meta" id="alarmMeta">—</span>
-          </div>
-          <div class="left">
-            <span class="pill" id="autoRefreshPill">Auto-refresh: ON (30s)</span>
-            <button class="btn secondary small" id="btnPauseAuto">Pause</button>
-          </div>
-        </div>
-
-        <div class="inputs">
-          <div class="muted">API Base</div>
-          <input id="apiBase" placeholder="/api" />
-          <button class="btn" id="btnSave">Lagre</button>
-
-          <div class="muted">X-API-Key</div>
-          <input id="apiKey" placeholder="dev-key-2" />
-          <div class="muted" style="text-align:right">lagres lokalt</div>
-        </div>
-
-        <div class="row" style="margin-top:12px">
-          <div class="left">
-            <span class="chip"><span class="dot info"></span><span id="cntTotal">total: 0</span></span>
-            <span class="chip"><span class="dot bad"></span><span id="cntOpen">OPEN: 0</span></span>
-            <span class="chip"><span class="dot warn"></span><span id="cntAck">ACK: 0</span></span>
-            <span class="chip"><span class="dot good"></span><span id="cntClosed">CLOSED: 0</span></span>
-          </div>
-          <div class="left">
-            <label class="chip" style="cursor:pointer">
-              <input id="onlyActive" type="checkbox" checked style="width:auto; margin:0" />
-              <span>kun aktive</span>
-            </label>
-            <select id="minSev" title="Min severity" style="width:170px">
-              <option value="LOW">min: LOW</option>
-              <option value="MEDIUM">min: MEDIUM</option>
-              <option value="HIGH">min: HIGH</option>
-            </select>
-            <input id="q" placeholder="Søk: rule_id / tittel ..." style="width:260px" />
-          </div>
-        </div>
-
-        <div class="notice" id="notice"></div>
-
-        <table>
-          <thead>
-            <tr>
-              <th style="width:70px">ID</th>
-              <th style="width:80px">Rule</th>
-              <th style="width:90px">Sev</th>
-              <th style="width:90px">Status</th>
-              <th>Tittel</th>
-              <th style="width:170px">Started</th>
-              <th style="width:170px">Last seen</th>
-              <th style="width:90px">Lag</th>
-              <th style="width:120px">Bevis</th>
-              <th style="width:150px">Handling</th>
-            </tr>
-          </thead>
-          <tbody id="tbody">
-            <tr><td colspan="10" class="muted">Trykk Refresh…</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <div id="shell"></div>
+    <div id="app"></div>
   </div>
+  <script src="./console_shared.js"></script>
+  <script>
+    pageShell('alarms.html', 'Varsler');
+    const app = document.getElementById('app');
 
-<script>
-  const LS_BASE = "agingos_api_base";
-  const LS_KEY  = "agingos_api_key";
+    const statusMap = { OPEN: 'Ny', ACK: 'Sett', CLOSED: 'Ferdig' };
+    const severityMap = { HIGH: 'Viktig', MEDIUM: 'Følg med', LOW: 'Lav' };
 
-  function normBase(x){
-    x = (x || "").trim();
-    if(!x) return "/api";
-    if(!x.startsWith("/")) x = "/" + x;
-    return x.replace(/\/+$/,"");
-  }
-  function sevRank(s){
-    return ({LOW:1, MEDIUM:2, HIGH:3}[String(s||"").toUpperCase()] || 0);
-  }
-  function esc(s){
-    return String(s ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  }
-  function fmtTs(x){
-    if(!x) return "—";
-    try{
-      const d = new Date(x);
-      return d.toISOString().replace("T"," ").replace("Z","Z");
-    }catch{ return String(x); }
-  }
-  function minutesBetween(a,b){
-    try{
-      const da = new Date(a).getTime();
-      const db = new Date(b).getTime();
-      if(!isFinite(da) || !isFinite(db)) return null;
-      return Math.round((db-da)/60000);
-    }catch{ return null; }
-  }
-
-  function setNotice(msg){
-    document.getElementById("notice").textContent = msg || "";
-  }
-
-  async function apiFetch(path){
-    const base = normBase(document.getElementById("apiBase").value);
-    const key  = (document.getElementById("apiKey").value || "").trim();
-    const url  = base + path;
-    const headers = {};
-    if(key) headers["X-API-Key"] = key;
-    const res = await fetch(url, {headers});
-    const txt = await res.text();
-    let json = null;
-    try{ json = JSON.parse(txt); }catch{}
-    return {ok: res.ok, status: res.status, url, text: txt, json};
-  }
-
-
-  async function apiPatch(path, body){
-    const base = normBase(document.getElementById("apiBase").value);
-    const key  = (document.getElementById("apiKey").value || "").trim();
-    const url  = base + path;
-    const headers = {"Content-Type":"application/json"};
-    if(key) headers["X-API-Key"] = key;
-    const res = await fetch(url, {method:"PATCH", headers, body: JSON.stringify(body || {})});
-    const txt = await res.text();
-    let json = null;
-    try{ json = JSON.parse(txt); }catch{}
-    return {ok: res.ok, status: res.status, url, text: txt, json};
-  }
-
-  async function setStatus(id, status){
-    if(!id) return;
-    const ok = confirm(`Sett status ${status} for deviation #${id}?`);
-    if(!ok) return;
-    setNotice(`Oppdaterer #${id} -> ${status}…`);
-    const r = await apiPatch(`/v1/deviations/${id}`, {status});
-    if(!r.ok){
-      setNotice(`FEIL ${r.status} fra ${r.url}: ${r.text}`);
-      return;
-    }
-    await refresh();
-    setNotice("");
-  }
-
-  function updateAuthPill(){
-    const base = normBase(document.getElementById("apiBase").value);
-    const key  = (document.getElementById("apiKey").value || "").trim();
-    document.getElementById("authPill").textContent = `API: ${base} | key: ${key ? "SET" : "MISSING"}`;
-  }
-
-  function render(rows){
-    const tbody = document.getElementById("tbody");
-    if(!rows.length){
-      tbody.innerHTML = `<tr><td colspan="10" class="muted">Ingen avvik matcher filter.</td></tr>`;
-      return;
-    }
-    tbody.innerHTML = rows.map(r => {
-      const id = r.deviation_id ?? "—";
-      const rule = esc(r.rule_id ?? "—");
-      const sev  = String(r.severity ?? "—").toUpperCase();
-      const st   = String(r.status ?? "—").toUpperCase();
-      const title= esc(r.title ?? "");
-      const started = fmtTs(r.started_at);
-      const lastSeen = fmtTs(r.last_seen_at || r.timestamp);
-      const nowIso = new Date().toISOString();
-      const lag = r.evidence?.last_event_ts ? minutesBetween(r.evidence.last_event_ts, nowIso) : null;
-
-      const sevDot = (sev==="HIGH") ? "bad" : (sev==="MEDIUM" ? "warn" : "good");
-      const stDot  = (st==="OPEN") ? "bad" : (st==="ACK" ? "warn" : "good");
-
-      const ev = r.evidence || {};
-      const evPretty = esc(JSON.stringify(ev, null, 2));
-
-      return `
-        <tr>
-          <td>${esc(id)}</td>
-          <td><span class="chip"><span class="dot info"></span>${rule}</span></td>
-          <td><span class="chip"><span class="dot ${sevDot}"></span>${esc(sev)}</span></td>
-          <td><span class="chip"><span class="dot ${stDot}"></span>${esc(st)}</span></td>
-          <td>${title}<div class="muted" style="margin-top:4px">start: ${esc(started)}</div></td>
-          <td>${esc(started)}</td>
-          <td>${esc(lastSeen)}</td>
-          <td>${lag==null ? "—" : esc(lag + "m")}</td>
-          <td>
-            <details>
-              <summary class="muted">vis</summary>
-              <pre>${evPretty}</pre>
-            </details>
-          </td>
-          <td>
-            <button class="btn small" onclick="setStatus(${id},'ACK')" ${st==='ACK' || st==='CLOSED' ? 'disabled' : ''}>ACK</button>
-            <button class="btn small secondary" onclick="setStatus(${id},'CLOSED')" ${st==='CLOSED' ? 'disabled' : ''}>CLOSE</button>
-          </td>
-        </tr>`;
-    }).join("");
-  }
-
-  function applyFilters(all){
-    const onlyActive = document.getElementById("onlyActive").checked;
-    const minSev = document.getElementById("minSev").value;
-    const q = (document.getElementById("q").value || "").trim().toLowerCase();
-
-    let rows = all.slice();
-    if(onlyActive){
-      rows = rows.filter(r => String(r.status||"").toUpperCase() !== "CLOSED");
-    }
-    rows = rows.filter(r => sevRank(r.severity) >= sevRank(minSev));
-    if(q){
-      rows = rows.filter(r => {
-        const a = String(r.rule_id||"").toLowerCase();
-        const b = String(r.title||"").toLowerCase();
-        const c = String(r.explanation||"").toLowerCase();
-        return a.includes(q) || b.includes(q) || c.includes(q);
-      });
-    }
-    // nyeste først
-    rows.sort((x,y) => String(y.timestamp||"").localeCompare(String(x.timestamp||"")));
-    return rows;
-  }
-
-  function updateCounts(all){
-    const st = s => String(s||"").toUpperCase();
-    const open = all.filter(r => st(r.status)==="OPEN").length;
-    const ack  = all.filter(r => st(r.status)==="ACK").length;
-    const clo  = all.filter(r => st(r.status)==="CLOSED").length;
-    document.getElementById("cntTotal").textContent = `total: ${all.length}`;
-    document.getElementById("cntOpen").textContent  = `OPEN: ${open}`;
-    document.getElementById("cntAck").textContent   = `ACK: ${ack}`;
-    document.getElementById("cntClosed").textContent= `CLOSED: ${clo}`;
-  }
-
-  let _all = [];
-
-  let _autoTimer = null;
-  let _autoEnabled = true;
-
-  function bannerUpdate(all){
-    const st = x => String(x||"").toUpperCase();
-    const sev = x => String(x||"").toUpperCase();
-    const open = all.filter(r => st(r.status)==="OPEN");
-    const ack  = all.filter(r => st(r.status)==="ACK");
-    const active = all.filter(r => st(r.status)!=="CLOSED");
-
-    const openHigh = open.filter(r => sev(r.severity)==="HIGH").length;
-    const openMed  = open.filter(r => sev(r.severity)==="MEDIUM").length;
-    const openLow  = open.filter(r => sev(r.severity)==="LOW").length;
-
-    const banner = document.getElementById("alarmBanner");
-    const title  = document.getElementById("alarmTitle");
-    const meta   = document.getElementById("alarmMeta");
-    const dot    = document.getElementById("alarmDot");
-
-    if(!banner || !title || !meta || !dot) return;
-
-    if(active.length === 0){
-      banner.classList.add("hidden");
-      return;
+    function confidence(dev) {
+      const c = Number(dev.evidence?.confidence ?? dev.evidence?.score ?? 0);
+      if (c >= 0.75) return 'Høy sikkerhet';
+      if (c >= 0.45) return 'Middels sikkerhet';
+      return 'Lav sikkerhet';
     }
 
-    banner.classList.remove("hidden");
-    banner.classList.remove("bad","warn");
-
-    if(openHigh > 0){
-      banner.classList.add("bad");
-      dot.className = "dot bad";
-      title.textContent = `⚠️ ${openHigh} HIGH OPEN alarm${openHigh===1?"":"er"}`;
-    }else if(openMed > 0){
-      banner.classList.add("warn");
-      dot.className = "dot warn";
-      title.textContent = `⚠️ ${openMed} MEDIUM OPEN alarm${openMed===1?"":"er"}`;
-    }else if(open.length > 0){
-      banner.classList.add("warn");
-      dot.className = "dot warn";
-      title.textContent = `⚠️ ${open.length} OPEN alarm${open.length===1?"":"er"}`;
-    }else{
-      dot.className = "dot good";
-      title.textContent = `Aktive alarmer: ${active.length} (ingen OPEN)`;
+    function eventsLink(window, room) {
+      const q = new URLSearchParams();
+      if (room && room !== 'Ukjent rom') q.set('room', room);
+      if (window?.since) q.set('since', window.since);
+      if (window?.until) q.set('until', window.until);
+      return './events.html?' + q.toString();
     }
 
-    const parts = [];
-    parts.push(`Aktive: ${active.length}`);
-    parts.push(`OPEN: ${open.length} (H:${openHigh} M:${openMed} L:${openLow})`);
-    parts.push(`ACK: ${ack.length}`);
-    meta.textContent = parts.join(" • ");
-  }
-
-  function autoRefreshStart(){
-    autoRefreshStop();
-    if(!_autoEnabled) return;
-    _autoTimer = setInterval(() => {
-      if(document.hidden) return; // pause when tab is not visible
-      refresh();
-    }, 30000);
-  }
-  function autoRefreshStop(){
-    if(_autoTimer){ clearInterval(_autoTimer); _autoTimer = null; }
-  }
-  function autoRefreshSet(enabled){
-    _autoEnabled = !!enabled;
-    const pill = document.getElementById("autoRefreshPill");
-    const btn  = document.getElementById("btnPauseAuto");
-    if(pill) pill.textContent = _autoEnabled ? "Auto-refresh: ON (30s)" : "Auto-refresh: OFF";
-    if(btn) btn.textContent = _autoEnabled ? "Pause" : "Resume";
-    autoRefreshStart();
-  }
-
-
-  async function refresh(){
-    updateAuthPill();
-    setNotice("Henter deviations…");
-    const r = await apiFetch("/v1/deviations?limit=200");
-    if(!r.ok){
-      setNotice(`FEIL ${r.status} fra ${r.url}: ${r.text}`);
-      return;
+    async function patchStatus(id, status) {
+      await api('/v1/deviations/' + id, { method: 'PATCH', body: JSON.stringify({ status }) });
+      location.reload();
     }
-    _all = Array.isArray(r.json) ? r.json : [];
-    updateCounts(_all);
-    bannerUpdate(_all);
-    render(applyFilters(_all));
-    setNotice("");
-  }
 
-  function loadSettings(){
-    document.getElementById("apiBase").value = normBase(localStorage.getItem(LS_BASE) || "/api");
-    document.getElementById("apiKey").value  = (localStorage.getItem(LS_KEY) || "");
-    updateAuthPill();
-  }
+    window.patchStatus = patchStatus;
 
-  document.getElementById("btnSave").addEventListener("click", () => {
-    localStorage.setItem(LS_BASE, normBase(document.getElementById("apiBase").value));
-    localStorage.setItem(LS_KEY, (document.getElementById("apiKey").value || "").trim());
-    updateAuthPill();
-    setNotice("Lagret lokalt. Trykk Refresh.");
-  });
-  document.getElementById("btnRefresh").addEventListener("click", refresh);
-  document.getElementById("onlyActive").addEventListener("change", () => render(applyFilters(_all)));
-  document.getElementById("minSev").addEventListener("change", () => render(applyFilters(_all)));
-  document.getElementById("q").addEventListener("input", () => render(applyFilters(_all)));
+    (async () => {
+      const cache = loadCache('alarms');
+      const [devRes, packRes] = await Promise.all([
+        apiTry('/v1/deviations?limit=500'),
+        apiTry('/rules/pilot-pack'),
+      ]);
 
-  loadSettings();
-  refresh();
+      const devs = devRes.ok ? devRes.data : (cache?.data?.devs || []);
+      const pack = packRes.ok ? packRes.data : (cache?.data?.pack || []);
+      if (devRes.ok || packRes.ok) saveCache('alarms', { devs, pack });
 
-  const btnPause = document.getElementById("btnPauseAuto");
-  if(btnPause){
-    btnPause.addEventListener("click", () => autoRefreshSet(!_autoEnabled));
-  }
-  document.addEventListener("visibilitychange", () => {
-    // restart timer when returning
-    if(!document.hidden) autoRefreshStart();
-  });
-  autoRefreshSet(true);
+      const fallback = ['R-001', 'R-002', 'R-003', 'R-004', 'R-005', 'R-006', 'R-007', 'R-008', 'R-009', 'R-010'];
+      const rules = (Array.isArray(pack) ? pack : []).map((r) => r.rule_id || r.id).filter(Boolean);
+      const allRules = rules.length ? rules : fallback;
+      const byRule = {};
+      devs.forEach((d) => { byRule[d.rule_id] = byRule[d.rule_id] || []; byRule[d.rule_id].push(d); });
 
-</script>
+      app.innerHTML = `
+        ${failSoftBlock(cache)}
+
+        <div class="card">
+          <h2>Pilotregelpakke</h2>
+          <div class="row">
+            ${allRules.map((r) => `<span class="chip ${byRule[r]?.length ? 'ok' : 'warn'}">${r}: ${byRule[r]?.length ? `${byRule[r].length} registrert` : 'ingen funn nå'}</span>`).join('')}
+          </div>
+        </div>
+
+        <div class="card">
+          <table>
+            <thead>
+              <tr>
+                <th>Tittel</th>
+                <th>Rom</th>
+                <th>Oppdaget</th>
+                <th>Sist sett</th>
+                <th>Alvorlighet</th>
+                <th>Sikkerhet</th>
+                <th>Status</th>
+                <th>Handlinger</th>
+              </tr>
+            </thead>
+            <tbody id="tb"></tbody>
+          </table>
+        </div>
+      `;
+
+      const tb = document.getElementById('tb');
+      tb.innerHTML = devs.map((d) => {
+        const ev = d.evidence || {};
+        const room = ev.room || ev.room_id || 'Ukjent rom';
+        const normal = ev.baseline ?? ev.expected ?? 'Mangler sammenlignbar historikk for denne perioden.';
+        const observed = ev.observed ?? ev.current ?? 'Mangler observasjon i grunnlaget.';
+        const diff = ev.delta ?? ev.diff ?? 'Forskjellen kan ikke tallfestes sikkert ennå.';
+        const certainty = confidence(d);
+
+        const uncertaintyText = certainty !== 'Høy sikkerhet'
+          ? (ev.uncertainty_reason || 'Vi mangler enten sammenlignbar historikk, stabil romkobling eller bedre datakvalitet. Mer data kan hjelpe, men tidshorisonten varierer per varseltype.')
+          : '';
+
+        return `
+          <tr>
+            <td>
+              <b>${esc(d.title || 'Varsel')}</b>
+              <div class="small muted">Hva bør du gjøre? Se hendelser i samme tidsrom og bekreft situasjonen i rommet.</div>
+              <details style="margin-top:8px">
+                <summary>Se forklaring</summary>
+                <div class="qa"><div class="q">1. Hva reagerer vi på?</div><div class="a">${esc(d.title || 'Mønsteravvik')}</div></div>
+                <div class="qa"><div class="q">2. Hvorfor fikk du dette varselet?</div><div class="a">${esc(d.explanation || 'Vi har oppdaget avvik fra det som er vanlig i samme tidsrom.')}</div></div>
+                <div class="qa"><div class="q">3. Hva er vanlig?</div><div class="a">${esc(String(normal))}</div></div>
+                <div class="qa"><div class="q">4. Hva ble sett nå?</div><div class="a">${esc(String(observed))}</div></div>
+                <div class="qa"><div class="q">5. Hvor stor er forskjellen?</div><div class="a">${esc(String(diff))}</div></div>
+                <div class="qa"><div class="q">6. Hvor sikre er vi?</div><div class="a">${certainty}</div></div>
+                <div class="qa"><div class="q">7. Hvor alvorlig virker dette?</div><div class="a">${severityMap[d.severity] || 'Følg med'}</div></div>
+                <div class="qa"><div class="q">8. Hva bør du gjøre nå?</div><div class="a">Se hendelser i samme tidsrom, sjekk rommet og marker deretter som sett eller ferdig.</div></div>
+                ${uncertaintyText ? `<div class="notice warn small">Usikkerhet: ${esc(uncertaintyText)}</div>` : ''}
+                ${devDetails(d)}
+              </details>
+            </td>
+            <td>${esc(room)}</td>
+            <td>${fmtNo(d.started_at || d.timestamp)}</td>
+            <td>${fmtNo(d.last_seen_at)}</td>
+            <td>${severityMap[d.severity] || 'Følg med'}</td>
+            <td>${certainty}</td>
+            <td>${statusMap[d.status] || d.status}</td>
+            <td>
+              <div class="actions">
+                <button class="btn secondary" onclick="patchStatus(${d.deviation_id}, 'ACK')">Marker som sett</button>
+                <button class="btn secondary" onclick="patchStatus(${d.deviation_id}, 'CLOSED')">Marker som ferdig</button>
+                <a href="${eventsLink(d.window, room)}">Se hendelser i samme tidsrom</a>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('') || '<tr><td colspan="8" class="muted">Ingen varsler å vise.</td></tr>';
+    })();
+  </script>
 </body>
 </html>
