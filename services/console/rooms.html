@@ -31,7 +31,7 @@
         apiTry('/v1/rooms'),
         apiTry('/v1/room_mappings'),
         apiTry('/v1/room_mappings/unknown_sensors?stream_id=prod'),
-        apiTry('/v1/events?limit=3000&stream_id=prod'),
+        apiTry('/v1/events?limit=1000&stream_id=prod'),
       ]);
 
       const rooms = roomsRes.ok ? roomsRes.data : (cache?.data?.rooms || []);
@@ -51,9 +51,10 @@
       events.forEach((e) => {
         const s = sensorOf(e);
         const t = new Date(e.timestamp).getTime();
-        const rm = roomOf(e);
+        const rmRaw = roomOf(e);
+        const rmLabel = rmRaw && String(rmRaw).trim() ? String(rmRaw).trim() : 'ukjent rom';
 
-        if (rm) observedRooms[rm] = (observedRooms[rm] || 0) + 1;
+        observedRooms[rmLabel] = (observedRooms[rmLabel] || 0) + 1;
 
         if (!s || Number.isNaN(t)) return;
         if (!lastBySensor[s] || t > lastBySensor[s].ts) lastBySensor[s] = { ts: t, cat: e.category };
@@ -83,9 +84,11 @@
         </div>
 
         ${rooms.length === 0 && observedRoomNames.length ? `
-          <div class="notice warn">
-            Ingen rom er registrert i romkatalogen ennå.
-            Men vi har observert aktivitet i disse romnavnene fra hendelser: <b>${observedRoomNames.join(', ')}</b>.
+          <div class="card">
+            <h2>Romkatalog mangler, men aktivitet er observert</h2>
+            <div>Ingen rom er registrert i katalogen ennå.</div>
+            <div style="margin-top:6px">Men vi har observert aktivitet i disse romnavnene fra hendelser: <b>${observedRoomNames.join(', ')}</b>.</div>
+            <div class="small muted" style="margin-top:6px">Tips: opprett rom i katalogen og koble sensorer for mer presise visninger.</div>
           </div>
         ` : ''}
 

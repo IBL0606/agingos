@@ -31,7 +31,7 @@
       };
 
       const [ev, an, dv, pp, bs] = await Promise.all([
-        apiTry('/v1/events?limit=5000&stream_id=prod'),
+        apiTry('/v1/events?limit=1000&stream_id=prod'),
         apiTry('/v1/anomalies?last=7d&limit=500'),
         apiTry('/v1/deviations?limit=500'),
         apiTry('/proposals?limit=300'),
