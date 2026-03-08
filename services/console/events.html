@@ -1,19 +1,172 @@
-<!doctype html><html lang="no"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hendelser</title><link rel="stylesheet" href="./console_shared.css"></head><body><div class="wrap"><div id="shell"></div><div id="app"></div></div><script src="./console_shared.js"></script><script>
-pageShell('events.html','Hendelser');
-const app=document.getElementById('app');
-const tr={'presence on':'Bevegelse registrert','presence off':'Bevegelse sluttet','door open':'Dør åpnet','door close':'Dør lukket','ha_snapshot':'Systemstatus fra sensorer'};
-function eventText(e){const p=e.payload||{};const k=`${e.category||''} ${p.state||p.action||''}`.trim().toLowerCase();return tr[k]||tr[e.category]||'Ukjent hendelse'}
-function roomOf(e){const p=e.payload||{};return p.room_id||p.room||p.area||''}
-(async()=>{const cache=loadCache('events'); let rows=[]; try{rows=await api('/v1/events?limit=1000&stream_id=prod');saveCache('events',rows)}catch(e){rows=cache?.data||[]} 
-app.innerHTML=failSoftBlock(cache)+`<div class='card'><div class='row'><label>Periode <select id='period'><option value='1'>1 dag</option><option value='7' selected>7 dager</option><option value='14'>14 dager</option></select></label><label>Rom <select id='room'><option value=''>Alle</option></select></label><label>Type <input id='type' placeholder='f.eks. door'></label><label>Antall <input id='limit' type='number' value='100' min='1' max='1000' style='width:90px'></label><button class='btn' id='apply'>Oppdater visning</button></div></div><div id='summary'></div><div class='card'><table><thead><tr><th>Tid</th><th>Rom</th><th>Hendelse</th><th>Detalj</th></tr></thead><tbody id='tb'></tbody></table></div>`;
-const rooms=[...new Set(rows.map(roomOf).filter(Boolean))].sort();document.getElementById('room').innerHTML='<option value="">Alle</option>'+rooms.map(r=>`<option>${r}</option>`).join('');
-function render(){const days=Number(document.getElementById('period').value||7);const room=document.getElementById('room').value;const type=(document.getElementById('type').value||'').toLowerCase();const lim=Number(document.getElementById('limit').value||100);const since=Date.now()-days*86400000;
-let f=rows.filter(r=>new Date(r.timestamp).getTime()>=since);if(room)f=f.filter(r=>roomOf(r)===room);if(type)f=f.filter(r=>`${r.category} ${JSON.stringify(r.payload||{})}`.toLowerCase().includes(type));
-const counts={};f.forEach(r=>{const rm=roomOf(r)||'Ukjent rom';counts[rm]=(counts[rm]||0)+1});const sorted=Object.entries(counts).sort((a,b)=>b[1]-a[1]);const active=sorted.filter(x=>x[0]!=='Ukjent rom').map(x=>x[0]);
-const unknown=counts['Ukjent rom']||0;const knownRooms=rooms;const none=knownRooms.filter(r=>!counts[r]);
- document.getElementById('summary').innerHTML=`<div class='card'><h2>Oppsummering</h2><div>Aktive rom: ${active.join(', ')||'Ingen'}</div><div>Mest aktivitet: ${sorted[0]?.[0]||'—'}</div><div>Minst aktivitet: ${(sorted.filter(x=>x[0]!=='Ukjent rom').slice(-1)[0]||[])[0]||'—'}</div><div>Rom uten aktivitet: ${none.join(', ')||'Ingen'}</div>${unknown?`<div class='notice'>Vi har mottatt en hendelse fra en sensor som ennå ikke er koblet til et rom. <a href='./rooms.html'>Åpne Rom og sensorer</a></div>`:''}</div>`;
- document.getElementById('tb').innerHTML=f.slice(0,lim).map(r=>`<tr><td>${fmtNo(r.timestamp)}</td><td>${esc(roomOf(r)||'Ukjent rom')}</td><td>${eventText(r)}</td><td>${esc((r.payload&&JSON.stringify(r.payload))||'—')}<details><summary>Vis mer</summary>${devDetails(r)}</details></td></tr>`).join('')||'<tr><td colspan="4" class="muted">Ingen hendelser i valgt filter.</td></tr>';
-}
-render();document.getElementById('apply').onclick=render;
-})();
-</script></body></html>
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Hendelser</title>
+  <link rel="stylesheet" href="./console_shared.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div id="shell"></div>
+    <div id="app"></div>
+  </div>
+  <script src="./console_shared.js"></script>
+  <script>
+    pageShell('events.html', 'Hendelser');
+    const app = document.getElementById('app');
+
+    const translations = {
+      'presence on': 'Bevegelse registrert',
+      'presence off': 'Bevegelse sluttet',
+      'door open': 'Dør åpnet',
+      'door close': 'Dør lukket',
+      'ha_snapshot': 'Systemstatus fra sensorer',
+    };
+
+    function roomOf(e) {
+      const p = e.payload || {};
+      return p.room_id || p.room || p.area || '';
+    }
+
+    function eventLabel(e) {
+      const p = e.payload || {};
+      const key = `${e.category || ''} ${p.state || p.action || ''}`.trim().toLowerCase();
+      return translations[key] || translations[e.category] || 'Ukjent hendelse';
+    }
+
+    function detailLabel(e) {
+      const p = e.payload || {};
+      if (e.category === 'presence') {
+        if ((p.state || '').toLowerCase() === 'on') return 'Sensor registrerte ny bevegelse.';
+        if ((p.state || '').toLowerCase() === 'off') return 'Sensor registrerte at bevegelsen stoppet.';
+      }
+      if (e.category === 'door') {
+        if ((p.state || '').toLowerCase() === 'open') return 'Dør ble åpnet.';
+        if ((p.state || '').toLowerCase() === 'close') return 'Dør ble lukket.';
+      }
+      if (e.category === 'ha_snapshot') return 'Systemet mottok status fra sensorer.';
+      return 'Hendelse registrert. Åpne «Vis mer» for tekniske detaljer.';
+    }
+
+    (async () => {
+      const cache = loadCache('events');
+      const res = await apiTry('/v1/events?limit=1000&stream_id=prod');
+      const rows = res.ok ? res.data : (cache?.data || []);
+      if (res.ok) saveCache('events', rows);
+
+      app.innerHTML = `
+        ${failSoftBlock(cache)}
+        <div class="card">
+          <div class="row">
+            <label>Periode
+              <select id="period">
+                <option value="1">1 dag</option>
+                <option value="7" selected>7 dager</option>
+                <option value="14">14 dager</option>
+                <option value="30">30 dager</option>
+              </select>
+            </label>
+            <label>Rom
+              <select id="room"><option value="">Alle</option></select>
+            </label>
+            <label>Type hendelse
+              <input id="type" placeholder="f.eks. dør" />
+            </label>
+            <label>Antall
+              <input id="limit" type="number" value="100" min="1" max="1000" style="width:90px" />
+            </label>
+            <button class="btn" id="apply">Oppdater visning</button>
+          </div>
+        </div>
+
+        <div id="summary"></div>
+
+        <div class="card">
+          <table>
+            <thead>
+              <tr><th>Tid</th><th>Rom</th><th>Hendelse</th><th>Detalj</th></tr>
+            </thead>
+            <tbody id="tb"></tbody>
+          </table>
+        </div>
+      `;
+
+      const qp = new URLSearchParams(location.search);
+      const qpRoom = qp.get('room') || '';
+      const qpType = qp.get('type') || '';
+      const qpSince = qp.get('since');
+      const qpUntil = qp.get('until');
+
+      const rooms = [...new Set(rows.map(roomOf).filter(Boolean))].sort();
+      document.getElementById('room').innerHTML = '<option value="">Alle</option>' + rooms.map((r) => `<option>${esc(r)}</option>`).join('');
+      if (qpRoom) document.getElementById('room').value = qpRoom;
+      if (qpType) document.getElementById('type').value = qpType;
+
+      function render() {
+        const days = Number(document.getElementById('period').value || 7);
+        const room = document.getElementById('room').value;
+        const type = (document.getElementById('type').value || '').toLowerCase();
+        const lim = Number(document.getElementById('limit').value || 100);
+
+        const since = qpSince ? new Date(qpSince).getTime() : (Date.now() - days * 86400000);
+        const until = qpUntil ? new Date(qpUntil).getTime() : null;
+
+        let filtered = rows.filter((r) => {
+          const ts = new Date(r.timestamp).getTime();
+          if (Number.isNaN(ts)) return false;
+          if (ts < since) return false;
+          if (until && ts > until) return false;
+          return true;
+        });
+        if (room) filtered = filtered.filter((r) => roomOf(r) === room);
+        if (type) {
+          filtered = filtered.filter((r) => {
+            const txt = `${eventLabel(r)} ${detailLabel(r)} ${r.category || ''}`.toLowerCase();
+            return txt.includes(type);
+          });
+        }
+
+        const counts = {};
+        filtered.forEach((r) => {
+          const rm = roomOf(r) || 'Ukjent rom';
+          counts[rm] = (counts[rm] || 0) + 1;
+        });
+        const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+        const activeRooms = sorted.filter(([name]) => name !== 'Ukjent rom').map(([name]) => name);
+        const knownNoActivity = rooms.filter((r) => !counts[r]);
+        const unknownCount = counts['Ukjent rom'] || 0;
+
+        document.getElementById('summary').innerHTML = `
+          <div class="card">
+            <h2>Oppsummering</h2>
+            <div>Aktive rom i valgt periode: ${activeRooms.join(', ') || 'Ingen'}</div>
+            <div>Mest aktivitet: ${sorted[0]?.[0] || '—'}</div>
+            <div>Minst aktivitet: ${(sorted.filter(([n]) => n !== 'Ukjent rom').slice(-1)[0] || [])[0] || '—'}</div>
+            <div>Rom uten aktivitet: ${knownNoActivity.join(', ') || 'Ingen'}</div>
+            ${unknownCount ? `<div class="notice warn" style="margin-top:8px">Vi har mottatt en hendelse fra en sensor som ennå ikke er koblet til et rom. <a href="./rooms.html">Åpne Rom og sensorer</a>.</div>` : ''}
+          </div>
+        `;
+
+        document.getElementById('tb').innerHTML = filtered.slice(0, lim).map((r) => `
+          <tr>
+            <td>${fmtNo(r.timestamp)}</td>
+            <td>${esc(roomOf(r) || 'Ukjent rom')}</td>
+            <td>${esc(eventLabel(r))}</td>
+            <td>
+              ${esc(detailLabel(r))}
+              <details style="margin-top:6px">
+                <summary>Vis mer</summary>
+                ${devDetails(r)}
+              </details>
+            </td>
+          </tr>
+        `).join('') || '<tr><td colspan="4" class="muted">Ingen hendelser i valgt filter.</td></tr>';
+      }
+
+      render();
+      document.getElementById('apply').onclick = render;
+    })();
+  </script>
+</body>
+</html>

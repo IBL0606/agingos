@@ -1,14 +1,107 @@
-<!doctype html><html lang="no"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mulige avvik</title><link rel="stylesheet" href="./console_shared.css"></head><body><div class="wrap"><div id="shell"></div><div id="app"></div></div><script src="./console_shared.js"></script><script>
-pageShell('anomalies.html','Mulige avvik');const app=document.getElementById('app');
-function diffLabel(s){if(s>=0.75)return 'Stor';if(s>=0.4)return 'Tydelig';return 'Liten'}
-(async()=>{const cache=loadCache('anomalies');let eps=[],devs=[];try{[eps,devs]=await Promise.all([api('/v1/anomalies?last=14d&limit=400'),api('/v1/deviations?limit=500')]);saveCache('anomalies',{eps,devs})}catch(e){eps=cache?.data?.eps||[];devs=cache?.data?.devs||[]}
-app.innerHTML=failSoftBlock(cache)+`<div class='card'><h2>Vurderinger fra systemet</h2><div class='muted'>Denne siden viser vurderinger og resonnement, også når noe ikke blir et varsel.</div></div><div id='list'></div>`;
-const list=document.getElementById('list');
-list.innerHTML=eps.map(a=>{const room=a.room||'Ukjent rom';const score=Number(a.score_total||0);const baseline=a.baseline_ref?.expected||'Mangler sikkert sammenligningsgrunnlag';const observed=(a.reasons||[]).map(r=>r.reason||r.msg).filter(Boolean).slice(0,2).join('; ')||'Ingen ekstra detaljer';
-const match=devs.find(d=>(d.evidence?.room===room||d.evidence?.room_id===room||room==='Ukjent rom')&& (d.window?.since?new Date(d.window.since).getTime()<=new Date(a.start_ts).getTime():true));
-const alert=match? 'Ja' : (score>0.7?'Ikke ennå':'Nei');
-const conf=score>=0.7?'Høy':score>=0.45?'Middels':'Lav';
-const eUrl=`./events.html?room=${encodeURIComponent(room)}&since=${encodeURIComponent(a.start_ts||'')}`;
-return `<div class='card'><h2>${esc(room)} · ${a.level==='RED'?'Høy oppmerksomhet':'Rolig vurdering'}</h2><ol><li>Hva la systemet merke til? Score ${score.toFixed(2)} med nivå ${a.level}.</li><li>Hva er vanlig? ${esc(String(baseline))}</li><li>Hva ble sett denne gangen? ${esc(observed)}</li><li>Hvor stor er forskjellen? ${diffLabel(score)}</li><li>Hvor sikker er vurderingen? ${conf}</li><li>Ble dette et varsel? ${alert}</li></ol><div class='row'><a href='${eUrl}'>Åpne relevante hendelser</a> ${match?`<a href='./alarms.html'>Åpne tilhørende varsel</a>`:''}</div>${devDetails(a)}</div>`}).join('')||'<div class="card muted">Ingen mulige avvik i valgt periode.</div>';
-})();
-</script></body></html>
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mulige avvik</title>
+  <link rel="stylesheet" href="./console_shared.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div id="shell"></div>
+    <div id="app"></div>
+  </div>
+  <script src="./console_shared.js"></script>
+  <script>
+    pageShell('anomalies.html', 'Mulige avvik');
+    const app = document.getElementById('app');
+
+    function diffLabel(score) {
+      if (score >= 0.75) return 'Stor';
+      if (score >= 0.4) return 'Tydelig';
+      return 'Liten';
+    }
+
+    function confidenceLabel(score) {
+      if (score >= 0.75) return 'Høy sikkerhet';
+      if (score >= 0.45) return 'Middels sikkerhet';
+      return 'Lav sikkerhet';
+    }
+
+    function observationText(a) {
+      const reasons = Array.isArray(a.reasons) ? a.reasons : [];
+      const lines = reasons.map((r) => r.reason || r.msg).filter(Boolean);
+      return lines.slice(0, 2).join(' · ') || 'Systemet har registrert et mulig avvik uten ekstra forklaring i hovedgrunnlaget.';
+    }
+
+    (async () => {
+      const cache = loadCache('anomalies');
+      const anomaliesRes = await apiTry('/v1/anomalies?last=14d&limit=400');
+      const deviationsRes = await apiTry('/v1/deviations?limit=500');
+
+      const anomalies = anomaliesRes.ok ? anomaliesRes.data : (cache?.data?.anomalies || []);
+      const deviations = deviationsRes.ok ? deviationsRes.data : (cache?.data?.deviations || []);
+
+      if (anomaliesRes.ok || deviationsRes.ok) {
+        saveCache('anomalies', { anomalies, deviations });
+      }
+
+      app.innerHTML = `
+        ${failSoftBlock(cache)}
+        <div class="card">
+          <h2>Vurderinger fra systemet</h2>
+          <div class="muted">Denne siden viser systemets vurderinger og resonnement, også når noe ikke blir et varsel.</div>
+        </div>
+        <div id="list"></div>
+      `;
+
+      const list = document.getElementById('list');
+      list.innerHTML = anomalies.map((a) => {
+        const room = a.room || 'Ukjent rom';
+        const score = Number(a.score_total || 0);
+        const normal = a.baseline_ref?.expected || 'Vi mangler sikkert sammenligningsgrunnlag for dette rommet.';
+        const observed = observationText(a);
+        const variation = diffLabel(score);
+        const certainty = confidenceLabel(score);
+
+        const matchingDeviation = deviations.find((d) => {
+          const dRoom = d.evidence?.room || d.evidence?.room_id || 'Ukjent rom';
+          return dRoom === room;
+        });
+
+        const warningState = matchingDeviation
+          ? 'Ja'
+          : (score >= 0.7 ? 'Ikke ennå' : 'Nei');
+
+        const noticed = score >= 0.75
+          ? 'Systemet la merke til et tydelig avvik fra forventet aktivitetsmønster.'
+          : score >= 0.4
+            ? 'Systemet la merke til en endring som bør følges med på.'
+            : 'Systemet la merke til en liten endring som foreløpig virker begrenset.';
+
+        const eventsUrl = `./events.html?room=${encodeURIComponent(room)}&since=${encodeURIComponent(a.start_ts || '')}`;
+
+        return `
+          <div class="card">
+            <h2>${esc(room)}</h2>
+
+            <div class="qa"><div class="q">1. Hva la systemet merke til?</div><div class="a">${esc(noticed)}</div></div>
+            <div class="qa"><div class="q">2. Hva er vanlig?</div><div class="a">${esc(String(normal))}</div></div>
+            <div class="qa"><div class="q">3. Hva ble sett denne gangen?</div><div class="a">${esc(observed)}</div></div>
+            <div class="qa"><div class="q">4. Hvor stor er forskjellen?</div><div class="a">${variation}</div></div>
+            <div class="qa"><div class="q">5. Hvor sikker er vurderingen?</div><div class="a">${certainty}</div></div>
+            <div class="qa"><div class="q">6. Ble dette et varsel?</div><div class="a">${warningState}</div></div>
+
+            <div class="row" style="margin-top:10px">
+              <a href="${eventsUrl}">Åpne relevante hendelser</a>
+              ${matchingDeviation ? '<a href="./alarms.html">Åpne tilhørende varsel</a>' : ''}
+            </div>
+
+            <div style="margin-top:10px">${devDetails(a)}</div>
+          </div>
+        `;
+      }).join('') || `<div class="card muted">Ingen mulige avvik i valgt periode.</div>`;
+    })();
+  </script>
+</body>
+</html>

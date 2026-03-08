@@ -1,19 +1,177 @@
-<!doctype html><html lang="no"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rom og sensorer</title><link rel="stylesheet" href="./console_shared.css"></head><body><div class="wrap"><div id="shell"></div><div id="app"></div></div><script src="./console_shared.js"></script><script>
-pageShell('rooms.html','Rom og sensorer');const app=document.getElementById('app');const HIDE='agingos_hidden_sensors';
-function nameFromEntity(e){if(!e)return 'Ukjent sensor';return e.split('.').pop().replaceAll('_',' ')}
-function sensorOf(ev){return ev.payload?.entity_id||''}
-function roomOf(ev){return ev.payload?.room_id||ev.payload?.room||ev.payload?.area||''}
-(async()=>{const cache=loadCache('rooms');let rooms=[],maps=[],unknown=[],events=[];try{[rooms,maps,unknown,events]=await Promise.all([api('/v1/rooms'),api('/v1/room_mappings'),api('/v1/room_mappings/unknown_sensors?stream_id=prod'),api('/v1/events?limit=2000&stream_id=prod')]);saveCache('rooms',{rooms,maps,unknown,events})}catch(e){const c=cache?.data||{};rooms=c.rooms||[];maps=c.maps||[];unknown=c.unknown||[];events=c.events||[]}
-const now=Date.now();const lastBySensor={};const count7={};events.forEach(e=>{const s=sensorOf(e);if(!s)return;const t=new Date(e.timestamp).getTime();if(!lastBySensor[s]||t>lastBySensor[s].ts)lastBySensor[s]={ts:t,cat:e.category};if(t>now-7*86400000)count7[s]=(count7[s]||0)+1});
-const hidden=JSON.parse(localStorage.getItem(HIDE)||'{}');const unknownIds=unknown.map(u=>u.entity_id).filter(id=>{const h=hidden[id];return !(h && lastBySensor[id] && lastBySensor[id].ts<=h)});
-const oldSensors=Object.entries(lastBySensor).filter(([,v])=>v.ts<now-48*3600000).length;
-app.innerHTML=failSoftBlock(cache)+`<div class='card row'><span class='chip'>Antall rom: ${rooms.length}</span><span class='chip'>Antall kjente sensorer: ${maps.filter(m=>m.active).length}</span><span class='chip'>Antall ukjente sensorer: ${unknownIds.length}</span><span class='chip'>Antall sensorer ikke sett nylig: ${oldSensors}</span></div><div id='roomCards'></div><div id='unknown'></div>`;
-const rm=document.getElementById('roomCards');
-rm.innerHTML=rooms.map(r=>{const rs=maps.filter(m=>m.room_id===r.room_id);const last=Math.max(...rs.map(s=>lastBySensor[s.entity_id]?.ts||0),0);const needs=rs.some(s=>!s.active || (lastBySensor[s.entity_id] && lastBySensor[s.entity_id].ts<now-48*3600000));
-return `<div class='card'><h2>${esc(r.display_name||r.room_id)}</h2><div>Antall sensorer: ${rs.length}</div><div>Sist aktivitet: ${last?fmtNo(last):'Ikke sett'}</div><div>${needs?'<span class="warn">Trenger oppfølging</span>':'<span class="ok">Ser normalt ut</span>'}</div><ul>${rs.map(s=>{const ls=lastBySensor[s.entity_id];const st=!s.active?'Skjult':!ls?'Uavklart':(ls.ts<now-48*3600000?'Ikke sett nylig':'Aktiv');return `<li>${esc(nameFromEntity(s.entity_id))} · ${st} · Sist sett: ${ls?fmtNo(ls.ts):'—'} · Siste hendelse: ${esc(ls?.cat||'—')} <a href='./events.html?room=${encodeURIComponent(r.room_id)}'>Se hendelser</a> <a href='./alarms.html'>Se varsler</a>${devDetails(s)}</li>`}).join('')||'<li>Ingen sensorer koblet.</li>'}</ul></div>`}).join('')||'<div class="card muted">Ingen rom registrert.</div>';
-const uk=document.getElementById('unknown');
-uk.innerHTML=`<div class='card'><h2>Ukjente sensorer</h2>${unknownIds.map(id=>{const ls=lastBySensor[id];const sug=roomOf(events.find(e=>sensorOf(e)===id)||{})||'Ikke tilgjengelig';return `<div style='border-top:1px solid var(--line);padding-top:8px;margin-top:8px'><b>${esc(nameFromEntity(id))}</b><div>Sist sett: ${ls?fmtNo(ls.ts):'—'}</div><div>Antall hendelser siste 7 dager: ${count7[id]||0}</div><div>Foreslått rom: ${esc(sug)}</div><div>Status: Ukjent sensor</div><div class='row'><select id='room_${esc(id)}'><option value=''>Velg rom</option>${rooms.map(r=>`<option value='${esc(r.room_id)}'>${esc(r.display_name||r.room_id)}</option>`).join('')}</select><button class='btn secondary' onclick='mapSensor("${esc(id)}")'>Koble til rom</button><button class='btn secondary' onclick='hideSensor("${esc(id)}")'>Skjul</button><a href='./events.html?type=${encodeURIComponent(id)}'>Se hendelser</a></div>${devDetails({entity_id:id})}</div>`}).join('')||'Ingen ukjente sensorer nå.'}</div>`;
-window.mapSensor=async(id)=>{const room=document.getElementById('room_'+CSS.escape(id)).value;if(!room)return alert('Velg rom først');await api('/v1/room_mappings',{method:'POST',body:JSON.stringify({entity_id:id,room_id:room,active:true})});location.reload()};
-window.hideSensor=(id)=>{hidden[id]=Date.now();localStorage.setItem(HIDE,JSON.stringify(hidden));location.reload()};
-})();
-</script></body></html>
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Rom og sensorer</title>
+  <link rel="stylesheet" href="./console_shared.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div id="shell"></div>
+    <div id="app"></div>
+  </div>
+  <script src="./console_shared.js"></script>
+  <script>
+    pageShell('rooms.html', 'Rom og sensorer');
+    const app = document.getElementById('app');
+    const HIDE = 'agingos_hidden_sensors';
+
+    function nameFromEntity(e) {
+      if (!e) return 'Ukjent sensor';
+      return e.split('.').pop().replaceAll('_', ' ');
+    }
+
+    function sensorOf(ev) { return ev.payload?.entity_id || ''; }
+    function roomOf(ev) { return ev.payload?.room_id || ev.payload?.room || ev.payload?.area || ''; }
+
+    (async () => {
+      const cache = loadCache('rooms');
+      const [roomsRes, mapRes, unknownRes, eventsRes] = await Promise.all([
+        apiTry('/v1/rooms'),
+        apiTry('/v1/room_mappings'),
+        apiTry('/v1/room_mappings/unknown_sensors?stream_id=prod'),
+        apiTry('/v1/events?limit=3000&stream_id=prod'),
+      ]);
+
+      const rooms = roomsRes.ok ? roomsRes.data : (cache?.data?.rooms || []);
+      const mappings = mapRes.ok ? mapRes.data : (cache?.data?.mappings || []);
+      const unknown = unknownRes.ok ? unknownRes.data : (cache?.data?.unknown || []);
+      const events = eventsRes.ok ? eventsRes.data : (cache?.data?.events || []);
+
+      if (roomsRes.ok || mapRes.ok || unknownRes.ok || eventsRes.ok) {
+        saveCache('rooms', { rooms, mappings, unknown, events });
+      }
+
+      const now = Date.now();
+      const lastBySensor = {};
+      const count7 = {};
+      const observedRooms = {};
+
+      events.forEach((e) => {
+        const s = sensorOf(e);
+        const t = new Date(e.timestamp).getTime();
+        const rm = roomOf(e);
+
+        if (rm) observedRooms[rm] = (observedRooms[rm] || 0) + 1;
+
+        if (!s || Number.isNaN(t)) return;
+        if (!lastBySensor[s] || t > lastBySensor[s].ts) lastBySensor[s] = { ts: t, cat: e.category };
+        if (t > now - 7 * 86400000) count7[s] = (count7[s] || 0) + 1;
+      });
+
+      const hidden = JSON.parse(localStorage.getItem(HIDE) || '{}');
+      const unknownIds = unknown
+        .map((u) => u.entity_id)
+        .filter((id) => {
+          const hiddenAt = hidden[id];
+          const last = lastBySensor[id]?.ts;
+          return !(hiddenAt && last && last <= hiddenAt);
+        });
+
+      const notSeenRecently = Object.values(lastBySensor).filter((v) => v.ts < now - 48 * 3600000).length;
+      const observedRoomNames = Object.keys(observedRooms).sort();
+
+      app.innerHTML = `
+        ${failSoftBlock(cache)}
+
+        <div class="card row">
+          <span class="chip">Antall rom: ${rooms.length}</span>
+          <span class="chip">Antall kjente sensorer: ${mappings.filter((m) => m.active).length}</span>
+          <span class="chip">Antall ukjente sensorer: ${unknownIds.length}</span>
+          <span class="chip">Antall sensorer ikke sett nylig: ${notSeenRecently}</span>
+        </div>
+
+        ${rooms.length === 0 && observedRoomNames.length ? `
+          <div class="notice warn">
+            Ingen rom er registrert i romkatalogen ennå.
+            Men vi har observert aktivitet i disse romnavnene fra hendelser: <b>${observedRoomNames.join(', ')}</b>.
+          </div>
+        ` : ''}
+
+        <div id="roomCards"></div>
+        <div id="unknown"></div>
+      `;
+
+      const roomCards = document.getElementById('roomCards');
+      roomCards.innerHTML = rooms.map((r) => {
+        const sensors = mappings.filter((m) => m.room_id === r.room_id);
+        const lastTs = Math.max(...sensors.map((s) => lastBySensor[s.entity_id]?.ts || 0), 0);
+        const needsFollowUp = sensors.some((s) => !s.active || (lastBySensor[s.entity_id] && lastBySensor[s.entity_id].ts < now - 48 * 3600000));
+
+        return `
+          <div class="card">
+            <h2>${esc(r.display_name || r.room_id)}</h2>
+            <div>Antall sensorer: ${sensors.length}</div>
+            <div>Sist aktivitet: ${lastTs ? fmtNo(lastTs) : 'Ikke sett'}</div>
+            <div>${needsFollowUp ? '<span class="warn">Trenger oppfølging</span>' : '<span class="ok">Ser normalt ut</span>'}</div>
+            <ul>
+              ${sensors.map((s) => {
+                const ls = lastBySensor[s.entity_id];
+                const status = !s.active ? 'Skjult' : !ls ? 'Uavklart' : (ls.ts < now - 48 * 3600000 ? 'Ikke sett nylig' : 'Aktiv');
+                return `
+                  <li>
+                    ${esc(nameFromEntity(s.entity_id))} · ${status} · Sist sett: ${ls ? fmtNo(ls.ts) : '—'} · Siste hendelsestype: ${esc(ls?.cat || '—')}
+                    <div class="row small" style="margin-top:4px">
+                      <a href="./events.html?room=${encodeURIComponent(r.room_id)}">Se hendelser</a>
+                      <a href="./alarms.html">Se varsler</a>
+                    </div>
+                    ${devDetails(s)}
+                  </li>
+                `;
+              }).join('') || '<li>Ingen sensorer koblet.</li>'}
+            </ul>
+          </div>
+        `;
+      }).join('') || '<div class="card muted">Ingen rom registrert i katalogen.</div>';
+
+      const unknownEl = document.getElementById('unknown');
+      unknownEl.innerHTML = `
+        <div class="card">
+          <h2>Ukjente sensorer</h2>
+          ${unknownIds.map((id) => {
+            const ls = lastBySensor[id];
+            const suggested = roomOf(events.find((e) => sensorOf(e) === id) || {}) || 'Ikke tilgjengelig';
+            return `
+              <div style="border-top:1px solid var(--line);padding-top:8px;margin-top:8px">
+                <b>${esc(nameFromEntity(id))}</b>
+                <div>Sist sett: ${ls ? fmtNo(ls.ts) : '—'}</div>
+                <div>Antall hendelser siste 7 dager: ${count7[id] || 0}</div>
+                <div>Foreslått rom: ${esc(suggested)}</div>
+                <div>Status: Ukjent sensor</div>
+                <div class="row" style="margin-top:6px">
+                  <select id="room_${esc(id)}">
+                    <option value="">Velg rom</option>
+                    ${rooms.map((r) => `<option value="${esc(r.room_id)}">${esc(r.display_name || r.room_id)}</option>`).join('')}
+                  </select>
+                  <button class="btn secondary" onclick="mapSensor('${esc(id)}')">Koble til rom</button>
+                  <button class="btn secondary" onclick="hideSensor('${esc(id)}')">Skjul</button>
+                  <a href="./events.html?type=${encodeURIComponent(id)}">Se hendelser</a>
+                </div>
+                ${devDetails({ entity_id: id })}
+              </div>
+            `;
+          }).join('') || 'Ingen ukjente sensorer nå.'}
+        </div>
+      `;
+
+      window.mapSensor = async (id) => {
+        const sel = document.getElementById('room_' + CSS.escape(id));
+        const room = sel ? sel.value : '';
+        if (!room) return alert('Velg rom først');
+        await api('/v1/room_mappings', {
+          method: 'POST',
+          body: JSON.stringify({ entity_id: id, room_id: room, active: true }),
+        });
+        location.reload();
+      };
+
+      window.hideSensor = (id) => {
+        hidden[id] = Date.now();
+        localStorage.setItem(HIDE, JSON.stringify(hidden));
+        location.reload();
+      };
+    })();
+  </script>
+</body>
+</html>

@@ -1,16 +1,141 @@
-<!doctype html><html lang="no"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Varsler</title><link rel="stylesheet" href="./console_shared.css"></head><body><div class="wrap"><div id="shell"></div><div id="app"></div></div><script src="./console_shared.js"></script><script>
-pageShell('alarms.html','Varsler'); const app=document.getElementById('app');
-const sm={OPEN:'Ny',ACK:'Sett',CLOSED:'Ferdig'}; const sev={HIGH:'Viktig',MEDIUM:'Følg med',LOW:'Lav'};
-function conf(d){const c=d.evidence?.confidence??d.evidence?.score??0; if(c>=0.75)return 'Høy sikkerhet'; if(c>=0.45)return 'Middels sikkerhet'; return 'Lav sikkerhet'}
-function eventsLink(w,r){const q=new URLSearchParams(); if(r)q.set('room',r); if(w?.since)q.set('since',w.since); if(w?.until)q.set('until',w.until); return './events.html?'+q.toString()}
-async function patch(id,status){await api('/v1/deviations/'+id,{method:'PATCH',body:JSON.stringify({status})});location.reload()}
-(async()=>{const cache=loadCache('alarms');let devs=[];let pack=[];try{[devs,pack]=await Promise.all([api('/v1/deviations?limit=500'),api('/rules/pilot-pack')]);saveCache('alarms',{devs,pack})}catch(e){const c=cache?.data||{};devs=c.devs||[];pack=c.pack||[]}
-const rules=(Array.isArray(pack)?pack:[]).map(r=>r.rule_id||r.id).filter(Boolean);const fallback=['R-001','R-002','R-003','R-004','R-005','R-006','R-007','R-008','R-009','R-010'];const allRules=rules.length?rules:fallback;
-const byRule={};devs.forEach(d=>(byRule[d.rule_id]=byRule[d.rule_id]||[]).push(d));
-app.innerHTML=failSoftBlock(cache)+`<div class='card'><h2>Pilotregelpakke</h2>${allRules.map(r=>`<span class='chip ${byRule[r]?.length?'ok':'warn'}'>${r}: ${byRule[r]?.length?byRule[r].length+' aktive/tidligere':'ingen funn nå'}</span>`).join(' ')}</div>
-<div class='card'><table><thead><tr><th>Tittel</th><th>Rom</th><th>Oppdaget</th><th>Sist sett</th><th>Alvorlighet</th><th>Sikkerhet</th><th>Status</th><th>Handling</th></tr></thead><tbody id='tb'></tbody></table></div>`;
-const tb=document.getElementById('tb');
-tb.innerHTML=devs.map(d=>{const ev=d.evidence||{};const room=ev.room||ev.room_id||'Ukjent rom';const baseline=ev.baseline??ev.expected??'Mangler sammenlignbar historikk';const obs=ev.observed??ev.current??'Mangler observasjon';const diff=ev.delta??ev.diff??'Ukjent';const uncertain=conf(d)!=='Høy sikkerhet'?`<div class='muted small'>Usikkerhet: ${ev.uncertainty_reason||'Vi mangler enten historikk, stabil romkobling eller tydelige signaler.'}</div>`:'';
-return `<tr><td><b>${esc(d.title||d.rule_id)}</b><div class='small muted'>${esc(d.rule_id||'')}</div><details><summary>Se forklaring</summary><ol class='small'><li>Hva reagerer vi på? ${esc(d.title||'Mønsteravvik')}</li><li>Hvorfor fikk du dette varselet? ${esc(d.explanation||'Avvik fra vanlig nivå')}</li><li>Hva er vanlig? ${esc(String(baseline))}</li><li>Hva ble sett nå? ${esc(String(obs))}</li><li>Hvor stor er forskjellen? ${esc(String(diff))}</li><li>Hvor sikre er vi? ${conf(d)}</li><li>Hvor alvorlig virker dette? ${sev[d.severity]||'Følg med'}</li><li>Hva bør du gjøre nå? Se hendelser i samme tidsrom og bekreft situasjonen.</li></ol>${uncertain}${devDetails(d)}</details></td><td>${esc(room)}</td><td>${fmtNo(d.started_at||d.timestamp)}</td><td>${fmtNo(d.last_seen_at)}</td><td>${sev[d.severity]||'Følg med'}</td><td>${conf(d)}</td><td>${sm[d.status]||d.status}</td><td><button class='btn secondary' onclick='patch(${d.deviation_id},"ACK")'>Marker som sett</button><button class='btn secondary' onclick='patch(${d.deviation_id},"CLOSED")'>Marker som ferdig</button><a href='${eventsLink(d.window,room)}'>Se hendelser i samme tidsrom</a></td></tr>`}).join('')||'<tr><td colspan="8" class="muted">Ingen varsler å vise.</td></tr>';
-})();
-</script></body></html>
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Varsler</title>
+  <link rel="stylesheet" href="./console_shared.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div id="shell"></div>
+    <div id="app"></div>
+  </div>
+  <script src="./console_shared.js"></script>
+  <script>
+    pageShell('alarms.html', 'Varsler');
+    const app = document.getElementById('app');
+
+    const statusMap = { OPEN: 'Ny', ACK: 'Sett', CLOSED: 'Ferdig' };
+    const severityMap = { HIGH: 'Viktig', MEDIUM: 'Følg med', LOW: 'Lav' };
+
+    function confidence(dev) {
+      const c = Number(dev.evidence?.confidence ?? dev.evidence?.score ?? 0);
+      if (c >= 0.75) return 'Høy sikkerhet';
+      if (c >= 0.45) return 'Middels sikkerhet';
+      return 'Lav sikkerhet';
+    }
+
+    function eventsLink(window, room) {
+      const q = new URLSearchParams();
+      if (room && room !== 'Ukjent rom') q.set('room', room);
+      if (window?.since) q.set('since', window.since);
+      if (window?.until) q.set('until', window.until);
+      return './events.html?' + q.toString();
+    }
+
+    async function patchStatus(id, status) {
+      await api('/v1/deviations/' + id, { method: 'PATCH', body: JSON.stringify({ status }) });
+      location.reload();
+    }
+
+    window.patchStatus = patchStatus;
+
+    (async () => {
+      const cache = loadCache('alarms');
+      const [devRes, packRes] = await Promise.all([
+        apiTry('/v1/deviations?limit=500'),
+        apiTry('/rules/pilot-pack'),
+      ]);
+
+      const devs = devRes.ok ? devRes.data : (cache?.data?.devs || []);
+      const pack = packRes.ok ? packRes.data : (cache?.data?.pack || []);
+      if (devRes.ok || packRes.ok) saveCache('alarms', { devs, pack });
+
+      const fallback = ['R-001', 'R-002', 'R-003', 'R-004', 'R-005', 'R-006', 'R-007', 'R-008', 'R-009', 'R-010'];
+      const rules = (Array.isArray(pack) ? pack : []).map((r) => r.rule_id || r.id).filter(Boolean);
+      const allRules = rules.length ? rules : fallback;
+      const byRule = {};
+      devs.forEach((d) => { byRule[d.rule_id] = byRule[d.rule_id] || []; byRule[d.rule_id].push(d); });
+
+      app.innerHTML = `
+        ${failSoftBlock(cache)}
+
+        <div class="card">
+          <h2>Pilotregelpakke</h2>
+          <div class="row">
+            ${allRules.map((r) => `<span class="chip ${byRule[r]?.length ? 'ok' : 'warn'}">${r}: ${byRule[r]?.length ? `${byRule[r].length} registrert` : 'ingen funn nå'}</span>`).join('')}
+          </div>
+        </div>
+
+        <div class="card">
+          <table>
+            <thead>
+              <tr>
+                <th>Tittel</th>
+                <th>Rom</th>
+                <th>Oppdaget</th>
+                <th>Sist sett</th>
+                <th>Alvorlighet</th>
+                <th>Sikkerhet</th>
+                <th>Status</th>
+                <th>Handlinger</th>
+              </tr>
+            </thead>
+            <tbody id="tb"></tbody>
+          </table>
+        </div>
+      `;
+
+      const tb = document.getElementById('tb');
+      tb.innerHTML = devs.map((d) => {
+        const ev = d.evidence || {};
+        const room = ev.room || ev.room_id || 'Ukjent rom';
+        const normal = ev.baseline ?? ev.expected ?? 'Mangler sammenlignbar historikk for denne perioden.';
+        const observed = ev.observed ?? ev.current ?? 'Mangler observasjon i grunnlaget.';
+        const diff = ev.delta ?? ev.diff ?? 'Forskjellen kan ikke tallfestes sikkert ennå.';
+        const certainty = confidence(d);
+
+        const uncertaintyText = certainty !== 'Høy sikkerhet'
+          ? (ev.uncertainty_reason || 'Vi mangler enten sammenlignbar historikk, stabil romkobling eller bedre datakvalitet. Mer data kan hjelpe, men tidshorisonten varierer per varseltype.')
+          : '';
+
+        return `
+          <tr>
+            <td>
+              <b>${esc(d.title || 'Varsel')}</b>
+              <div class="small muted">Hva bør du gjøre? Se hendelser i samme tidsrom og bekreft situasjonen i rommet.</div>
+              <details style="margin-top:8px">
+                <summary>Se forklaring</summary>
+                <div class="qa"><div class="q">1. Hva reagerer vi på?</div><div class="a">${esc(d.title || 'Mønsteravvik')}</div></div>
+                <div class="qa"><div class="q">2. Hvorfor fikk du dette varselet?</div><div class="a">${esc(d.explanation || 'Vi har oppdaget avvik fra det som er vanlig i samme tidsrom.')}</div></div>
+                <div class="qa"><div class="q">3. Hva er vanlig?</div><div class="a">${esc(String(normal))}</div></div>
+                <div class="qa"><div class="q">4. Hva ble sett nå?</div><div class="a">${esc(String(observed))}</div></div>
+                <div class="qa"><div class="q">5. Hvor stor er forskjellen?</div><div class="a">${esc(String(diff))}</div></div>
+                <div class="qa"><div class="q">6. Hvor sikre er vi?</div><div class="a">${certainty}</div></div>
+                <div class="qa"><div class="q">7. Hvor alvorlig virker dette?</div><div class="a">${severityMap[d.severity] || 'Følg med'}</div></div>
+                <div class="qa"><div class="q">8. Hva bør du gjøre nå?</div><div class="a">Se hendelser i samme tidsrom, sjekk rommet og marker deretter som sett eller ferdig.</div></div>
+                ${uncertaintyText ? `<div class="notice warn small">Usikkerhet: ${esc(uncertaintyText)}</div>` : ''}
+                ${devDetails(d)}
+              </details>
+            </td>
+            <td>${esc(room)}</td>
+            <td>${fmtNo(d.started_at || d.timestamp)}</td>
+            <td>${fmtNo(d.last_seen_at)}</td>
+            <td>${severityMap[d.severity] || 'Følg med'}</td>
+            <td>${certainty}</td>
+            <td>${statusMap[d.status] || d.status}</td>
+            <td>
+              <div class="actions">
+                <button class="btn secondary" onclick="patchStatus(${d.deviation_id}, 'ACK')">Marker som sett</button>
+                <button class="btn secondary" onclick="patchStatus(${d.deviation_id}, 'CLOSED')">Marker som ferdig</button>
+                <a href="${eventsLink(d.window, room)}">Se hendelser i samme tidsrom</a>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('') || '<tr><td colspan="8" class="muted">Ingen varsler å vise.</td></tr>';
+    })();
+  </script>
+</body>
+</html>

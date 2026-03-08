@@ -1,15 +1,76 @@
-<!doctype html><html lang="no"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Oversikt</title><link rel="stylesheet" href="./console_shared.css"></head><body><div class="wrap"><div id="shell"></div><div id="app"></div></div><script src="./console_shared.js"></script><script>
-pageShell('index.html','Oversikt');
-const app=document.getElementById('app');
-(async()=>{let data=null,cache=loadCache('oversikt');try{data=await api('/health/detail');saveCache('oversikt',data);cache=loadCache('oversikt')}catch(e){data=cache?.data}
-if(!data){app.innerHTML=failSoftBlock(cache)+'<div class="card">Ingen helsedata tilgjengelig ennå.</div>';return}
-const comp=data.components||{};const g=(k)=>comp[k]?.status||'UKJENT';
-const levels={OK:'Bra',DEGRADED:'Følg med',ERROR:'Trenger oppfølging'}; const level=levels[data.overall_status]||'Følg med';
-const checks=[['System',data.overall_status],['Nye hendelser kommer inn',g('ingest')],['Analyse fungerer',g('anomalies_runner')],['Varsler fungerer',g('scheduler')],['Historikkgrunnlag er klart',g('baseline')]];
-const action = data.overall_status==='OK'?'Følg normal drift og sjekk varsler ved behov.':'Sjekk tilkobling, datainnhenting eller grunnlag før pilotbruk.';
-app.innerHTML=failSoftBlock(cache)+`<div class='card'><h2>Slik står det til</h2><div class='chip ${level==='Bra'?'ok':level==='Følg med'?'warn':'bad'}'>${level}</div><div class='muted' style='margin-top:8px'>Slik står det til akkurat nå.</div></div>
-<div class='card'><h2>Helsesjekk</h2>${checks.map(([t,s])=>`<div class='row'><b style='min-width:240px'>${t}</b><span class='chip'>${s||'UKJENT'}</span></div>`).join('')}</div>
-<div class='card'><h2>Hva bør jeg gjøre nå?</h2><p>${action}</p><button class='btn' onclick='location.reload()'>Oppdater</button></div>
-<div class='card'>${devDetails(data)}</div>`;
-})();
-</script></body></html>
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Oversikt</title>
+  <link rel="stylesheet" href="./console_shared.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div id="shell"></div>
+    <div id="app"></div>
+  </div>
+  <script src="./console_shared.js"></script>
+  <script>
+    pageShell('index.html', 'Oversikt');
+    const app = document.getElementById('app');
+
+    (async () => {
+      const cache = loadCache('oversikt');
+      let data = null;
+
+      const res = await apiTry('/health/detail');
+      if (res.ok) {
+        data = res.data;
+        saveCache('oversikt', data);
+      } else {
+        data = cache?.data || null;
+      }
+
+      if (!data) {
+        app.innerHTML = failSoftBlock(cache) + `<div class="card">Ingen helsedata tilgjengelig ennå.</div>`;
+        return;
+      }
+
+      const c = data.components || {};
+      const checks = [
+        ['System', statusNorwegian(data.overall_status)],
+        ['Nye hendelser kommer inn', statusNorwegian(c.ingest?.status)],
+        ['Analyse fungerer', statusNorwegian(c.anomalies_runner?.status)],
+        ['Varsler fungerer', statusNorwegian(c.scheduler?.status)],
+        ['Historikkgrunnlag er klart', statusNorwegian(c.baseline?.status)],
+      ];
+
+      const overall = statusNorwegian(data.overall_status);
+      const action = overall === 'Bra'
+        ? 'Følg normal drift og se gjennom nye varsler ved behov.'
+        : 'Sjekk tilkobling og datagrunnlag før videre pilotoppfølging.';
+
+      app.innerHTML = `
+        ${failSoftBlock(cache)}
+        <div class="card">
+          <h2>Slik står det til</h2>
+          <span class="chip ${overall === 'Bra' ? 'ok' : overall === 'Følg med' ? 'warn' : 'bad'}">${overall}</span>
+          <div class="muted" style="margin-top:8px">Slik står det til akkurat nå.</div>
+        </div>
+
+        <div class="card">
+          <h2>Helsesjekk</h2>
+          ${checks.map(([k, v]) => `<div class="row"><b style="min-width:250px">${k}</b><span class="chip">${v}</span></div>`).join('')}
+        </div>
+
+        <div class="card">
+          <h2>Hva bør jeg gjøre nå?</h2>
+          <p>${action}</p>
+          <button class="btn" onclick="location.reload()">Oppdater</button>
+        </div>
+
+        <div class="card">
+          ${devDetails(data)}
+        </div>
+      `;
+    })();
+  </script>
+</body>
+</html>
