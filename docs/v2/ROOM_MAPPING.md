@@ -44,7 +44,8 @@ Backend API (v1)
 - POST /v1/rooms (upsert)
 - GET  /v1/room_mappings
 - POST /v1/room_mappings (upsert; validerer room_id finnes)
-- GET  /v1/room_mappings/unknown_sensors?stream_id=prod
+- GET  /v1/room_mappings/unknown_sensors?stream_id=<selected-stream>
+- POST /v1/room_mappings/self_heal?stream_id=<selected-stream>&dry_run=true|false
 
 Console: Romoppsett (operator)
 URL:
@@ -70,3 +71,25 @@ Dev verifikasjon (evidence)
 Pilotbox verifikasjon
 - Template only (NO_EVIDENCE):
   docs/audit/_templates/pilotbox_capture/fixpack-3_room_mapping.md
+
+
+Self-heal (Fixpack-10)
+- Endpoint: `POST /v1/room_mappings/self_heal`
+- Query:
+  - `stream_id` (default `prod`)
+  - `dry_run` (default `true`)
+- Datakilde: live `events` i samme scope + stream.
+- Rooms rebuild:
+  - leser `payload.room` / `payload.area`
+  - oppretter bare rom som mangler (bevarer norske navn fra payload)
+  - overskriver ikke eksisterende rom blindt
+- Mapping rebuild:
+  - mapper kun entydige `entity_id -> room` observasjoner
+  - konflikt (`entity_id` i flere rom) auto-mappes ikke
+  - eksisterende mapping til annen room_id overskrives ikke blindt
+- Idempotens:
+  - gjentatt kall uten nye observasjoner skal gi `*_unchanged`/`skipped_existing`, ikke duplikater
+
+Console Rooms-side (Fixpack-10)
+- Rooms-siden bruker valgt `stream_id` fra Console-konfigurasjon (localStorage), ikke hardkodet `prod`.
+- Ved tom romkatalog vises eksplisitt operatør-state i UI (ikke stille tomside).

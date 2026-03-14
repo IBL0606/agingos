@@ -1,0 +1,32 @@
+$ PYTHONPATH=backend python -m pytest -q backend/tests/rules/test_r007_night_wandering_room_switches_unit.py backend/tests/rules/test_r010_sensor_stuck_unit.py
+
+==================================== ERRORS ====================================
+_ ERROR collecting backend/tests/rules/test_r007_night_wandering_room_switches_unit.py _
+backend/tests/rules/test_r007_night_wandering_room_switches_unit.py:6: in <module>
+    from services.rules.r007 import eval_r007_night_wandering_room_switches
+backend/services/rules/r007.py:6: in <module>
+    from models.db_event import EventDB
+backend/models/__init__.py:3: in <module>
+    from models.db_event import EventDB  # noqa: F401
+backend/models/db_event.py:3: in <module>
+    from db import Base
+backend/db.py:8: in <module>
+    raise RuntimeError("DATABASE_URL is not set")
+E   RuntimeError: DATABASE_URL is not set
+_____ ERROR collecting backend/tests/rules/test_r010_sensor_stuck_unit.py ______
+backend/tests/rules/test_r010_sensor_stuck_unit.py:6: in <module>
+    from services.rules.r010 import eval_r010_sensor_stuck_room_stuck
+backend/services/rules/r010.py:6: in <module>
+    from models.db_event import EventDB
+backend/models/__init__.py:3: in <module>
+    from models.db_event import EventDB  # noqa: F401
+backend/models/db_event.py:3: in <module>
+    from db import Base
+backend/db.py:8: in <module>
+    raise RuntimeError("DATABASE_URL is not set")
+E   RuntimeError: DATABASE_URL is not set
+=========================== short test summary info ============================
+ERROR backend/tests/rules/test_r007_night_wandering_room_switches_unit.py - R...
+ERROR backend/tests/rules/test_r010_sensor_stuck_unit.py - RuntimeError: DATA...
+!!!!!!!!!!!!!!!!!!! Interrupted: 2 errors during collection !!!!!!!!!!!!!!!!!!!!
+2 errors in 1.22s

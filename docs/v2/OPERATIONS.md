@@ -145,3 +145,18 @@ Truth guardrails:
 - No cooldown semantics beyond what is explicit in config are allowed.
 - Outbox anti-spam truth is idempotency-key based delivery dedupe, not alarm-generation dedupe.
 - If deviation status history/audit is required, it is currently NO_EVIDENCE unless a concrete table/endpoint is introduced and verified.
+
+
+## Fixpack-10 runtime truth (boot + room inventory)
+
+- Pilot/LAN restart/autostart truth in repo remains compose with expose overlay:
+  - `docker compose -f docker-compose.yml -f docker-compose.expose.yml up -d --build`
+  - `docker compose -f docker-compose.yml -f docker-compose.expose.yml down`
+- Base compose only (`docker compose up -d`) is not sufficient truth for LAN-reachable Console in pilot mode.
+- Room inventory self-heal API (scope + stream-aware):
+  - `POST /v1/room_mappings/self_heal?stream_id=<id>&dry_run=true|false`
+  - Reads live observed `payload.room` / `payload.area` and `payload.entity_id` from current scope+stream.
+  - Reports deterministic counters: `rooms_inserted`, `rooms_unchanged`, `mappings_inserted`, `mappings_unchanged`, `mappings_conflicted`, `skipped_existing`, `conflicts[]`.
+  - Conflict policy: if one `entity_id` is observed in multiple rooms, mapping is **not** auto-written; conflict is reported explicitly.
+  - Existing mappings to another room are not overwritten blindly (`skipped_existing`).
+

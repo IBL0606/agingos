@@ -508,3 +508,25 @@ Important residual note:
 Evidence:
 - `/opt/agingos/_handoff/minipc_upgrade/20260307T170203Z/`
 - off-host copy: `~/agingos-minipc-backups/20260307T170203Z`
+
+### Fixpack-10 — Boot + Room Inventory Robustness — 2026-03-14
+- **Branch:** `work`
+- **Scope:** dev repo only (`/workspace/agingos`). No MiniPC/pilotbox runtime changes.
+- **Delivered (code/docs):**
+  - Added room inventory self-heal endpoint:
+    - `POST /v1/room_mappings/self_heal?stream_id=<id>&dry_run=true|false`
+  - Self-heal behavior:
+    - Rebuild/upsert missing rooms from live observed `payload.room` / `payload.area`
+    - Rebuild/upsert sensor mappings only for unique observed `entity_id -> room`
+    - Explicit conflict reporting for multi-room observations per entity
+    - No blind overwrite of existing different mappings (`skipped_existing`)
+  - Rooms UI now uses selected stream from Console config (localStorage) for:
+    - `/v1/room_mappings/unknown_sensors`
+    - `/v1/events`
+  - Rooms UI now renders explicit operator state for empty room catalog.
+  - MiniPC runbook start/stop/log commands updated to expose overlay truth:
+    - `docker compose -f docker-compose.yml -f docker-compose.expose.yml ...`
+- **Evidence pack target:**
+  - `docs/audit/verification-2026-03-14-fixpack-10-boot-room-robustness/`
+- **Important limitation:**
+  - Runtime API verification in this environment is `NO_EVIDENCE` when Docker is unavailable.

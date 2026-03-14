@@ -6,19 +6,19 @@ Repo lives at: `/opt/agingos`
 ## Start/Stop/Status
 ~~~bash
 cd /opt/agingos
-sudo docker compose up -d
-sudo docker compose ps
-sudo docker compose down --remove-orphans
+sudo docker compose -f docker-compose.yml -f docker-compose.expose.yml up -d --build
+sudo docker compose -f docker-compose.yml -f docker-compose.expose.yml ps
+sudo docker compose -f docker-compose.yml -f docker-compose.expose.yml down --remove-orphans
 ~~~
 
 ## Logs
 ~~~bash
 cd /opt/agingos
-sudo docker compose logs -f --tail=200 backend
-sudo docker compose logs -f --tail=200 ai-bot
-sudo docker compose logs -f --tail=200 console
-sudo docker compose logs -f --tail=200 db
-sudo docker compose logs -f --tail=200 heartbeat
+sudo docker compose -f docker-compose.yml -f docker-compose.expose.yml logs -f --tail=200 backend
+sudo docker compose -f docker-compose.yml -f docker-compose.expose.yml logs -f --tail=200 ai-bot
+sudo docker compose -f docker-compose.yml -f docker-compose.expose.yml logs -f --tail=200 console
+sudo docker compose -f docker-compose.yml -f docker-compose.expose.yml logs -f --tail=200 db
+sudo docker compose -f docker-compose.yml -f docker-compose.expose.yml logs -f --tail=200 heartbeat
 ~~~
 
 ## Sanity curls (via nginx on :8080)
