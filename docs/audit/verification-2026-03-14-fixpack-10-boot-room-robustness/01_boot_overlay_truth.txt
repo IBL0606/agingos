@@ -1,0 +1,62 @@
+# CHECK-FP10-01 boot runtime truth
+$ sed -n "1,120p" docs/runbook_minipc.md
+# AgingOS MiniPC Runbook (pilot)
+
+## Location
+Repo lives at: `/opt/agingos`
+
+## Start/Stop/Status
+~~~bash
+cd /opt/agingos
+sudo docker compose -f docker-compose.yml -f docker-compose.expose.yml up -d --build
+sudo docker compose -f docker-compose.yml -f docker-compose.expose.yml ps
+sudo docker compose -f docker-compose.yml -f docker-compose.expose.yml down --remove-orphans
+~~~
+
+## Logs
+~~~bash
+cd /opt/agingos
+sudo docker compose -f docker-compose.yml -f docker-compose.expose.yml logs -f --tail=200 backend
+sudo docker compose -f docker-compose.yml -f docker-compose.expose.yml logs -f --tail=200 ai-bot
+sudo docker compose -f docker-compose.yml -f docker-compose.expose.yml logs -f --tail=200 console
+sudo docker compose -f docker-compose.yml -f docker-compose.expose.yml logs -f --tail=200 db
+sudo docker compose -f docker-compose.yml -f docker-compose.expose.yml logs -f --tail=200 heartbeat
+~~~
+
+## Sanity curls (via nginx on :8080)
+~~~bash
+curl -sS -i http://127.0.0.1:8080/api/health -H "X-API-Key: YOUR_API_KEY"
+curl -sS http://127.0.0.1:8080/api/ai/status -H "X-API-Key: YOUR_API_KEY" | jq
+curl -sS "http://127.0.0.1:8080/api/events?limit=20" -H "X-API-Key: YOUR_API_KEY" | jq '.[0:5]'
+curl -sS "http://127.0.0.1:8080/api/ai/proposals?until=$(date -u +%Y-%m-%dT%H:%M:%SZ)&meaningful_recent_floor=0&min_abs_increase=0&z_threshold=0"   -H "X-API-Key: YOUR_API_KEY" | jq
+~~~
+
+## Smoke / Scenario
+~~~bash
+cd /opt/agingos
+AGINGOS_API_KEY=YOUR_API_KEY bash scripts/smoke_sprint2.sh
+~~~
+
+## Config
+`/opt/agingos/.env` is used for local overrides (not committed). Minimum required:
+~~~env
+AI_BOT_ENABLED=true
+~~~
+
+$ rg "docker compose -f docker-compose.yml -f docker-compose.expose.yml" -n docs/v2/OPERATIONS.md docs/runbook_minipc.md
+docs/v2/OPERATIONS.md:23:  - `docker compose -f docker-compose.yml -f docker-compose.expose.yml up -d --build`
+docs/v2/OPERATIONS.md:25:  - `docker compose -f docker-compose.yml -f docker-compose.expose.yml down`
+docs/v2/OPERATIONS.md:47:ExecStart=/usr/bin/docker compose -f docker-compose.yml -f docker-compose.expose.yml up -d --build
+docs/v2/OPERATIONS.md:48:ExecStop=/usr/bin/docker compose -f docker-compose.yml -f docker-compose.expose.yml down
+docs/v2/OPERATIONS.md:70:  - `docker compose -f docker-compose.yml -f docker-compose.expose.yml up -d`
+docs/v2/OPERATIONS.md:74:  - `docker compose -f docker-compose.yml -f docker-compose.expose.yml down`
+docs/v2/OPERATIONS.md:153:  - `docker compose -f docker-compose.yml -f docker-compose.expose.yml up -d --build`
+docs/v2/OPERATIONS.md:154:  - `docker compose -f docker-compose.yml -f docker-compose.expose.yml down`
+docs/runbook_minipc.md:9:sudo docker compose -f docker-compose.yml -f docker-compose.expose.yml up -d --build
+docs/runbook_minipc.md:10:sudo docker compose -f docker-compose.yml -f docker-compose.expose.yml ps
+docs/runbook_minipc.md:11:sudo docker compose -f docker-compose.yml -f docker-compose.expose.yml down --remove-orphans
+docs/runbook_minipc.md:17:sudo docker compose -f docker-compose.yml -f docker-compose.expose.yml logs -f --tail=200 backend
+docs/runbook_minipc.md:18:sudo docker compose -f docker-compose.yml -f docker-compose.expose.yml logs -f --tail=200 ai-bot
+docs/runbook_minipc.md:19:sudo docker compose -f docker-compose.yml -f docker-compose.expose.yml logs -f --tail=200 console
+docs/runbook_minipc.md:20:sudo docker compose -f docker-compose.yml -f docker-compose.expose.yml logs -f --tail=200 db
+docs/runbook_minipc.md:21:sudo docker compose -f docker-compose.yml -f docker-compose.expose.yml logs -f --tail=200 heartbeat

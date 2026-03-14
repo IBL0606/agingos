@@ -1,5 +1,6 @@
 const LS_BASE = 'agingos_api_base';
 const LS_KEY = 'agingos_api_key';
+const LS_STREAM = 'agingos_stream_id';
 const CACHE_PREFIX = 'agingos_cache_';
 
 const NAV = [
@@ -22,9 +23,15 @@ function key() {
   return (localStorage.getItem(LS_KEY) || '').trim();
 }
 
-function setCfg(base, k) {
+
+function streamId() {
+  return (localStorage.getItem(LS_STREAM) || 'prod').trim() || 'prod';
+}
+
+function setCfg(base, k, stream) {
   localStorage.setItem(LS_BASE, nbase(base));
   localStorage.setItem(LS_KEY, (k || '').trim());
+  localStorage.setItem(LS_STREAM, (stream || 'prod').trim() || 'prod');
 }
 
 function esc(s) {
@@ -116,11 +123,13 @@ function pageShell(active, title) {
       <div class="row small" style="margin-top:8px">
         <span class="chip">API: ${esc(nbase())}</span>
         <span class="chip">Nøkkel: ${key() ? 'lagt inn' : 'mangler'}</span>
+        <span class="chip">Stream: ${esc(streamId())}</span>
         <button class="btn secondary" id="openCfg">Koble til</button>
       </div>
       <div id="cfg" class="row" style="display:none;margin-top:8px">
         <input id="cfgBase" placeholder="/api" value="${esc(nbase())}" />
         <input id="cfgKey" placeholder="API-nøkkel" value="${esc(key())}" />
+        <input id="cfgStream" placeholder="stream_id" value="${esc(streamId())}" />
         <button class="btn" id="saveCfg">Lagre</button>
       </div>
     </div>
@@ -131,7 +140,11 @@ function pageShell(active, title) {
     el.style.display = el.style.display === 'none' ? 'flex' : 'none';
   };
   document.getElementById('saveCfg').onclick = () => {
-    setCfg(document.getElementById('cfgBase').value, document.getElementById('cfgKey').value);
+    setCfg(
+      document.getElementById('cfgBase').value,
+      document.getElementById('cfgKey').value,
+      document.getElementById('cfgStream').value,
+    );
     location.reload();
   };
 }

@@ -1,0 +1,2 @@
+$ playwright goto http://localhost:8080/rooms.html
+FAILED: net::ERR_EMPTY_RESPONSE (service not running in this environment)

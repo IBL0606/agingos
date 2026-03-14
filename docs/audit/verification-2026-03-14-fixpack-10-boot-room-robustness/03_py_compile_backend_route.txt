@@ -1,0 +1,2 @@
+$ python -m py_compile backend/routes/room_mappings.py
+PASS

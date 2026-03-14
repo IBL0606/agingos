@@ -1,3 +1,5 @@
+# CHECK-FP10-02/03/04/05 backend self-heal code
+$ sed -n "1,320p" backend/routes/room_mappings.py
 # backend/routes/room_mappings.py
 
 from __future__ import annotations
@@ -318,77 +320,3 @@ def self_heal_room_inventory_v1(
                     "org_id": scope.org_id,
                     "home_id": scope.home_id,
                     "room_id": room_id,
-                    "display_name": room_name,
-                },
-            )
-            existing_room_by_id[room_id] = {"room_id": room_id, "display_name": room_name}
-            existing_room_by_name[room_key] = {"room_id": room_id, "display_name": room_name}
-
-    mappings_inserted = 0
-    mappings_unchanged = 0
-    mappings_conflicted = 0
-    conflicts: List[RoomInventoryConflict] = []
-
-    for entity_id in sorted(observed_entity_room_names.keys()):
-        names = sorted(observed_entity_room_names[entity_id])
-        if len(names) != 1:
-            mappings_conflicted += 1
-            conflicts.append(
-                RoomInventoryConflict(
-                    entity_id=entity_id,
-                    observed_rooms=names,
-                    reason="entity_observed_in_multiple_rooms",
-                )
-            )
-            continue
-
-        room_name = names[0]
-        room_ref = existing_room_by_name.get(room_name.lower())
-        if not room_ref:
-            skipped_existing += 1
-            continue
-        target_room_id = str(room_ref["room_id"])
-
-        existing_room_id = existing_mapping_by_entity.get(entity_id)
-        if existing_room_id:
-            if existing_room_id == target_room_id:
-                mappings_unchanged += 1
-            else:
-                skipped_existing += 1
-            continue
-
-        mappings_inserted += 1
-        if not dry_run:
-            db.execute(
-                text(
-                    """
-                    INSERT INTO public.sensor_room_map (org_id, home_id, entity_id, room_id, active, note)
-                    VALUES (:org_id, :home_id, :entity_id, :room_id, true, :note)
-                    """
-                ),
-                {
-                    "org_id": scope.org_id,
-                    "home_id": scope.home_id,
-                    "entity_id": entity_id,
-                    "room_id": target_room_id,
-                    "note": "auto self-heal from live observations",
-                },
-            )
-            existing_mapping_by_entity[entity_id] = target_room_id
-
-    if not dry_run:
-        db.commit()
-
-    return RoomInventoryHealResult(
-        stream_id=stream_id,
-        dry_run=dry_run,
-        observed_rooms=len(observed_room_names),
-        observed_entities=len(observed_entity_room_names),
-        rooms_inserted=rooms_inserted,
-        rooms_unchanged=rooms_unchanged,
-        mappings_inserted=mappings_inserted,
-        mappings_unchanged=mappings_unchanged,
-        mappings_conflicted=mappings_conflicted,
-        skipped_existing=skipped_existing,
-        conflicts=conflicts,
-    )

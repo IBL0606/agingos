@@ -508,3 +508,62 @@ Important residual note:
 Evidence:
 - `/opt/agingos/_handoff/minipc_upgrade/20260307T170203Z/`
 - off-host copy: `~/agingos-minipc-backups/20260307T170203Z`
+
+### Fixpack-10 — Boot + Room Inventory Robustness — 2026-03-14
+- **Branch:** `work`
+- **Scope:** dev repo only (`/workspace/agingos`). No MiniPC/pilotbox runtime changes.
+- **Delivered (code/docs):**
+  - Added room inventory self-heal endpoint:
+    - `POST /v1/room_mappings/self_heal?stream_id=<id>&dry_run=true|false`
+  - Self-heal behavior:
+    - Rebuild/upsert missing rooms from live observed `payload.room` / `payload.area`
+    - Rebuild/upsert sensor mappings only for unique observed `entity_id -> room`
+    - Explicit conflict reporting for multi-room observations per entity
+    - No blind overwrite of existing different mappings (`skipped_existing`)
+  - Rooms UI now uses selected stream from Console config (localStorage) for:
+    - `/v1/room_mappings/unknown_sensors`
+    - `/v1/events`
+  - Rooms UI now renders explicit operator state for empty room catalog.
+  - MiniPC runbook start/stop/log commands updated to expose overlay truth:
+    - `docker compose -f docker-compose.yml -f docker-compose.expose.yml ...`
+- **Evidence pack target:**
+  - `docs/audit/verification-2026-03-14-fixpack-10-boot-room-robustness/`
+- **Important limitation:**
+  - Runtime API verification in this environment is `NO_EVIDENCE` when Docker is unavailable.
+
+### Fixpack-10 — Boot + Room Inventory Robustness — VERIFIED ON DEV — 2026-03-14
+Branch: `fixpack-10-verify`
+PR: https://github.com/IBL0606/agingos/pull/43
+
+Scope:
+- truthful pilot/LAN boot/runtime path
+- room inventory self-heal/bootstrap
+- Rooms UI stream + empty-state hardening
+
+Evidence pack:
+- `docs/audit/verification-2026-03-14-fixpack-10-boot-room-robustness/`
+
+Verified status:
+- CHECK-FP10-01: PASS
+- CHECK-FP10-02: PASS
+- CHECK-FP10-03: NO_EVIDENCE
+- CHECK-FP10-04: PASS
+- CHECK-FP10-05: NO_EVIDENCE
+- CHECK-FP10-06: PASS
+- CHECK-FP10-07: PASS
+- CHECK-FP10-08: NO_EVIDENCE
+
+Verified facts:
+- `/v1/room_mappings/self_heal` is registered in runtime.
+- Room self-heal from live observed `payload.room` / `payload.area` is runtime-verified on dev.
+- Re-running self-heal is idempotent for room creation in current dev dataset.
+- Rooms UI now uses selected stream from shared Console config, not hardcoded `prod`.
+- MiniPC runbook now reflects expose-overlay boot truth for pilot/LAN mode.
+
+Remaining evidence gaps:
+- Current dev events do not contain `payload.entity_id`.
+- Therefore entity→room auto-mapping, conflict handling for same entity in multiple rooms, and unknown-sensors reduction after self-heal remain NO_EVIDENCE in this verification run.
+
+Merge position:
+- Safe to merge with truthful NO_EVIDENCE status retained.
+- Not a full 100% DoD close until entity-bearing dev/pilot evidence exists.
