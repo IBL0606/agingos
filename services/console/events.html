@@ -33,7 +33,10 @@
 
     function roomOf(e) {
       const p = e.payload || {};
-      return p.room_id || p.room || p.area || '';
+      const room = p.room_id || p.room || p.area || '';
+      if (room) return room;
+      if ((e.category || '').toLowerCase() === 'ha_snapshot') return 'System';
+      return '';
     }
 
     function eventLabel(e) {
