@@ -20,18 +20,31 @@
       'presence on': 'Bevegelse registrert',
       'presence off': 'Bevegelse sluttet',
       'door open': 'Dør åpnet',
-      'door close': 'Dør lukket',
+      'door closed': 'Dør lukket',
       'ha_snapshot': 'Systemstatus fra sensorer',
     };
 
+    function normState(v) {
+      const s = String(v || '').trim().toLowerCase();
+      if (['open', 'opened', 'on'].includes(s)) return 'open';
+      if (['close', 'closed', 'off'].includes(s)) return 'closed';
+      return s;
+    }
+
     function roomOf(e) {
       const p = e.payload || {};
-      return p.room_id || p.room || p.area || '';
+      const room = p.room_id || p.room || p.area || '';
+      if (room) return room;
+      if ((e.category || '').toLowerCase() === 'ha_snapshot') return 'System';
+      return '';
     }
 
     function eventLabel(e) {
       const p = e.payload || {};
-      const key = `${e.category || ''} ${p.state || p.action || ''}`.trim().toLowerCase();
+      const state = e.category === 'door'
+        ? normState(p.state || p.action)
+        : String(p.state || p.action || '').trim().toLowerCase();
+      const key = `${e.category || ''} ${state}`.trim().toLowerCase();
       return translations[key] || translations[e.category] || 'Ukjent hendelse';
     }
 
@@ -42,8 +55,9 @@
         if ((p.state || '').toLowerCase() === 'off') return 'Sensor registrerte at bevegelsen stoppet.';
       }
       if (e.category === 'door') {
-        if ((p.state || '').toLowerCase() === 'open') return 'Dør ble åpnet.';
-        if ((p.state || '').toLowerCase() === 'close') return 'Dør ble lukket.';
+        const state = normState(p.state || p.action);
+        if (state === 'open') return 'Dør ble åpnet.';
+        if (state === 'closed') return 'Dør ble lukket.';
       }
       if (e.category === 'ha_snapshot') return 'Systemet mottok status fra sensorer.';
       return 'Hendelse registrert. Åpne «Vis mer» for tekniske detaljer.';
