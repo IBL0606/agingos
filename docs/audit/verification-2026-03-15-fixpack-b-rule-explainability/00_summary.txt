@@ -1,0 +1,21 @@
+Fixpack-B / MUST-B1 verification summary
+Date: 2026-03-15
+PR: https://github.com/IBL0606/agingos/pull/48
+Status: FUNCTIONAL PASS
+
+Scope verified:
+- operator-friendly rules page in Console
+- additive operator fields on /v1/rules
+- truthful rule -> findings drilldown
+- truthful findings/anomalies -> events drilldown
+- explicit no-fake-precision wording when exact trigger event is not provable
+- existing alarms/anomalies/proposals flow not broken by file-touch scope
+
+CHECK-B-01 PASS
+CHECK-B-02 PASS
+CHECK-B-03 PASS
+CHECK-B-04 PASS
+CHECK-B-05 PASS
+
+Known gap / risk:
+- backend/routes/rules.py logs scope fallback / subjects-table robustness noise in this dev environment, but still returns 200 with fallback data

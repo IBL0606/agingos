@@ -96,6 +96,28 @@ In `/health/detail`:
 - `components.anomalies_runner.runner_status` can be null immediately after restart (process-local).
 
 
+
+## Fixpack-B — Hvordan lese regler og drilldown i Console
+
+Etter Fixpack-B skal operatør kunne:
+- åpne `Regler` i Console
+- lese hva hver regel betyr i vanlig språk
+- gå videre til relevante funn for en bestemt regel
+- gå videre fra funn/anomali til relevante hendelser i samme scope/tidsvindu/rom/kategori
+
+Praktisk bruk:
+- `Regler` viser regel-ID, navn, forklaring og status
+- `Åpne funn for denne regelen` filtrerer varsler på valgt `rule_id`
+- `Se relevant datagrunnlag i hendelser` åpner `events.html` med auto-filter
+
+Sannhetsregel:
+- Hvis eksakt trigger-event ikke er bevist, skal drilldown leses som relevant datagrunnlag i samme scope/tidsvindu/rom/kategori
+- Det skal ikke leses som 100% bevis for ett bestemt trigger-event når slik eksakt binding ikke finnes
+
+Evidence:
+- `docs/audit/verification-2026-03-15-fixpack-b-rule-explainability/`
+- `docs/audit/AgingOS_CONTROL_TOWER.md`
+
 ## Fixpack-C — Hvordan lese regler og alarmer sannferdig
 
 Etter Fixpack-C kan enkelte regler bevisst la være å gi vanlig alarm dersom grunnlaget er for svakt.

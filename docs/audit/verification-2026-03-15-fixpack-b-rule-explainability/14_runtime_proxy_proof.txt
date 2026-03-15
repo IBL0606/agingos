@@ -1,0 +1,5 @@
+Runtime proxy proof:
+- console nginx config proxies /api/* to backend:8000
+- forwards X-API-Key
+- /rules path is reserved for backend JSON, not static SPA fallback
+- console network can reach backend /v1/rules and returns operator-facing rule fields for R-001..R-010
