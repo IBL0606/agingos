@@ -225,3 +225,35 @@ Suggested capture commands:
 
 NO_EVIDENCE in this container:
 - Browser screenshot/UI capture only.
+
+
+## Fixpack-A (MUST-A1) verification checks
+
+### CHECK-A-01 — Active worklist excludes CLOSED by default
+Command evidence target:
+- Open `services/console/alarms.html` and verify default button is `Aktiv arbeidsliste (OPEN + ACK)`.
+- Verify list rendering for active view filters status to `OPEN` + `ACK` only.
+
+### CHECK-A-02 — History remains available as explicit view
+Command evidence target:
+- In Console, switch to `Historikk (CLOSED)` and verify only `CLOSED` rows are shown.
+
+### CHECK-A-03 — Stale OPEN after rule-fix is handled truthfully
+Command evidence target:
+- Verify existing lifecycle contract is described truthfully:
+  - active statuses are `OPEN` + `ACK`
+  - scheduler stale-close moves stale `OPEN/ACK -> CLOSED`
+  - later trigger after `CLOSED` creates new `OPEN` row
+- Verify Console default active worklist only shows active statuses, so non-active rows are not mixed into operator worklist.
+
+### CHECK-A-04 — R-002 local night trigger + day no-trigger
+Command:
+- `pytest -q backend/tests/rules/test_r002_front_door_open_at_night_unit.py`
+Expected:
+- test for local-night trigger PASS
+- test for local-day no-trigger PASS
+
+### CHECK-A-05 — Sorting controls support status, last_seen, title
+Command evidence target:
+- Verify sorting control options include status, last_seen, title.
+- Verify default sort remains `last_seen_desc` unless operator selects another safe sort.

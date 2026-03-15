@@ -1,0 +1,15 @@
+
+==================================== ERRORS ====================================
+_ ERROR collecting backend/tests/rules/test_r002_front_door_open_at_night_unit.py _
+ImportError while importing test module '/workspace/agingos/backend/tests/rules/test_r002_front_door_open_at_night_unit.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/root/.pyenv/versions/3.10.19/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+backend/tests/rules/test_r002_front_door_open_at_night_unit.py:5: in <module>
+    from services.rules.context import RuleContext
+E   ModuleNotFoundError: No module named 'services'
+=========================== short test summary info ============================
+ERROR backend/tests/rules/test_r002_front_door_open_at_night_unit.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.44s
