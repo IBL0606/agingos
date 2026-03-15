@@ -31,3 +31,16 @@ This Phase 4 fixpack is **Devbox-only**.
 
 ## Explainable alarm UI truth (Fixpack-7 / MUST-5)
 - Canonical MUST-5 explainability truth: `docs/v2/PILOT-ALARMS.md` (section 8).
+
+## Fixpack-C status
+
+Fixpack-C innførte truthful gating for pilot-regler slik at regler med svakt baseline-/profilgrunnlag ikke lenger presenteres som om de var fullverdig evaluert.
+
+Kort oppsummert:
+- eksplisitt klassifisering av regler
+- truth-stater for evaluering
+- sann operatørtekst i Console
+- CI/runtime hardening for fresh schema
+
+Evidence:
+Ingen separat samlet audit-pack ble laget for Fixpack-C; verifikasjonen ligger i test/CI-artefakter og `docs/audit/AgingOS_CONTROL_TOWER.md`.

@@ -160,3 +160,41 @@ Truth guardrails:
   - Conflict policy: if one `entity_id` is observed in multiple rooms, mapping is **not** auto-written; conflict is reported explicitly.
   - Existing mappings to another room are not overwritten blindly (`skipped_existing`).
 
+
+## Fixpack-C — Truthful gating for regler (2026-03-15)
+
+Pilot-reglene er nå klassifisert eksplisitt som:
+
+- `baseline_dependent`
+- `profile_dependent`
+- `independent`
+
+Formål:
+Regler skal ikke presenteres som fullverdige alarmer når historikkgrunnlaget eller boligprofilen er for svak.
+
+### Evaluation truth
+Følgende truth-stater brukes i runtime / Console:
+
+- `FULLY_EVALUATED` — regelen er vurdert med tilstrekkelig grunnlag
+- `WEAK_BASIS` — regelen er vurdert med svakt grunnlag og skal ikke leses som full-confidence
+- `NOT_EVALUATED` — regelen ble ikke fullverdig vurdert fordi grunnlaget mangler
+- `DEFAULT_PROFILE` — regelen bruker standardprofil / standardvindu og er ikke personlig tilpasset boligen
+
+### Operatørkontrakt
+Console skal bruke menneskespråk som tydelig sier hvorfor vurdering er svak eller uteblir, for eksempel:
+
+- «Ikke vurdert: mangler nok historikk»
+- «Svak vurdering: baseline ikke READY»
+- «Bruker standard nattvindu, ikke personlig boligprofil»
+
+Baseline-/profil-svake regler skal ikke presenteres som vanlige full-confidence alarmer.
+
+### Bevisstatus
+Fixpack-C ble verifisert gjennom:
+- CI grønn for PR #46
+- unit tests for truth-gating
+- unit tests for scope fallback i `/rules/evaluation-truth`
+- smoke-test oppdatert til truth-aware R-001-kontrakt
+- Control Tower entry i `docs/audit/AgingOS_CONTROL_TOWER.md`
+
+Det ble ikke laget en egen samlet `docs/audit/verification-...`-pakke i denne runden; verifikasjonen ligger i test/CI-artefakter og Control Tower.
