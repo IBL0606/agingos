@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
@@ -14,25 +15,41 @@ from services.rules.registry import RULE_REGISTRY
 from services.rules.gating import build_rule_truth
 
 router = APIRouter(prefix="/rules", tags=["rules"])
+logger = logging.getLogger("rules.routes")
 
 
 def _resolve_scope(db: Session) -> tuple[str, str, str]:
-    row = (
-        db.execute(
-            text(
-                """
-                SELECT org_id, home_id, subject_id
-                FROM subjects
-                ORDER BY created_at ASC NULLS LAST
-                LIMIT 1
-                """
+    """
+    Best-effort scope resolver for evaluation-truth endpoint.
+
+    CI/fresh installs may not have optional tables like "subjects" yet.
+    Never raise here; fall back to default scope.
+    """
+    try:
+        row = (
+            db.execute(
+                text(
+                    """
+                    SELECT org_id, home_id, subject_id
+                    FROM subjects
+                    ORDER BY created_at ASC NULLS LAST
+                    LIMIT 1
+                    """
+                )
             )
+            .mappings()
+            .first()
         )
-        .mappings()
-        .first()
-    )
+    except Exception:
+        logger.warning("rules_scope_resolution_failed_falling_back_default", exc_info=True)
+        return ("default", "default", "default")
+
     if row:
-        return (str(row.get("org_id") or "default"), str(row.get("home_id") or "default"), str(row.get("subject_id") or "default"))
+        return (
+            str(row.get("org_id") or "default"),
+            str(row.get("home_id") or "default"),
+            str(row.get("subject_id") or "default"),
+        )
     return ("default", "default", "default")
 
 
