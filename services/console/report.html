@@ -16,66 +16,56 @@
     pageShell('report.html', 'Ukessammendrag');
     const app = document.getElementById('app');
 
-    function roomOf(e) {
-      const p = e.payload || {};
-      return p.room_id || p.room || p.area || 'Ukjent rom';
-    }
-
     async function loadData(cache) {
-      const result = {
-        ev: cache?.data?.ev || [],
-        an: cache?.data?.an || [],
-        dv: cache?.data?.dv || [],
-        pp: cache?.data?.pp || [],
-        bs: cache?.data?.bs || {},
-      };
-
-      const [ev, an, dv, pp, bs] = await Promise.all([
-        apiTry('/v1/events?limit=1000&stream_id=prod'),
-        apiTry('/v1/anomalies?last=7d&limit=500'),
-        apiTry('/v1/deviations?limit=500'),
-        apiTry('/proposals?limit=300'),
-        apiTry('/baseline/status'),
-      ]);
-
-      if (ev.ok) result.ev = ev.data;
-      if (an.ok) result.an = an.data;
-      if (dv.ok) result.dv = dv.data;
-      if (pp.ok) result.pp = pp.data;
-      if (bs.ok) result.bs = bs.data;
-
-      if (ev.ok || an.ok || dv.ok || pp.ok || bs.ok) {
-        saveCache('report', result);
+      const result = cache?.data || null;
+      const weekly = await apiTry(`/v1/reports/weekly?stream_id=${encodeURIComponent(streamId())}`);
+      if (weekly.ok) {
+        saveCache('report', weekly.data);
+        return weekly.data;
       }
       return result;
+    }
+
+    function deficitLine(d) {
+      const missing = Array.isArray(d?.missing_rooms) && d.missing_rooms.length
+        ? ` Mangler rom: ${d.missing_rooms.join(', ')}.`
+        : '';
+      return `<li><b>${esc(d?.key || 'ukjent')}</b>: har ${esc(String(d?.have ?? '—'))}, trenger ${esc(String(d?.need ?? '—'))}. ${esc(d?.detail || '')}${esc(missing)}</li>`;
+    }
+
+    async function downloadTruthExport() {
+      const res = await fetch(`${nbase()}/v1/reports/weekly/export.json?stream_id=${encodeURIComponent(streamId())}`, {
+        headers: key() ? { 'X-API-Key': key() } : {},
+      });
+      if (!res.ok) {
+        alert(`Kunne ikke laste ned eksport: HTTP ${res.status}`);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const ts = new Date().toISOString().replace(/[:.]/g, '-');
+      a.href = url;
+      a.download = `agingos_weekly_truth_${ts}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
     }
 
     (async () => {
       const cache = loadCache('report');
       const data = await loadData(cache);
 
-      const since = Date.now() - 7 * 86400000;
-      const weekEvents = (data.ev || []).filter((e) => new Date(e.timestamp).getTime() >= since);
+      if (!data) {
+        app.innerHTML = failSoftBlock(cache) + `<div class="card">Ingen ukesannhet tilgjengelig ennå.</div>`;
+        return;
+      }
 
-      const roomCounts = {};
-      const dayCounts = {};
-      weekEvents.forEach((e) => {
-        const r = roomOf(e);
-        roomCounts[r] = (roomCounts[r] || 0) + 1;
-
-        const d = new Date(e.timestamp);
-        if (!Number.isNaN(d.getTime())) {
-          const day = d.toISOString().slice(0, 10);
-          dayCounts[day] = (dayCounts[day] || 0) + 1;
-        }
-      });
-
-      const roomSorted = Object.entries(roomCounts).sort((a, b) => b[1] - a[1]);
-      const daySorted = Object.entries(dayCounts).sort((a, b) => b[1] - a[1]);
-
-      const trust = data.bs?.baseline_ready || data.bs?.status === 'OK'
-        ? 'Godt grunnlag i flere rom.'
-        : 'Grunnlaget er fortsatt svakt i ett eller flere rom.';
+      const summary = data.summary || {};
+      const basis = data.basis || {};
+      const deficits = Array.isArray(basis.deficits) ? basis.deficits : [];
+      const weak = (basis.status || '').toUpperCase() !== 'READY';
 
       app.innerHTML = `
         ${failSoftBlock(cache)}
@@ -83,56 +73,43 @@
         <div class="card">
           <h2>Slik har uken vært</h2>
           <p>
-            Vi har registrert <b>${weekEvents.length}</b> hendelser siste 7 dager.
-            ${data.dv.length ? `Det har vært <b>${data.dv.length}</b> varsler som bør følges opp.` : 'Ingen tydelige varsler denne uken.'}
+            Vi har registrert <b>${summary.events_7d || 0}</b> hendelser siste 7 dager.
+            ${summary.deviations_open ? `Det er <b>${summary.deviations_open}</b> åpne/kvitterte varsler nå.` : 'Ingen åpne varsler akkurat nå.'}
           </p>
+          <div class="small muted">Kilde: serveraggregert sannhet fra /v1/reports/weekly for valgt scope/stream.</div>
         </div>
 
         <div class="grid2">
           <div class="card">
-            <h2>Aktivitet denne uken</h2>
-            <div>Mest aktivitet: ${roomSorted[0]?.[0] || '—'}</div>
-            <div>Minst aktivitet: ${(roomSorted.slice(-1)[0] || [])[0] || '—'}</div>
-            <div>Rom uten aktivitet: Ikke beregnet uten komplett romkatalog.</div>
-            <div>Mest aktiv dag: ${daySorted[0]?.[0] || '—'}</div>
-            <div>Roligste dag: ${(daySorted.slice(-1)[0] || [])[0] || '—'}</div>
-            <p class="small muted">Forklaring: Aktivitet teller antall registrerte hendelser per rom og dag.</p>
+            <h2>Analyse og historikkgrunnlag</h2>
+            <div class="row"><b style="min-width:260px">Analyse fungerer</b><span class="chip">${esc(data.analysis_running?.status || 'UNKNOWN')}</span></div>
+            <div class="small muted">Bevis: ${(data.analysis_running?.evidence || []).map(esc).join(' · ') || '—'}</div>
+            <div class="row" style="margin-top:8px"><b style="min-width:260px">Historikkgrunnlag er klart</b><span class="chip">${esc(data.history_basis_ready?.status || 'UNKNOWN')}</span></div>
+            <div class="small muted">Bevis: ${(data.history_basis_ready?.evidence || []).map(esc).join(' · ') || '—'}</div>
           </div>
 
           <div class="card">
-            <h2>Viktigste varsler</h2>
-            ${(data.dv || []).slice(0, 5).map((d) => `<div><b>${esc(d.title || 'Varsel')}</b> · ${fmtNo(d.last_seen_at)}</div>`).join('') || 'Ingen varsler registrert.'}
-            <h3 style="margin-top:12px">Mulige avvik vi fulgte med på</h3>
-            ${(data.an || []).slice(0, 5).map((a) => `<div>${esc(a.room || 'Ukjent rom')} · observert avvik</div>`).join('') || 'Ingen mulige avvik registrert.'}
+            <h2>Oppsummerte kilder</h2>
+            <div>Mulige avvik siste 7d: <b>${summary.anomalies_7d || 0}</b></div>
+            <div>Varsler sett siste 7d: <b>${summary.deviations_seen_7d || 0}</b></div>
+            <div>Forslag oppdatert siste 7d: <b>${summary.proposals_updated_7d || 0}</b></div>
+            <button class="btn" id="downloadExportBtn" style="margin-top:12px">Last ned sannhets-eksport (JSON)</button>
           </div>
-        </div>
-
-        <div class="card">
-          <h2>Hva ser ut til å være vanlig?</h2>
-          <p>
-            ${roomSorted.length
-              ? `Rommene ${roomSorted.slice(0, 3).map((x) => x[0]).join(', ')} har hatt jevnest aktivitet denne uken.`
-              : 'Vi har ikke nok hendelser til å beskrive tydelige mønstre ennå.'}
-          </p>
         </div>
 
         <div class="card">
           <h2>Hvor godt grunnlag har vi nå?</h2>
-          <p>${trust}</p>
-          <p class="muted">Mangler vi sammenlignbar historikk, blir vurderingene mer usikre.</p>
-        </div>
-
-        <div class="card">
-          <h2>Hva bør følges opp neste uke?</h2>
-          <ul>
-            <li>Bekreft rom med lav aktivitet mot faktisk drift.</li>
-            <li>Gå gjennom varsler med høy alvorlighet først.</li>
-            <li>Vurder åpne anbefalinger før nye endringer.</li>
-          </ul>
+          <p><b>${esc(basis.message || 'Ingen vurdering tilgjengelig.')}</b></p>
+          ${weak
+            ? `<p class="muted">Dette er konkret hva som mangler før grunnlaget regnes som klart:</p><ul>${deficits.map(deficitLine).join('')}</ul>`
+            : '<p class="muted">Minimumskravene er oppfylt for ukesammendrag.</p>'}
         </div>
 
         <div class="card">${devDetails(data)}</div>
       `;
+
+      const btn = document.getElementById('downloadExportBtn');
+      if (btn) btn.onclick = downloadTruthExport;
     })();
   </script>
 </body>

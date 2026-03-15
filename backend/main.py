@@ -31,7 +31,7 @@ from fastapi import Query
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from util.time import require_utc_aware
@@ -39,6 +39,547 @@ from util.room_id import derive_room_id, derive_room_id_scoped
 
 app = FastAPI(title="AgingOS Backend")
 
+
+def _weekly_truth_payload(scope: "AuthScope", stream_id: str = "prod") -> dict:
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(days=7)
+    db = SessionLocal()
+
+    payload = {
+        "schema_version": "weekly_truth_v1",
+        "generated_at_utc": now.isoformat(),
+        "window": {
+            "since_utc": since.isoformat(),
+            "until_utc": now.isoformat(),
+            "days": 7,
+            "stream_id": stream_id,
+        },
+        "scope": {
+            "org_id": scope.org_id,
+            "home_id": scope.home_id,
+            "subject_id": scope.subject_id,
+        },
+        "sources": {},
+        "summary": {},
+        "analysis_running": {"status": "UNKNOWN", "evidence": []},
+        "history_basis_ready": {"status": "UNKNOWN", "evidence": []},
+        "basis": {
+            "status": "WEAK",
+            "message": "Grunnlaget er fortsatt svakt: avventer konkrete minimumskrav.",
+            "deficits": [],
+            "metrics": {},
+        },
+    }
+
+    deficits = payload["basis"]["deficits"]
+
+    try:
+        events_row = (
+            db.execute(
+                text(
+                    """
+                    SELECT
+                      COUNT(*)::int AS events_7d,
+                      COUNT(DISTINCT ("timestamp" AT TIME ZONE 'Europe/Oslo')::date)::int AS days_with_data_7d,
+                      MAX("timestamp") AS latest_event_ts,
+                      MIN("timestamp") AS oldest_event_ts
+                    FROM events
+                    WHERE org_id=:org_id AND home_id=:home_id AND subject_id=:subject_id
+                      AND stream_id=:stream_id
+                      AND "timestamp" >= :since_utc
+                    """
+                ),
+                {
+                    "org_id": scope.org_id,
+                    "home_id": scope.home_id,
+                    "subject_id": scope.subject_id,
+                    "stream_id": stream_id,
+                    "since_utc": since,
+                },
+            )
+            .mappings()
+            .one()
+        )
+
+        all_events_row = (
+            db.execute(
+                text(
+                    """
+                    SELECT MAX("timestamp") AS latest_event_ts
+                    FROM events
+                    WHERE org_id=:org_id AND home_id=:home_id AND subject_id=:subject_id
+                      AND stream_id=:stream_id
+                    """
+                ),
+                {
+                    "org_id": scope.org_id,
+                    "home_id": scope.home_id,
+                    "subject_id": scope.subject_id,
+                    "stream_id": stream_id,
+                },
+            )
+            .mappings()
+            .one()
+        )
+
+        latest_event_ts = all_events_row["latest_event_ts"]
+        observed_days = 0
+        if latest_event_ts is not None and events_row["oldest_event_ts"] is not None:
+            observed_days = max(
+                1,
+                (latest_event_ts.date() - events_row["oldest_event_ts"].date()).days + 1,
+            )
+
+        payload["sources"]["events"] = {
+            "available": True,
+            "events_7d": int(events_row["events_7d"] or 0),
+            "days_with_data_7d": int(events_row["days_with_data_7d"] or 0),
+            "observed_days": int(observed_days),
+            "latest_event_ts": latest_event_ts.isoformat() if latest_event_ts else None,
+        }
+
+        if observed_days < 7:
+            deficits.append(
+                {
+                    "key": "observed_days",
+                    "have": observed_days,
+                    "need": 7,
+                    "detail": "Har ikke full observasjonsperiode på 7 dager ennå.",
+                }
+            )
+
+        if int(events_row["days_with_data_7d"] or 0) < 5:
+            deficits.append(
+                {
+                    "key": "days_with_data_7d",
+                    "have": int(events_row["days_with_data_7d"] or 0),
+                    "need": 5,
+                    "detail": "For få døgn med aktivitet siste uke til stabil sammenligning.",
+                }
+            )
+
+        if latest_event_ts is None:
+            deficits.append(
+                {
+                    "key": "latest_event_missing",
+                    "have": 0,
+                    "need": 1,
+                    "detail": "Fant ingen hendelser for valgt scope/stream.",
+                }
+            )
+        else:
+            stale_hours = max(0.0, (now - latest_event_ts).total_seconds() / 3600.0)
+            if stale_hours > 24:
+                deficits.append(
+                    {
+                        "key": "latest_event_stale_hours",
+                        "have": round(stale_hours, 2),
+                        "need": "<=24",
+                        "detail": "Siste hendelse er for gammel for en oppdatert ukesvurdering.",
+                    }
+                )
+    except Exception as e:
+        db.rollback()
+        payload["sources"]["events"] = {"available": False, "error": str(e)}
+        deficits.append(
+            {
+                "key": "events_source_unavailable",
+                "have": 0,
+                "need": 1,
+                "detail": "Kunne ikke lese hendelser fra databasen.",
+            }
+        )
+
+    try:
+        baseline = (
+            db.execute(
+                text(
+                    """
+                    SELECT model_start, model_end, baseline_ready, computed_at,
+                           min_days_required, days_in_window, days_with_data,
+                           room_bucket_rows, room_bucket_supported,
+                           transition_rows, transition_supported
+                    FROM baseline_model_status
+                    WHERE org_id=:org_id AND home_id=:home_id AND subject_id=:subject_id
+                    ORDER BY computed_at DESC
+                    LIMIT 1
+                    """
+                ),
+                {
+                    "org_id": scope.org_id,
+                    "home_id": scope.home_id,
+                    "subject_id": scope.subject_id,
+                },
+            )
+            .mappings()
+            .first()
+        )
+
+        if baseline is None:
+            payload["sources"]["baseline"] = {"available": False, "note": "no baseline_model_status row"}
+            deficits.append(
+                {
+                    "key": "baseline_missing",
+                    "have": 0,
+                    "need": 1,
+                    "detail": "Mangler baseline_model_status for scope.",
+                }
+            )
+        else:
+            b = dict(baseline)
+            for k in ("model_start", "model_end", "computed_at"):
+                if b.get(k) is not None:
+                    b[k] = b[k].isoformat()
+            payload["sources"]["baseline"] = {"available": True, "latest": b}
+
+            if not bool(baseline["baseline_ready"]):
+                deficits.append(
+                    {
+                        "key": "baseline_ready",
+                        "have": 0,
+                        "need": 1,
+                        "detail": "baseline_ready=false i baseline_model_status.",
+                    }
+                )
+
+            min_days_required = int(baseline["min_days_required"] or 7)
+            days_with_data = int(baseline["days_with_data"] or 0)
+            if days_with_data < min_days_required:
+                deficits.append(
+                    {
+                        "key": "baseline_days_with_data",
+                        "have": days_with_data,
+                        "need": min_days_required,
+                        "detail": "For få døgn med data i baseline-vindu.",
+                    }
+                )
+
+            room_rows = int(baseline["room_bucket_rows"] or 0)
+            room_supported = int(baseline["room_bucket_supported"] or 0)
+            if room_rows <= 0:
+                deficits.append(
+                    {
+                        "key": "room_bucket_rows",
+                        "have": room_rows,
+                        "need": 1,
+                        "detail": "Ingen room_bucket-rader i baseline.",
+                    }
+                )
+            elif room_supported < room_rows:
+                deficits.append(
+                    {
+                        "key": "room_bucket_supported",
+                        "have": room_supported,
+                        "need": room_rows,
+                        "detail": "Ikke alle room_bucket-rader har nok støtte.",
+                    }
+                )
+
+            try:
+                expected_rooms = (
+                    db.execute(
+                        text(
+                            """
+                            SELECT array_remove(array_agg(room_id ORDER BY room_id), NULL) AS rooms
+                            FROM rooms
+                            WHERE org_id=:org_id AND home_id=:home_id
+                            """
+                        ),
+                        {"org_id": scope.org_id, "home_id": scope.home_id},
+                    )
+                    .mappings()
+                    .one()
+                )
+                baseline_rooms = (
+                    db.execute(
+                        text(
+                            """
+                            SELECT array_remove(array_agg(DISTINCT room_id ORDER BY room_id), NULL) AS rooms
+                            FROM baseline_room_bucket
+                            WHERE org_id=:org_id AND home_id=:home_id AND subject_id=:subject_id
+                              AND model_end = CAST(:model_end AS date)
+                            """
+                        ),
+                        {
+                            "org_id": scope.org_id,
+                            "home_id": scope.home_id,
+                            "subject_id": scope.subject_id,
+                            "model_end": baseline["model_end"],
+                        },
+                    )
+                    .mappings()
+                    .one()
+                )
+
+                expected_list = expected_rooms.get("rooms") or []
+                baseline_list = baseline_rooms.get("rooms") or []
+                missing_rooms = [r for r in expected_list if r not in baseline_list]
+                payload["sources"]["baseline"]["expected_rooms"] = expected_list
+                payload["sources"]["baseline"]["baseline_rooms"] = baseline_list
+                if missing_rooms:
+                    deficits.append(
+                        {
+                            "key": "missing_expected_rooms",
+                            "have": len(expected_list) - len(missing_rooms),
+                            "need": len(expected_list),
+                            "detail": "Rom i katalog uten baseline-dekning.",
+                            "missing_rooms": missing_rooms,
+                        }
+                    )
+            except Exception as e:
+                payload["sources"]["baseline"]["room_check_error"] = str(e)
+    except Exception as e:
+        db.rollback()
+        payload["sources"]["baseline"] = {"available": False, "error": str(e)}
+        deficits.append(
+            {
+                "key": "baseline_source_unavailable",
+                "have": 0,
+                "need": 1,
+                "detail": "Kunne ikke lese baseline-kilde.",
+            }
+        )
+
+    try:
+        anomalies_row = (
+            db.execute(
+                text(
+                    """
+                    SELECT COUNT(*)::int AS anomalies_7d
+                    FROM anomaly_episodes
+                    WHERE org_id=:org_id AND home_id=:home_id AND subject_id=:subject_id
+                      AND start_ts >= :since_utc
+                    """
+                ),
+                {
+                    "org_id": scope.org_id,
+                    "home_id": scope.home_id,
+                    "subject_id": scope.subject_id,
+                    "since_utc": since,
+                },
+            )
+            .mappings()
+            .one()
+        )
+        payload["sources"]["anomalies"] = {
+            "available": True,
+            "anomalies_7d": int(anomalies_row["anomalies_7d"] or 0),
+        }
+    except Exception as e:
+        db.rollback()
+        payload["sources"]["anomalies"] = {"available": False, "error": str(e)}
+        deficits.append(
+            {
+                "key": "anomalies_source_unavailable",
+                "have": 0,
+                "need": 1,
+                "detail": "Anomali-kilde utilgjengelig; analysegrunnlag kan være ufullstendig.",
+            }
+        )
+
+    try:
+        proposals_row = (
+            db.execute(
+                text(
+                    """
+                    SELECT COUNT(*)::int AS proposals_updated_7d
+                    FROM proposals
+                    WHERE org_id=:org_id AND home_id=:home_id AND subject_id=:subject_id
+                      AND updated_at >= :since_utc
+                    """
+                ),
+                {
+                    "org_id": scope.org_id,
+                    "home_id": scope.home_id,
+                    "subject_id": scope.subject_id,
+                    "since_utc": since,
+                },
+            )
+            .mappings()
+            .one()
+        )
+        payload["sources"]["proposals"] = {
+            "available": True,
+            "proposals_updated_7d": int(proposals_row["proposals_updated_7d"] or 0),
+        }
+    except Exception as e:
+        db.rollback()
+        payload["sources"]["proposals"] = {"available": False, "error": str(e)}
+        deficits.append(
+            {
+                "key": "proposals_source_unavailable",
+                "have": 0,
+                "need": 1,
+                "detail": "Forslag-kilde utilgjengelig; oppfølgingsstatus kan være ufullstendig.",
+            }
+        )
+
+    try:
+        deviations_row = (
+            db.execute(
+                text(
+                    """
+                    SELECT
+                      COUNT(*) FILTER (WHERE status IN ('OPEN','ACK'))::int AS deviations_open,
+                      COUNT(*) FILTER (WHERE last_seen_at >= :since_utc)::int AS deviations_seen_7d
+                    FROM deviations
+                    WHERE org_id=:org_id AND home_id=:home_id AND subject_id=:subject_id
+                    """
+                ),
+                {
+                    "org_id": scope.org_id,
+                    "home_id": scope.home_id,
+                    "subject_id": scope.subject_id,
+                    "since_utc": since,
+                },
+            )
+            .mappings()
+            .one()
+        )
+        payload["sources"]["deviations"] = {
+            "available": True,
+            "deviations_open": int(deviations_row["deviations_open"] or 0),
+            "deviations_seen_7d": int(deviations_row["deviations_seen_7d"] or 0),
+        }
+    except Exception as e:
+        db.rollback()
+        payload["sources"]["deviations"] = {"available": False, "error": str(e)}
+
+    from services.scheduler import ANOMALIES_RUNNER_STATUS
+
+    rs = dict(ANOMALIES_RUNNER_STATUS)
+    has_recent_run = bool(rs.get("last_ok_at") or rs.get("last_run_at"))
+    payload["analysis_running"] = {
+        "status": "YES" if has_recent_run else "NO",
+        "evidence": [
+            f"last_ok_at={rs.get('last_ok_at')}",
+            f"last_run_at={rs.get('last_run_at')}",
+            f"last_error_at={rs.get('last_error_at')}",
+        ],
+    }
+    if not has_recent_run:
+        deficits.append(
+            {
+                "key": "analysis_runner_not_proven",
+                "have": 0,
+                "need": 1,
+                "detail": "Mangler bevis på nylig analysekjøring i denne prosessen.",
+            }
+        )
+
+    baseline_latest = payload.get("sources", {}).get("baseline", {}).get("latest", {})
+    baseline_ok = bool(baseline_latest) and bool(baseline_latest.get("baseline_ready"))
+    payload["history_basis_ready"] = {
+        "status": "YES" if baseline_ok else "NO",
+        "evidence": [
+            f"baseline_ready={baseline_latest.get('baseline_ready')}",
+            f"days_with_data={baseline_latest.get('days_with_data')}",
+            f"min_days_required={baseline_latest.get('min_days_required')}",
+            f"room_bucket_supported={baseline_latest.get('room_bucket_supported')}",
+            f"room_bucket_rows={baseline_latest.get('room_bucket_rows')}",
+        ],
+    }
+
+    payload["summary"] = {
+        "events_7d": int(payload["sources"].get("events", {}).get("events_7d", 0) or 0),
+        "deviations_open": int(payload["sources"].get("deviations", {}).get("deviations_open", 0) or 0),
+        "deviations_seen_7d": int(payload["sources"].get("deviations", {}).get("deviations_seen_7d", 0) or 0),
+        "anomalies_7d": int(payload["sources"].get("anomalies", {}).get("anomalies_7d", 0) or 0),
+        "proposals_updated_7d": int(payload["sources"].get("proposals", {}).get("proposals_updated_7d", 0) or 0),
+    }
+
+    payload["basis"]["metrics"] = {
+        "deficit_count": len(deficits),
+        "events_available": bool(payload["sources"].get("events", {}).get("available")),
+        "baseline_available": bool(payload["sources"].get("baseline", {}).get("available")),
+    }
+
+    if len(deficits) == 0:
+        payload["basis"]["status"] = "READY"
+        payload["basis"]["message"] = "Grunnlaget er klart: minimumskravene er oppfylt."
+    else:
+        payload["basis"]["status"] = "WEAK"
+        payload["basis"]["message"] = f"Grunnlaget er fortsatt svakt: {len(deficits)} konkrete mangler må lukkes."
+
+    db.close()
+    return payload
+
+
+
+def _operator_explanations_from_health(health: dict) -> list[dict]:
+    comps = health.get("components", {})
+    out = []
+
+    ingest = comps.get("ingest", {})
+    if ingest.get("status") in ("DEGRADED", "ERROR"):
+        lag = ingest.get("lag_seconds")
+        out.append(
+            {
+                "component": "ingest",
+                "status": ingest.get("status"),
+                "what_is_wrong": (
+                    f"Datainntak har avvik (lag_seconds={lag})."
+                    if lag is not None
+                    else "Datainntak har avvik."
+                ),
+                "what_it_means": "Nye hendelser kommer ikke raskt nok inn, så analyser og varsler kan være utdaterte.",
+                "operator_next_step": "Kontroller datakilde, stream_id og siste event-tidspunkt i /health/detail.components.ingest.",
+            }
+        )
+
+    anomalies_runner = comps.get("anomalies_runner", {})
+    rs = anomalies_runner.get("runner_status", {}) or {}
+    out.append(
+        {
+            "component": "anomalies_runner",
+            "status": anomalies_runner.get("status", "UNKNOWN"),
+            "what_is_wrong": (
+                "Analyse er ikke bevist kjørende i denne prosessen."
+                if not (rs.get("last_ok_at") or rs.get("last_run_at"))
+                else "Analysekjøring har sporbar status."
+            ),
+            "what_it_means": "Dette avgjør om ‘analyse fungerer’ er dokumentert av faktisk runner-status.",
+            "operator_next_step": "Se runner_status.last_ok_at / last_run_at / last_error_at og verifiser at anomalies_job er planlagt.",
+            "trace_fields": ["components.anomalies_runner.runner_status.last_ok_at", "components.anomalies_runner.runner_status.last_run_at", "components.anomalies_runner.runner_status.last_error_at"],
+        }
+    )
+
+    baseline = comps.get("baseline", {})
+    bl = baseline.get("latest", {}) or {}
+    out.append(
+        {
+            "component": "baseline",
+            "status": baseline.get("status", "UNKNOWN"),
+            "what_is_wrong": (
+                "Historikkgrunnlag er ikke klart."
+                if not bool(bl.get("baseline_ready"))
+                else "Historikkgrunnlag har baseline_ready=true."
+            ),
+            "what_it_means": "Dette avgjør om ‘historikkgrunnlag er klart’ kan spores til baseline-data.",
+            "operator_next_step": "Se baseline.latest.baseline_ready, days_with_data, min_days_required og room_bucket_supported/room_bucket_rows.",
+            "trace_fields": [
+                "components.baseline.latest.baseline_ready",
+                "components.baseline.latest.days_with_data",
+                "components.baseline.latest.min_days_required",
+                "components.baseline.latest.room_bucket_supported",
+                "components.baseline.latest.room_bucket_rows",
+            ],
+        }
+    )
+
+    scheduler_comp = comps.get("scheduler", {})
+    if scheduler_comp.get("status") in ("DEGRADED", "ERROR"):
+        out.append(
+            {
+                "component": "scheduler",
+                "status": scheduler_comp.get("status"),
+                "what_is_wrong": "Scheduler har avvik eller mangler jobber.",
+                "what_it_means": "Automatiske kjøringer for varsler/analyse kan stoppe opp.",
+                "operator_next_step": "Sjekk scheduler.running og scheduler.jobs i /health/detail.",
+            }
+        )
+
+    return out
 
 # P1-5: Deprecation headers for legacy (non-/v1) API paths.
 # - Additive: does not change behavior, only adds headers.
@@ -444,7 +985,50 @@ def health_detail(scope: "AuthScope" = Depends(require_scope)):
             out["components"]["anomalies_runner"]["status"] = "DEGRADED"
             degrade("DEGRADED", "anomalies runner has never run in this process")
 
+    out["operator_explanations"] = _operator_explanations_from_health(out)
+    try:
+        out["weekly_truth_snapshot"] = _weekly_truth_payload(scope=scope, stream_id=stream_id)
+    except Exception as e:
+        out["weekly_truth_snapshot"] = {"available": False, "error": str(e)}
+
     return out
+
+
+@app.get("/v1/reports/weekly")
+def weekly_report_truth_v1(
+    stream_id: str = Query(default="prod"),
+    scope: "AuthScope" = Depends(require_scope),
+):
+    return _weekly_truth_payload(scope=scope, stream_id=stream_id)
+
+
+@app.get("/reports/weekly")
+def weekly_report_truth_legacy(
+    stream_id: str = Query(default="prod"),
+    scope: "AuthScope" = Depends(require_scope),
+):
+    return weekly_report_truth_v1(stream_id=stream_id, scope=scope)
+
+
+@app.get("/v1/reports/weekly/export.json")
+def weekly_report_export_json_v1(
+    stream_id: str = Query(default="prod"),
+    scope: "AuthScope" = Depends(require_scope),
+):
+    data = _weekly_truth_payload(scope=scope, stream_id=stream_id)
+    return {
+        "export_format": "agingos_weekly_truth_json_v1",
+        "exported_at_utc": datetime.now(timezone.utc).isoformat(),
+        "data": data,
+    }
+
+
+@app.get("/reports/weekly/export.json")
+def weekly_report_export_json_legacy(
+    stream_id: str = Query(default="prod"),
+    scope: "AuthScope" = Depends(require_scope),
+):
+    return weekly_report_export_json_v1(stream_id=stream_id, scope=scope)
 
 
 @app.post("/v1/pattern_miner/run_once")

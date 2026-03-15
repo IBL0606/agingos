@@ -16,6 +16,15 @@
     pageShell('index.html', 'Oversikt');
     const app = document.getElementById('app');
 
+    function itemBlock(item) {
+      return `<div style="margin-bottom:10px">
+        <div><b>${esc(item.component || 'ukjent')}</b> · <span class="chip">${esc(item.status || 'UNKNOWN')}</span></div>
+        <div><b>Hva er galt:</b> ${esc(item.what_is_wrong || '—')}</div>
+        <div><b>Hva betyr det:</b> ${esc(item.what_it_means || '—')}</div>
+        <div><b>Hva bør operatør gjøre:</b> ${esc(item.operator_next_step || '—')}</div>
+      </div>`;
+    }
+
     (async () => {
       const cache = loadCache('oversikt');
       let data = null;
@@ -37,15 +46,18 @@
       const checks = [
         ['System', statusNorwegian(data.overall_status)],
         ['Nye hendelser kommer inn', statusNorwegian(c.ingest?.status)],
-        ['Analyse fungerer', statusNorwegian(c.anomalies_runner?.status)],
+        ['Analyse fungerer', (data.weekly_truth_snapshot?.analysis_running?.status || 'UNKNOWN')],
         ['Varsler fungerer', statusNorwegian(c.scheduler?.status)],
-        ['Historikkgrunnlag er klart', statusNorwegian(c.baseline?.status)],
+        ['Historikkgrunnlag er klart', (data.weekly_truth_snapshot?.history_basis_ready?.status || 'UNKNOWN')],
       ];
 
       const overall = statusNorwegian(data.overall_status);
+      const weeklyBasis = data.weekly_truth_snapshot?.basis;
       const action = overall === 'Bra'
         ? 'Følg normal drift og se gjennom nye varsler ved behov.'
-        : 'Sjekk tilkobling og datagrunnlag før videre pilotoppfølging.';
+        : 'Sjekk konkrete årsaker under “Hva er galt, hva betyr det, og hva bør du gjøre?”.';
+
+      const explanations = Array.isArray(data.operator_explanations) ? data.operator_explanations : [];
 
       app.innerHTML = `
         ${failSoftBlock(cache)}
@@ -57,7 +69,20 @@
 
         <div class="card">
           <h2>Helsesjekk</h2>
-          ${checks.map(([k, v]) => `<div class="row"><b style="min-width:250px">${k}</b><span class="chip">${v}</span></div>`).join('')}
+          ${checks.map(([k, v]) => `<div class="row"><b style="min-width:250px">${k}</b><span class="chip">${esc(v)}</span></div>`).join('')}
+        </div>
+
+        <div class="card">
+          <h2>Hva er galt, hva betyr det, og hva bør du gjøre?</h2>
+          ${explanations.length ? explanations.map(itemBlock).join('') : '<div>Ingen konkrete avvik meldt.</div>'}
+        </div>
+
+        <div class="card">
+          <h2>Historikkgrunnlag nå</h2>
+          <p><b>${esc(weeklyBasis?.message || 'Ingen grunnlagsvurdering tilgjengelig.')}</b></p>
+          ${(weeklyBasis?.deficits || []).length
+            ? `<ul>${weeklyBasis.deficits.map((d) => `<li>${esc(d.key)}: har ${esc(String(d.have ?? '—'))}, trenger ${esc(String(d.need ?? '—'))}. ${esc(d.detail || '')}</li>`).join('')}</ul>`
+            : '<p class="muted">Ingen registrerte mangler i grunnlaget.</p>'}
         </div>
 
         <div class="card">

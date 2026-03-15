@@ -650,3 +650,81 @@ Runtime/UI evidence:
 
 Known gap / risk:
 - `backend/routes/rules.py` har robusthetsstøy i scope-fallback mot `subjects` i dette dev-miljøet; respons ender fortsatt i 200 med fallback-data, men dette bør hardenes separat
+
+### Fixpack-D — MUST-D1 health/report truth and export — 2026-03-15 (draft)
+PR: TBD
+Status: IMPLEMENTED (pending full runtime verification)
+
+Scope:
+- konkret operatorforklaring i oversikt/health (hva er galt, hva betyr det, hva gjør man)
+- sporbarhet for `analyse fungerer` og `historikkgrunnlag er klart` til konkrete datafelt
+- ukesrapport sannhetskilde flyttet til backend-aggregert endpoint
+- sannferdig eksport i JSON via eget backend-endpoint
+- konkret svakt grunnlag med eksakte mangler (`have` vs `need`, evt. `missing_rooms`)
+
+Changed files:
+- backend/main.py
+- services/console/index.html
+- services/console/report.html
+- docs/v2/OPERATIONS.md
+
+Planned verification mapping:
+- CHECK-D-01: `operator_explanations` i `/health/detail` + visning i `index.html`
+- CHECK-D-02: `weekly_truth_snapshot.analysis_running` og `.history_basis_ready` knyttet til runner/baseline-felt
+- CHECK-D-03: `report.html` bruker `/v1/reports/weekly` som primær sannhetskilde
+- CHECK-D-04: eksport via `/v1/reports/weekly/export.json`
+- CHECK-D-05: `basis.deficits[]` viser konkrete mangler med `have/need/detail` (+ `missing_rooms` når relevant)
+- CHECK-D-06: additive legacy aliases beholdt (`/reports/weekly*`) og eksisterende health/report flyt er fail-soft
+
+### Fixpack-D — MUST-D1 health/report truth and export — 2026-03-15
+PR: https://github.com/IBL0606/agingos/pull/49
+Status: VERIFIED
+
+Scope:
+- konkret operatorforklaring i oversikt/health (hva er galt, hva betyr det, hva gjør man)
+- sporbarhet for `Analyse fungerer` og `Historikkgrunnlag er klart` til konkrete backend-felt
+- ukesrapport flyttet til backend-aggregert sannhetskilde
+- sannferdig eksport i JSON via eget backend-endpoint
+- konkretisering av svakt grunnlag med eksakte mangler (`have`, `need`, `detail`)
+- additive endringer uten å late som grunnlaget er sterkere enn det er
+
+Changed files:
+- backend/main.py
+- services/console/index.html
+- services/console/report.html
+- docs/v2/OPERATIONS.md
+
+Verification summary:
+- CHECK-D-01 PASS: `/health/detail` returnerer `operator_explanations[]`, og Oversikt viser konkrete årsaker, betydning og neste steg
+- CHECK-D-02 PASS: `/health/detail` returnerer `weekly_truth_snapshot`, og Console binder `Analyse fungerer` / `Historikkgrunnlag er klart` til konkrete weekly-truth-felter
+- CHECK-D-03 PASS: `/v1/reports/weekly?stream_id=prod` returnerer ikke-null serveraggregert weekly truth payload
+- CHECK-D-04 PASS: `/v1/reports/weekly/export.json?stream_id=prod` returnerer sannferdig JSON med `export_format=agingos_weekly_truth_json_v1`
+- CHECK-D-05 PASS: `basis.deficits[]` viser konkrete mangler med `have`, `need`, `detail`
+- CHECK-D-06 PASS: health/report-flyt fungerer additivt etter retting av `_weekly_truth_payload(...)` kontrollflyt
+
+Runtime/UI evidence:
+- `/health/detail` viste `operator_explanations` som liste og `weekly_truth_snapshot` som dict
+- `/v1/reports/weekly` viste `summary`, `analysis_running`, `history_basis_ready`, `basis`
+- `/v1/reports/weekly/export.json` viste `data_is_null=false`
+- UI-verifisering i Console viste:
+  - Oversikt med konkret helseforklaring
+  - Historikkgrunnlag med konkrete deficits
+  - Ukessammendrag med sann weekly truth og eksportknapp
+
+Known runtime truth in current dev dataset:
+- grunnlaget er fortsatt svakt i nåværende dev-data:
+  - `observed_days=0/7`
+  - `days_with_data_7d=0/5`
+  - `latest_event_stale_hours≈218`
+  - `baseline_source_unavailable`
+  - `analysis_runner_not_proven`
+- dette er forventet sann oppførsel i UI/API og ikke en bug i Fixpack-D
+
+EXTRA:
+- Rettet separat Console nginx-routing-regresjon slik at `rules.html` ikke lenger kapres av `/rules`-proxy:
+  - `services/console/nginx.conf`: `location /rules` -> `location = /rules`
+- Verifisert med `200 OK` for `/rules.html` fra statisk nginx-servering
+- Denne EXTRA-fiksen er utenfor MUST-D1, men inkludert i samme PR som en liten, avgrenset runtime-fix
+
+Known gap / risk:
+- `/rules` ga `502 Bad Gateway` i én lokal nginx-test rett etter restart; dette påvirker ikke verifiseringen av `rules.html`-routing-fiksen, men backend-upstream bør observeres separat dersom rules-endpoint skal runtime-bevises i samme miljø igjen

@@ -1,0 +1,23 @@
+Fixpack-D — MUST-D1 health/report truth + export
+Date: 2026-03-15
+PR: https://github.com/IBL0606/agingos/pull/49
+Status: VERIFIED (runtime PASS for CHECK-D-01..CHECK-D-06)
+
+What is verified:
+- /health/detail includes operator_explanations[]
+- /health/detail includes weekly_truth_snapshot
+- /v1/reports/weekly returns non-null backend-aggregated weekly truth payload
+- /v1/reports/weekly/export.json returns non-null JSON export with export_format=agingos_weekly_truth_json_v1
+- weak basis is concrete via basis.deficits[] with have/need/detail
+- Console UI shows concrete health explanation and truthful weak-basis weekly report
+- EXTRA: rules.html is served statically after nginx exact-match fix for /rules
+
+Known runtime truth in current dev dataset:
+- observed_days=0/7
+- days_with_data_7d=0/5
+- latest_event_stale_hours~=218
+- baseline_source_unavailable
+- analysis_runner_not_proven
+
+Note:
+- This evidence pack records the concrete verification artifacts for Fixpack-D closure on PR #49.
