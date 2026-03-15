@@ -95,3 +95,36 @@ In `/health/detail`:
 - `components.baseline` indicates readiness/staleness.
 - `components.anomalies_runner.runner_status` can be null immediately after restart (process-local).
 
+
+## Fixpack-C — Hvordan lese regler og alarmer sannferdig
+
+Etter Fixpack-C kan enkelte regler bevisst la være å gi vanlig alarm dersom grunnlaget er for svakt.
+
+Dette gjelder særlig:
+- regler som trenger historikk / baseline
+- regler som avhenger av boligspesifikk døgnprofil
+
+### Hva operatør skal se etter
+Når Console viser at en regel er:
+
+- `WEAK_BASIS`
+- `NOT_EVALUATED`
+- `DEFAULT_PROFILE`
+
+skal dette leses som:
+- systemet skjuler ikke sannheten om svakt grunnlag
+- fravær av vanlig alarm betyr ikke automatisk «alt er normalt»
+- vurderingen må leses sammen med forklaringen i Console
+
+### Praktisk konsekvens i pilot
+- Baseline-avhengige regler kan utebli som normal alarm hvis baseline ikke er READY
+- Profil-avhengige regler kan bruke standardprofil og skal da merkes tydelig som ikke personlig tilpasset
+- Uavhengige regler skal fortsatt fungere normalt
+
+### Evidence
+Ingen egen samlet Fixpack-C evidence-pack ble laget under `docs/audit/verification-...`.
+Verifikasjon er i stedet bevist gjennom:
+- CI / smoke for PR #46
+- tester i `backend/tests/rules/test_rule_truth_gating_unit.py`
+- tester i `backend/tests/test_rules_scope_resolution_unit.py`
+- appendet Control Tower-tekst i `docs/audit/AgingOS_CONTROL_TOWER.md`
