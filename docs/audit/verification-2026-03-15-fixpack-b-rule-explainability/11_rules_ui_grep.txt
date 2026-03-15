@@ -1,0 +1,9 @@
+rules.html proof:
+- table headers contain Rule ID / Forklaring / Funn
+- row rendering uses:
+  - r.rule_id
+  - r.display_name
+  - r.human_explanation
+  - r.runtime_status
+- findings link target:
+  ./alarms.html?rule_id=...

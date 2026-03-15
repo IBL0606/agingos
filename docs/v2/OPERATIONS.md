@@ -161,6 +161,45 @@ Truth guardrails:
   - Existing mappings to another room are not overwritten blindly (`skipped_existing`).
 
 
+
+## Fixpack-B — Rule explainability + truthful drilldown (2026-03-15)
+
+Console:
+- `services/console/rules.html` / `rules.html` er operatorflaten for regler.
+- Siden skal vise minst:
+  - `rule_id`
+  - menneskelig navn
+  - menneskelig forklaring
+  - runtime-status / truth-status når tilgjengelig
+- Regelsiden skal kunne sende operatør videre til relevante funn via:
+  - `./alarms.html?rule_id=<RULE_ID>`
+
+API truth:
+- `GET /v1/rules` er utvidet additivt med operatorfelter:
+  - `rule_id`
+  - `display_name`
+  - `human_explanation`
+  - `runtime_status`
+- Eksisterende felt/atferd skal bevares; dette er ikke parameterredigering.
+
+Drilldown truth:
+- Varsler/funn skal lenke til `events.html` med reelle filtre når slikt grunnlag finnes:
+  - `room`
+  - `category`
+  - `since`
+  - `until`
+  - `stream_id`
+  - `auto=1`
+- `events.html` skal lese og faktisk bruke disse filtrene i visningen.
+- Hvis eksakt trigger-event ikke kan bevises/rekonstrueres, skal Console si dette eksplisitt og vise relevant datagrunnlag for samme scope/tidsvindu/rom/kategori i stedet.
+
+Bevisstatus:
+- Verifisert i dev på PR #48.
+- Evidence pack:
+  - `docs/audit/verification-2026-03-15-fixpack-b-rule-explainability/`
+- Control Tower:
+  - `docs/audit/AgingOS_CONTROL_TOWER.md`
+
 ## Fixpack-C — Truthful gating for regler (2026-03-15)
 
 Pilot-reglene er nå klassifisert eksplisitt som:

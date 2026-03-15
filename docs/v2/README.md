@@ -32,6 +32,22 @@ This Phase 4 fixpack is **Devbox-only**.
 ## Explainable alarm UI truth (Fixpack-7 / MUST-5)
 - Canonical MUST-5 explainability truth: `docs/v2/PILOT-ALARMS.md` (section 8).
 
+
+## Fixpack-B status
+
+Fixpack-B innførte operatorvennlig regelvisning og sann drilldown for regel-funn i Console.
+
+Kort oppsummert:
+- egen `Regler`-side i Console
+- additive operatorfelter på `/v1/rules`
+- regel -> funn via `alarms.html?rule_id=...`
+- funn/anomalier -> `events.html` med sanne filtre
+- eksplisitt "ingen falsk presisjon" når eksakt trigger-event ikke kan bevises
+
+Evidence:
+- eksplisitt verification-pack: `docs/audit/verification-2026-03-15-fixpack-b-rule-explainability/`
+- Control Tower: `docs/audit/AgingOS_CONTROL_TOWER.md`
+
 ## Fixpack-C status
 
 Fixpack-C innførte truthful gating for pilot-regler slik at regler med svakt baseline-/profilgrunnlag ikke lenger presenteres som om de var fullverdig evaluert.

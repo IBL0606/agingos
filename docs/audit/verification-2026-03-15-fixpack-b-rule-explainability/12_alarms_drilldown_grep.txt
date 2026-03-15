@@ -1,0 +1,15 @@
+alarms.html drilldown proof:
+- supports query param rule_id and filters deviations by selected rule
+- builds events drilldown with:
+  - room
+  - category
+  - since
+  - until
+  - auto=1
+  - stream_id
+- preserves PATCH status actions:
+  - ACK
+  - CLOSED
+- explicit truth text:
+  - exact trigger event exists but filter view is still used
+  - exact trigger event is not proven; relevant scope/time/room/category is shown instead

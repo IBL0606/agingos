@@ -1,0 +1,10 @@
+events.html query contract proof:
+- consumes:
+  - room
+  - category (via category/type mapping)
+  - since
+  - until
+  - stream_id
+  - auto
+- applies actual filtering on rows by time window, room and type/category
+- surfaces auto-filter active notice in UI

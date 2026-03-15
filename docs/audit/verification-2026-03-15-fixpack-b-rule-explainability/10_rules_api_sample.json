@@ -1,0 +1,13 @@
+Verified in dev via authenticated request to /v1/rules.
+Representative returned fields:
+- rule_id
+- display_name
+- human_explanation
+- runtime_status
+
+Sample proof captured during verification in chat/runtime:
+R-001 returned:
+- rule_id=R-001
+- display_name=Lite eller ingen bevegelse i tidsvindu
+- human_explanation=Regelen følger med på om det er mye mindre bevegelse enn vanlig i et relevant tidsvindu.
+- runtime_status.evaluation_truth=NOT_EVALUATED

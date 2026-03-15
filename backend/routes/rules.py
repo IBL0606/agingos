@@ -18,6 +18,59 @@ router = APIRouter(prefix="/rules", tags=["rules"])
 logger = logging.getLogger("rules.routes")
 
 
+_RULE_HUMAN_TEXT = {
+    "R-001": {
+        "display_name": "Lite eller ingen bevegelse i tidsvindu",
+        "human_explanation": "Regelen følger med på om det er mye mindre bevegelse enn vanlig i et relevant tidsvindu.",
+    },
+    "R-002": {
+        "display_name": "Ytterdør åpen om natten",
+        "human_explanation": "Regelen varsler når ytterdør åpnes i nattperioden der det vanligvis forventes ro.",
+    },
+    "R-003": {
+        "display_name": "Dør åpnet uten bevegelse etterpå",
+        "human_explanation": "Regelen ser etter situasjoner der en dør åpnes, men det ikke kommer normal bevegelse i etterkant.",
+    },
+    "R-004": {
+        "display_name": "Langt opphold på bad",
+        "human_explanation": "Regelen markerer uvanlig lang aktivitet på bad sammenlignet med normal bruk.",
+    },
+    "R-005": {
+        "display_name": "Lite baderomsaktivitet over tid",
+        "human_explanation": "Regelen ser etter at baderomsaktivitet over et døgn faller tydelig under det som er vanlig.",
+    },
+    "R-006": {
+        "display_name": "Lite stueaktivitet på dagtid",
+        "human_explanation": "Regelen følger med på om stueaktivitet på dagtid blir klart lavere enn forventet.",
+    },
+    "R-007": {
+        "display_name": "Nattvandring mellom rom",
+        "human_explanation": "Regelen oppdager mange rombytter i nattperioden sammenlignet med normalt mønster.",
+    },
+    "R-008": {
+        "display_name": "Mange dørhendelser på kort tid",
+        "human_explanation": "Regelen markerer uvanlig tett serie med døråpning/lukking i samme tidsrom.",
+    },
+    "R-009": {
+        "display_name": "Innsamling stoppet",
+        "human_explanation": "Regelen varsler når systemet ikke mottar forventede liveness-hendelser innen rimelig tid.",
+    },
+    "R-010": {
+        "display_name": "Sensor eller rom virker fastlåst",
+        "human_explanation": "Regelen ser etter signaler som står urimelig lenge i samme tilstand uten normal variasjon.",
+    },
+}
+
+
+def _human_rule_text(rule_id: str, spec_description: str | None) -> dict:
+    fallback = (spec_description or rule_id or "").strip() or "Ukjent regel"
+    info = _RULE_HUMAN_TEXT.get(rule_id, {})
+    return {
+        "display_name": info.get("display_name") or fallback,
+        "human_explanation": info.get("human_explanation") or fallback,
+    }
+
+
 def _resolve_scope(db: Session) -> tuple[str, str, str]:
     """
     Best-effort scope resolver for evaluation-truth endpoint.
@@ -211,17 +264,36 @@ def list_rules(db: Session = Depends(get_db)):
     by_name = {r.name: r for r in db_rows if getattr(r, "name", None)}
 
     out = []
+    org_id, home_id, subject_id = _resolve_scope(db)
+    truth_by_rule = {}
     for name in sorted(yaml_rules.keys()):
         y = dict(yaml_rules.get(name) or {})
+        spec = RULE_REGISTRY.get(name)
+        human = _human_rule_text(name, spec.description if spec is not None else name)
         enabled_in_scheduler = bool(y.get("enabled_in_scheduler", False))
         lookback_minutes = y.get("lookback_minutes")
         expire_after_minutes = y.get("expire_after_minutes")
         params = dict(y.get("params", {}) or {})
 
         r = by_name.get(name)
+        if enabled_in_scheduler:
+            try:
+                truth_by_rule[name] = build_rule_truth(
+                    cfg,
+                    name,
+                    db=db,
+                    org_id=org_id,
+                    home_id=home_id,
+                    subject_id=subject_id,
+                )
+            except Exception:
+                logger.warning("rules_list_truth_build_failed", extra={"rule_id": name}, exc_info=True)
         out.append(
             {
                 "name": name,
+                "rule_id": name,
+                "display_name": human["display_name"],
+                "human_explanation": human["human_explanation"],
                 "enabled_in_scheduler": enabled_in_scheduler,
                 "lookback_minutes": lookback_minutes,
                 "expire_after_minutes": expire_after_minutes,
@@ -236,6 +308,7 @@ def list_rules(db: Session = Depends(get_db)):
                 ),
                 "rule_type": (str(r.rule_type) if r is not None else None),
                 "evaluation_truth_config": _evaluation_truth_config(y),
+                "runtime_status": truth_by_rule.get(name),
             }
         )
 
@@ -243,9 +316,14 @@ def list_rules(db: Session = Depends(get_db)):
     for name, r in sorted(by_name.items()):
         if name in yaml_rules:
             continue
+        spec = RULE_REGISTRY.get(name)
+        human = _human_rule_text(name, spec.description if spec is not None else name)
         out.append(
             {
                 "name": name,
+                "rule_id": name,
+                "display_name": human["display_name"],
+                "human_explanation": human["human_explanation"],
                 "enabled_in_scheduler": False,
                 "lookback_minutes": None,
                 "expire_after_minutes": None,
@@ -259,6 +337,7 @@ def list_rules(db: Session = Depends(get_db)):
                 "rule_type": str(r.rule_type),
                 "note": "db_only",
                 "evaluation_truth_config": _evaluation_truth_config({}),
+                "runtime_status": None,
             }
         )
 
