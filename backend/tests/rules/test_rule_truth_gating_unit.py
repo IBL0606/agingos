@@ -112,3 +112,33 @@ def test_independent_rule_stays_fully_evaluated():
 
     assert out["evaluation_truth"] == "FULLY_EVALUATED"
     assert out["gating_reason"] is None
+
+
+class _DBRaises:
+    def execute(self, *_args, **_kwargs):
+        raise RuntimeError("UndefinedColumn: min_days_required")
+
+
+def test_baseline_truth_missing_columns_degrades_without_crash():
+    cfg = RuleConfig(
+        raw={
+            "rules": {
+                "R-001": {
+                    "evaluation_mode": "baseline_dependent",
+                    "requires_baseline": True,
+                }
+            }
+        }
+    )
+
+    out = build_rule_truth(
+        cfg,
+        "R-001",
+        db=_DBRaises(),
+        org_id="default",
+        home_id="default",
+        subject_id="default",
+    )
+
+    assert out["evaluation_truth"] == "NOT_EVALUATED"
+    assert out["gating_reason"] == "baseline_status_missing"

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from config.rule_config import RuleConfig
+
+logger = logging.getLogger("rules.gating")
 
 
 def _safe_ratio(num: int | None, den: int | None) -> float | None:
@@ -16,6 +19,32 @@ def _safe_ratio(num: int | None, den: int | None) -> float | None:
     return float(num) / float(den)
 
 
+def _coerce_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return int(value)
+    try:
+        return int(value)
+    except Exception:
+        return None
+
+
+def _coverage_value(supported: Any, rows: Any) -> float | None:
+    rows_i = _coerce_int(rows)
+    if rows_i is None or rows_i <= 0:
+        return None
+
+    # In fresh pilot schema, *_supported can be boolean; represent as 0.0/1.0.
+    if isinstance(supported, bool):
+        return 1.0 if supported else 0.0
+
+    supported_i = _coerce_int(supported)
+    if supported_i is None:
+        return None
+    return _safe_ratio(supported_i, rows_i)
+
+
 def load_baseline_truth(
     db: Session,
     *,
@@ -23,33 +52,45 @@ def load_baseline_truth(
     home_id: str,
     subject_id: str,
 ) -> dict[str, Any]:
-    row = (
-        db.execute(
-            text(
-                """
-                SELECT
-                  baseline_ready,
-                  min_days_required,
-                  days_with_data,
-                  room_bucket_rows,
-                  room_bucket_supported,
-                  transition_rows,
-                  transition_supported
-                FROM baseline_model_status
-                WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
-                ORDER BY computed_at DESC
-                LIMIT 1
-                """
-            ),
-            {
+    try:
+        row = (
+            db.execute(
+                text(
+                    """
+                    SELECT
+                      baseline_ready,
+                      days_with_data,
+                      room_bucket_rows,
+                      room_bucket_supported,
+                      transition_rows,
+                      transition_supported
+                    FROM baseline_model_status
+                    WHERE org_id = :org_id AND home_id = :home_id AND subject_id = :subject_id
+                    ORDER BY computed_at DESC
+                    LIMIT 1
+                    """
+                ),
+                {
+                    "org_id": org_id,
+                    "home_id": home_id,
+                    "subject_id": subject_id,
+                },
+            )
+            .mappings()
+            .first()
+        )
+    except Exception:
+        logger.warning(
+            "baseline_truth_unavailable",
+            extra={
                 "org_id": org_id,
                 "home_id": home_id,
                 "subject_id": subject_id,
             },
+            exc_info=True,
         )
-        .mappings()
-        .first()
-    )
+        row = None
+
     if not row:
         return {
             "baseline_ready": False,
@@ -60,19 +101,16 @@ def load_baseline_truth(
             "has_status": False,
         }
 
-    days = row.get("days_with_data")
-    min_days = row.get("min_days_required")
-    room_supported = row.get("room_bucket_supported")
-    room_rows = row.get("room_bucket_rows")
-    trans_supported = row.get("transition_supported")
-    trans_rows = row.get("transition_rows")
-
     return {
         "baseline_ready": bool(row.get("baseline_ready")),
-        "min_days_required": min_days,
-        "days_with_data": int(days or 0),
-        "coverage_room_bucket": _safe_ratio(int(room_supported or 0), int(room_rows or 0)),
-        "coverage_transition": _safe_ratio(int(trans_supported or 0), int(trans_rows or 0)),
+        "min_days_required": None,
+        "days_with_data": int(row.get("days_with_data") or 0),
+        "coverage_room_bucket": _coverage_value(
+            row.get("room_bucket_supported"), row.get("room_bucket_rows")
+        ),
+        "coverage_transition": _coverage_value(
+            row.get("transition_supported"), row.get("transition_rows")
+        ),
         "has_status": True,
     }
 
@@ -113,7 +151,6 @@ def build_rule_truth(
         "coverage_transition": None,
     }
 
-    baseline = None
     if requires_baseline:
         baseline = load_baseline_truth(
             db,
