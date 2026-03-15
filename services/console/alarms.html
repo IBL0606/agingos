@@ -34,6 +34,16 @@
       return 'Lav sikkerhet';
     }
 
+
+
+    function truthText(t) {
+      if (!t || t === 'FULLY_EVALUATED') return 'Full vurdering';
+      if (t === 'NOT_EVALUATED') return 'Ikke vurdert: mangler nok historikk';
+      if (t === 'WEAK_BASIS') return 'Datagrunnlaget er for svakt til full vurdering';
+      if (t === 'DEFAULT_PROFILE') return 'Bruker standard nattvindu, ikke personlig boligprofil';
+      return t;
+    }
+
     function eventsLink(window, room) {
       const q = new URLSearchParams();
       if (room && room !== 'Ukjent rom') q.set('room', room);
@@ -77,14 +87,16 @@
 
     (async () => {
       const cache = loadCache('alarms');
-      const [devRes, packRes] = await Promise.all([
+      const [devRes, packRes, truthRes] = await Promise.all([
         apiTry('/v1/deviations?limit=500'),
         apiTry('/rules/pilot-pack'),
+        apiTry('/rules/evaluation-truth'),
       ]);
 
       const devs = devRes.ok ? devRes.data : (cache?.data?.devs || []);
       const pack = packRes.ok ? packRes.data : (cache?.data?.pack || []);
-      if (devRes.ok || packRes.ok) saveCache('alarms', { devs, pack });
+      const truth = truthRes.ok ? truthRes.data : (cache?.data?.truth || { rules: [] });
+      if (devRes.ok || packRes.ok || truthRes.ok) saveCache('alarms', { devs, pack, truth });
 
       const fallback = ['R-001', 'R-002', 'R-003', 'R-004', 'R-005', 'R-006', 'R-007', 'R-008', 'R-009', 'R-010'];
       const rules = (Array.isArray(pack) ? pack : []).map((r) => r.rule_id || r.id).filter(Boolean);
@@ -100,6 +112,21 @@
           <div class="row">
             ${allRules.map((r) => `<span class="chip ${byRule[r]?.length ? 'ok' : 'warn'}">${r}: ${byRule[r]?.length ? `${byRule[r].length} registrert` : 'ingen funn nå'}</span>`).join('')}
           </div>
+        </div>
+
+        <div class="card">
+          <h2>Regel-evaluering (sannhet)</h2>
+          <div class="small muted">Viser hvorfor regler eventuelt ikke er fullt vurdert.</div>
+          <table>
+            <thead><tr><th>Regel</th><th>Evalueringsgrunnlag</th><th>Detaljer</th></tr></thead>
+            <tbody>
+              ${(truth.rules || []).map((r) => `<tr>
+                <td>${esc(r.rule_id)}</td>
+                <td>${esc(truthText(r.evaluation_truth))}</td>
+                <td class="small muted">${esc(r.basis_summary || (r.gating_reason || 'Ingen begrensning'))}</td>
+              </tr>`).join('') || '<tr><td colspan="3" class="muted">Ingen evalueringsstatus tilgjengelig.</td></tr>'}
+            </tbody>
+          </table>
         </div>
 
         <div class="card">
@@ -147,6 +174,8 @@
         const observed = ev.observed ?? ev.current ?? 'Mangler observasjon i grunnlaget.';
         const diff = ev.delta ?? ev.diff ?? 'Forskjellen kan ikke tallfestes sikkert ennå.';
         const certainty = confidence(d);
+        const evalTruth = ev.evaluation_truth || 'FULLY_EVALUATED';
+        const truthMsg = truthText(evalTruth);
 
         const uncertaintyText = certainty !== 'Høy sikkerhet'
           ? (ev.uncertainty_reason || 'Vi mangler enten sammenlignbar historikk, stabil romkobling eller bedre datakvalitet. Mer data kan hjelpe, men tidshorisonten varierer per varseltype.')
@@ -165,6 +194,7 @@
                 <div class="qa"><div class="q">4. Hva ble sett nå?</div><div class="a">${esc(String(observed))}</div></div>
                 <div class="qa"><div class="q">5. Hvor stor er forskjellen?</div><div class="a">${esc(String(diff))}</div></div>
                 <div class="qa"><div class="q">6. Hvor sikre er vi?</div><div class="a">${certainty}</div></div>
+                <div class="qa"><div class="q">6b. Evalueringsgrunnlag</div><div class="a">${esc(truthMsg)}</div></div>
                 <div class="qa"><div class="q">7. Hvor alvorlig virker dette?</div><div class="a">${severityMap[d.severity] || 'Følg med'}</div></div>
                 <div class="qa"><div class="q">8. Hva bør du gjøre nå?</div><div class="a">Se hendelser i samme tidsrom, sjekk rommet og marker deretter som sett eller ferdig.</div></div>
                 ${uncertaintyText ? `<div class="notice warn small">Usikkerhet: ${esc(uncertaintyText)}</div>` : ''}

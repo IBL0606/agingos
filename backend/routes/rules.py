@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from db import get_db
@@ -10,13 +11,48 @@ from config.rule_config import load_rule_config
 from models.rule import Rule
 from models.rule import RuleType
 from services.rules.registry import RULE_REGISTRY
+from services.rules.gating import build_rule_truth
 
 router = APIRouter(prefix="/rules", tags=["rules"])
+
+
+def _resolve_scope(db: Session) -> tuple[str, str, str]:
+    row = (
+        db.execute(
+            text(
+                """
+                SELECT org_id, home_id, subject_id
+                FROM subjects
+                ORDER BY created_at ASC NULLS LAST
+                LIMIT 1
+                """
+            )
+        )
+        .mappings()
+        .first()
+    )
+    if row:
+        return (str(row.get("org_id") or "default"), str(row.get("home_id") or "default"), str(row.get("subject_id") or "default"))
+    return ("default", "default", "default")
+
 
 
 def _severity_label(score: int) -> str:
     return {1: "LOW", 2: "MEDIUM", 3: "HIGH"}.get(int(score or 2), "MEDIUM")
 
+
+
+def _evaluation_truth_config(yaml_rule: dict) -> dict:
+    return {
+        "evaluation_mode": yaml_rule.get("evaluation_mode", "independent"),
+        "requires_baseline": bool(yaml_rule.get("requires_baseline", False)),
+        "requires_profile": bool(yaml_rule.get("requires_profile", False)),
+        "profile_mode": yaml_rule.get("profile_mode"),
+        "uses_default_profile_when_missing": bool(
+            yaml_rule.get("uses_default_profile_when_missing", False)
+        ),
+        "min_days_with_data": yaml_rule.get("min_days_with_data"),
+    }
 
 def _pilot_pack_row(rule_id: str, db_rule: Rule | None, yaml_rule: dict) -> dict:
     spec = RULE_REGISTRY.get(rule_id)
@@ -35,6 +71,7 @@ def _pilot_pack_row(rule_id: str, db_rule: Rule | None, yaml_rule: dict) -> dict
             "source": "rules.severity" if db_rule is not None else "default=2",
         },
         "scheduler_enabled": bool(yaml_rule.get("enabled_in_scheduler", False)),
+        "evaluation_truth_config": _evaluation_truth_config(yaml_rule),
         "cooldown_grouping": {
             "cooldown": "NONE",
             "grouping": "OPEN/ACK dedupe by rule+subject+scope in scheduler upsert",
@@ -77,6 +114,32 @@ def get_pilot_pack(db: Session = Depends(get_db)):
             "cooldown is NONE for all rules (no cooldown setting in backend/config/rules.yaml)",
             "grouping reflects scheduler/deviation active dedupe only; notification anti-spam is handled in outbox worker",
         ],
+    }
+
+
+@router.get("/evaluation-truth")
+def get_rules_evaluation_truth(db: Session = Depends(get_db)):
+    cfg = load_rule_config()
+    yaml_rules = (cfg.raw.get("rules", {}) if isinstance(cfg.raw, dict) else {}) or {}
+    org_id, home_id, subject_id = _resolve_scope(db)
+
+    rows = []
+    for rid in sorted(yaml_rules.keys()):
+        if not cfg.rule_enabled_in_scheduler(rid):
+            continue
+        truth = build_rule_truth(
+            cfg,
+            rid,
+            db=db,
+            org_id=org_id,
+            home_id=home_id,
+            subject_id=subject_id,
+        )
+        rows.append({"rule_id": rid, **truth})
+
+    return {
+        "scope": {"org_id": org_id, "home_id": home_id, "subject_id": subject_id},
+        "rules": rows,
     }
 
 
@@ -155,6 +218,7 @@ def list_rules(db: Session = Depends(get_db)):
                     else None
                 ),
                 "rule_type": (str(r.rule_type) if r is not None else None),
+                "evaluation_truth_config": _evaluation_truth_config(y),
             }
         )
 
@@ -177,6 +241,7 @@ def list_rules(db: Session = Depends(get_db)):
                 ),
                 "rule_type": str(r.rule_type),
                 "note": "db_only",
+                "evaluation_truth_config": _evaluation_truth_config({}),
             }
         )
 
