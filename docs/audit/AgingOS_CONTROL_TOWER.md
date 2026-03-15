@@ -583,3 +583,37 @@ Evidence path:
 
 Status note:
 - CHECK-A-01..CHECK-A-05 intended to be proven from this verification pack.
+
+### Fixpack-B — MUST-B1 Rule explainability + drilldown — 2026-03-15
+PR: https://github.com/IBL0606/agingos/pull/48
+Branch: pr-48-fixpack-b
+Status: IMPLEMENTED / VERIFIED IN DEV
+
+Scope:
+- operatorvennlig regelvisning i Console
+- regel → funn-filtering
+- sann drilldown fra funn/anomali til hendelser
+- ingen falsk presisjon når eksakt trigger-event ikke kan bevises
+
+Changed files:
+- backend/routes/rules.py
+- services/console/rules.html
+- services/console/console_shared.js
+- services/console/alarms.html
+- services/console/anomalies.html
+- services/console/events.html
+
+Verification summary:
+- CHECK-B-01 PASS: egen regelside i Console (`rules.html`)
+- CHECK-B-02 PASS: `/v1/rules` returnerer `rule_id`, `display_name`, `human_explanation`, `runtime_status`
+- CHECK-B-03 PASS: `rules.html -> alarms.html?rule_id=...`, og `alarms/anomalies -> events.html?...`
+- CHECK-B-04 PASS: drilldown bygger og konsumerer reelle filterfelt (`room`, `category`, `since`, `until`, `stream_id`, `auto=1`)
+- CHECK-B-05 PASS: ACK/CLOSE-flyt beholdt; anomalies-flyt beholdt; proposals ikke rørt
+
+Runtime/UI evidence:
+- statisk regelside inneholder kolonnene `Rule ID`, `Forklaring`, `Funn`
+- backend er tilgjengelig fra console-nettverket og returnerer operatorfelter for R-001..R-010
+- nginx proxyer `/api/*` til backend og videresender `X-API-Key`
+
+Known gap / risk:
+- `backend/routes/rules.py` har robusthetsstøy i scope-fallback mot `subjects` i dette dev-miljøet; respons ender fortsatt i 200 med fallback-data, men dette bør hardenes separat
