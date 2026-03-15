@@ -650,3 +650,28 @@ Runtime/UI evidence:
 
 Known gap / risk:
 - `backend/routes/rules.py` har robusthetsstøy i scope-fallback mot `subjects` i dette dev-miljøet; respons ender fortsatt i 200 med fallback-data, men dette bør hardenes separat
+
+### Fixpack-D — MUST-D1 health/report truth and export — 2026-03-15 (draft)
+PR: TBD
+Status: IMPLEMENTED (pending full runtime verification)
+
+Scope:
+- konkret operatorforklaring i oversikt/health (hva er galt, hva betyr det, hva gjør man)
+- sporbarhet for `analyse fungerer` og `historikkgrunnlag er klart` til konkrete datafelt
+- ukesrapport sannhetskilde flyttet til backend-aggregert endpoint
+- sannferdig eksport i JSON via eget backend-endpoint
+- konkret svakt grunnlag med eksakte mangler (`have` vs `need`, evt. `missing_rooms`)
+
+Changed files:
+- backend/main.py
+- services/console/index.html
+- services/console/report.html
+- docs/v2/OPERATIONS.md
+
+Planned verification mapping:
+- CHECK-D-01: `operator_explanations` i `/health/detail` + visning i `index.html`
+- CHECK-D-02: `weekly_truth_snapshot.analysis_running` og `.history_basis_ready` knyttet til runner/baseline-felt
+- CHECK-D-03: `report.html` bruker `/v1/reports/weekly` som primær sannhetskilde
+- CHECK-D-04: eksport via `/v1/reports/weekly/export.json`
+- CHECK-D-05: `basis.deficits[]` viser konkrete mangler med `have/need/detail` (+ `missing_rooms` når relevant)
+- CHECK-D-06: additive legacy aliases beholdt (`/reports/weekly*`) og eksisterende health/report flyt er fail-soft
