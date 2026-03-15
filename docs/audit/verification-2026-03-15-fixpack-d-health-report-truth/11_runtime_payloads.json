@@ -1,0 +1,162 @@
+{
+  "health_detail_extract": {
+    "overall_status": "ERROR",
+    "operator_explanations_type": "list",
+    "weekly_truth_snapshot_type": "dict",
+    "weekly_truth_snapshot_basis": {
+      "status": "WEAK",
+      "message": "Grunnlaget er fortsatt svakt: 5 konkrete mangler må lukkes.",
+      "deficits": [
+        {
+          "key": "observed_days",
+          "have": 0,
+          "need": 7,
+          "detail": "Har ikke full observasjonsperiode på 7 dager ennå."
+        },
+        {
+          "key": "days_with_data_7d",
+          "have": 0,
+          "need": 5,
+          "detail": "For få døgn med aktivitet siste uke til stabil sammenligning."
+        },
+        {
+          "key": "latest_event_stale_hours",
+          "have": 218.26,
+          "need": "<=24",
+          "detail": "Siste hendelse er for gammel for en oppdatert ukesvurdering."
+        },
+        {
+          "key": "baseline_source_unavailable",
+          "have": 0,
+          "need": 1,
+          "detail": "Kunne ikke lese baseline-kilde."
+        },
+        {
+          "key": "analysis_runner_not_proven",
+          "have": 0,
+          "need": 1,
+          "detail": "Mangler bevis på nylig analysekjøring i denne prosessen."
+        }
+      ],
+      "metrics": {
+        "deficit_count": 5,
+        "events_available": true,
+        "baseline_available": false
+      }
+    }
+  },
+  "weekly_report_extract": {
+    "is_null": false,
+    "summary": {
+      "events_7d": 0,
+      "deviations_open": 2,
+      "deviations_seen_7d": 3,
+      "anomalies_7d": 0,
+      "proposals_updated_7d": 0
+    },
+    "analysis_running": {
+      "status": "NO",
+      "evidence": [
+        "last_ok_at=None",
+        "last_run_at=None",
+        "last_error_at=None"
+      ]
+    },
+    "history_basis_ready": {
+      "status": "NO",
+      "evidence": [
+        "baseline_ready=None",
+        "days_with_data=None",
+        "min_days_required=None",
+        "room_bucket_supported=None",
+        "room_bucket_rows=None"
+      ]
+    },
+    "basis": {
+      "status": "WEAK",
+      "message": "Grunnlaget er fortsatt svakt: 5 konkrete mangler må lukkes.",
+      "deficits": [
+        {
+          "key": "observed_days",
+          "have": 0,
+          "need": 7,
+          "detail": "Har ikke full observasjonsperiode på 7 dager ennå."
+        },
+        {
+          "key": "days_with_data_7d",
+          "have": 0,
+          "need": 5,
+          "detail": "For få døgn med aktivitet siste uke til stabil sammenligning."
+        },
+        {
+          "key": "latest_event_stale_hours",
+          "have": 218.26,
+          "need": "<=24",
+          "detail": "Siste hendelse er for gammel for en oppdatert ukesvurdering."
+        },
+        {
+          "key": "baseline_source_unavailable",
+          "have": 0,
+          "need": 1,
+          "detail": "Kunne ikke lese baseline-kilde."
+        },
+        {
+          "key": "analysis_runner_not_proven",
+          "have": 0,
+          "need": 1,
+          "detail": "Mangler bevis på nylig analysekjøring i denne prosessen."
+        }
+      ],
+      "metrics": {
+        "deficit_count": 5,
+        "events_available": true,
+        "baseline_available": false
+      }
+    }
+  },
+  "weekly_export_extract": {
+    "export_format": "agingos_weekly_truth_json_v1",
+    "data_is_null": false,
+    "data_basis": {
+      "status": "WEAK",
+      "message": "Grunnlaget er fortsatt svakt: 5 konkrete mangler må lukkes.",
+      "deficits": [
+        {
+          "key": "observed_days",
+          "have": 0,
+          "need": 7,
+          "detail": "Har ikke full observasjonsperiode på 7 dager ennå."
+        },
+        {
+          "key": "days_with_data_7d",
+          "have": 0,
+          "need": 5,
+          "detail": "For få døgn med aktivitet siste uke til stabil sammenligning."
+        },
+        {
+          "key": "latest_event_stale_hours",
+          "have": 218.26,
+          "need": "<=24",
+          "detail": "Siste hendelse er for gammel for en oppdatert ukesvurdering."
+        },
+        {
+          "key": "baseline_source_unavailable",
+          "have": 0,
+          "need": 1,
+          "detail": "Kunne ikke lese baseline-kilde."
+        },
+        {
+          "key": "analysis_runner_not_proven",
+          "have": 0,
+          "need": 1,
+          "detail": "Mangler bevis på nylig analysekjøring i denne prosessen."
+        }
+      ],
+      "metrics": {
+        "deficit_count": 5,
+        "events_available": true,
+        "baseline_available": false
+      }
+    }
+  }
+}

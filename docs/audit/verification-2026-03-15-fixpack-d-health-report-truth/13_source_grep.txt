@@ -1,0 +1,10 @@
+=== backend route/operator symbols ===
+509:def _operator_explanations_from_health(health: dict) -> list[dict]:
+988:    out["operator_explanations"] = _operator_explanations_from_health(out)
+990:        out["weekly_truth_snapshot"] = _weekly_truth_payload(scope=scope, stream_id=stream_id)
+992:        out["weekly_truth_snapshot"] = {"available": False, "error": str(e)}
+997:@app.get("/v1/reports/weekly")
+1013:@app.get("/v1/reports/weekly/export.json")
+
+=== nginx rules exact-match ===
+25:  location = /rules {

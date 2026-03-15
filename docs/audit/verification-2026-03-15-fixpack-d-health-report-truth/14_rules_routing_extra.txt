@@ -1,0 +1,4 @@
+EXTRA runtime verification for rules.html routing:
+- rules.html exists in /usr/share/nginx/html
+- local nginx fetch for /rules.html returns HTTP 200 text/html
+- this proves the exact-match nginx fix stopped /rules.html from being captured by backend proxy

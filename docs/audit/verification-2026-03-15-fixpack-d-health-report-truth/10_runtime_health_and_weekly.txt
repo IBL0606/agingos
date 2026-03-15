@@ -1,0 +1,7 @@
+Verified by runtime checks inside backend container after backend restart.
+
+Expected assertions:
+- /health/detail => operator_explanations is list
+- /health/detail => weekly_truth_snapshot is dict
+- /v1/reports/weekly => non-null payload
+- /v1/reports/weekly/export.json => export_format=agingos_weekly_truth_json_v1 and data != null

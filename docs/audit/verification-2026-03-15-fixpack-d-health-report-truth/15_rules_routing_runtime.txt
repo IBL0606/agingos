@@ -1,0 +1,24 @@
+=== rules.html exists ===
+RULES_EXISTS
+
+=== fetch /rules.html ===
+HTTP/1.1 200 OK
+Server: nginx/1.29.4
+Date: Sun, 15 Mar 2026 21:01:34 GMT
+Content-Type: text/html
+Content-Length: 3923
+Last-Modified: Sun, 15 Mar 2026 20:29:49 GMT
+Connection: keep-alive
+ETag: "69b716bd-f53"
+Accept-Ranges: bytes
+
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Regler</title>
+  <link rel="stylesheet" href="./console_shared.css" />
+</head>
+<body>
+  <div class="wrap">

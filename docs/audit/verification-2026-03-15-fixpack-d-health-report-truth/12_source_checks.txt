@@ -1,0 +1,5 @@
+Source-level checks:
+- backend/main.py contains weekly truth routes
+- backend/main.py contains weekly_truth_snapshot
+- backend/main.py contains operator_explanations
+- services/console/nginx.conf uses exact-match for /rules (EXTRA)
