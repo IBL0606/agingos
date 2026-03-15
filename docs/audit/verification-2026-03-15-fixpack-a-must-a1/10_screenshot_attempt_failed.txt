@@ -1,0 +1,3 @@
+Attempted screenshot capture for front-end alarms view using browser tool and local http.server on port 4173.
+Result: failed due to Playwright Chromium crash (SIGSEGV / TargetClosedError) in this environment.
+No screenshot artifact available.

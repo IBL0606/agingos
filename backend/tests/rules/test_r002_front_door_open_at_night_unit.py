@@ -35,14 +35,14 @@ class _FakeSession:
         return _FakeQuery(self._rows)
 
 
-def test_r002_triggers_on_door_open_at_night_default_window():
-    # Default night window is 23:00 -> 06:00 (rule defaults if params are missing)
+def test_r002_triggers_on_local_night_default_window_europe_oslo():
     now = datetime(2026, 2, 21, 10, 0, 0, tzinfo=timezone.utc)
-    since = now - timedelta(hours=6)
+    since = now - timedelta(hours=12)
     until = now
 
-    night_ts = datetime(2026, 2, 21, 23, 30, 0, tzinfo=timezone.utc)
-    rows = [_Row(123, night_ts, {"state": "open"})]
+    # 2026-02-20 22:30 UTC == 23:30 local (Europe/Oslo, UTC+1)
+    night_local_ts_utc = datetime(2026, 2, 20, 22, 30, 0, tzinfo=timezone.utc)
+    rows = [_Row(123, night_local_ts_utc, {"state": "open"})]
 
     ctx = RuleContext(
         session=_FakeSession(rows), since=since, until=until, now=now, params={}
@@ -58,13 +58,31 @@ def test_r002_triggers_on_door_open_at_night_default_window():
     assert d.evidence == ["123"]
 
 
-def test_r002_does_not_trigger_outside_night_window():
+def test_r002_does_not_trigger_on_local_daytime_default_window_europe_oslo():
     now = datetime(2026, 2, 21, 10, 0, 0, tzinfo=timezone.utc)
+    since = now - timedelta(hours=12)
+    until = now
+
+    # 2026-02-21 11:00 UTC == 12:00 local (Europe/Oslo, UTC+1)
+    day_local_ts_utc = datetime(2026, 2, 21, 11, 0, 0, tzinfo=timezone.utc)
+    rows = [_Row(124, day_local_ts_utc, {"state": "open"})]
+
+    ctx = RuleContext(
+        session=_FakeSession(rows), since=since, until=until, now=now, params={}
+    )
+    devs = eval_r002_front_door_open_at_night(ctx)
+
+    assert devs == []
+
+
+def test_r002_regression_march_0555utc_is_not_night_in_oslo_default_window():
+    now = datetime(2026, 3, 10, 8, 0, 0, tzinfo=timezone.utc)
     since = now - timedelta(hours=6)
     until = now
 
-    day_ts = datetime(2026, 2, 21, 12, 0, 0, tzinfo=timezone.utc)
-    rows = [_Row(124, day_ts, {"state": "open"})]
+    # 2026-03-10 05:55 UTC == 06:55 local (Europe/Oslo, UTC+1 before DST switch)
+    near_pilot_ts_utc = datetime(2026, 3, 10, 5, 55, 0, tzinfo=timezone.utc)
+    rows = [_Row(125, near_pilot_ts_utc, {"state": "open"})]
 
     ctx = RuleContext(
         session=_FakeSession(rows), since=since, until=until, now=now, params={}

@@ -567,3 +567,19 @@ Remaining evidence gaps:
 Merge position:
 - Safe to merge with truthful NO_EVIDENCE status retained.
 - Not a full 100% DoD close until entity-bearing dev/pilot evidence exists.
+
+### Fixpack-A — MUST-A1 Alarm truth + lifecycle in Console — 2026-03-15
+- **Scope:** dev repo only (`/workspace/agingos`). No pilot/prod data change.
+- **Goal:** keep alarm view truthful and operator-safe with explicit active vs history split, and align R-002 night logic with local time semantics.
+
+Delivered:
+- Console alarms view now defaults to active worklist (`OPEN` + `ACK`) and separates `CLOSED` into explicit history view.
+- Console added sorting options for status, last_seen, title.
+- R-002 now evaluates night window in local timezone (`Europe/Oslo` by default; configurable via params.timezone).
+- R-002 unit tests updated to prove local-night trigger, local-day no-trigger, and March regression (`05:55 UTC` => non-night local).
+
+Evidence path:
+- `docs/audit/verification-2026-03-15-fixpack-a-must-a1/`
+
+Status note:
+- CHECK-A-01..CHECK-A-05 intended to be proven from this verification pack.

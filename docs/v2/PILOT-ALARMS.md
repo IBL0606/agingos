@@ -156,3 +156,27 @@ CHECK-WHY mapping:
 
 NO_EVIDENCE:
 - Browser screenshot/UI capture is still NO_EVIDENCE unless captured explicitly from running Console.
+
+
+## 9) Fixpack-A (MUST-A1) alarm truth + lifecycle in Console
+Status: **ACTIVE (dev-repo truth)**
+
+Truth implemented in repo:
+- Console `alarms.html` now has explicit view split:
+  - **Aktiv arbeidsliste** = `OPEN` + `ACK` (default)
+  - **Historikk** = `CLOSED`
+- `CLOSED` rows are not shown in default active worklist view.
+- Operator can switch to explicit history view to see closed alarms.
+- Sorting in Console supports at least:
+  - status
+  - last_seen
+  - title
+- Existing backend lifecycle contract is unchanged:
+  - active statuses are `OPEN` and `ACK`
+  - scheduler stale-close moves stale `OPEN/ACK -> CLOSED`
+  - later trigger after `CLOSED` creates new `OPEN` row
+
+R-002 local night-window truth:
+- Rule now evaluates `night_window.start_local_time` / `end_local_time` in local timezone.
+- Default timezone is `Europe/Oslo`, configurable via `rules.R-002.params.timezone`.
+- Regression covered for March timestamp around `05:55 UTC` (`06:55` local), which must **not** trigger default `23:00-06:00` local night window.

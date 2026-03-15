@@ -1,0 +1,21 @@
+21:    const VIEW_ACTIVE = 'active';
+22:    const VIEW_HISTORY = 'history';
+24:      last_seen_desc: 'Sist sett (nyeste først)',
+25:      last_seen_asc: 'Sist sett (eldste først)',
+26:      status_asc: 'Status (A–Å)',
+27:      title_asc: 'Tittel (A–Å)',
+59:        if (sortKey === 'status_asc') {
+62:        if (sortKey === 'title_asc') {
+65:        if (sortKey === 'last_seen_asc') {
+66:          return Date.parse(a.last_seen_at || a.timestamp || 0) - Date.parse(b.last_seen_at || b.timestamp || 0);
+68:        return Date.parse(b.last_seen_at || b.timestamp || 0) - Date.parse(a.last_seen_at || a.timestamp || 0);
+73:    function filterByView(rows, view) {
+74:      if (view === VIEW_HISTORY) return rows.filter((d) => d.status === 'CLOSED');
+140:      let currentView = VIEW_ACTIVE;
+176:            <td>${fmtNo(d.last_seen_at)}</td>
+189:        }).join('') || `<tr><td colspan="8" class="muted">Ingen varsler i ${currentView === VIEW_ACTIVE ? 'aktiv arbeidsliste' : 'historikk'}.</td></tr>`;
+193:        btnActive.className = currentView === VIEW_ACTIVE ? 'btn' : 'btn secondary';
+194:        btnHistory.className = currentView === VIEW_HISTORY ? 'btn' : 'btn secondary';
+195:        const visible = filterByView(devs, currentView);
+200:        currentView = VIEW_ACTIVE;
+204:        currentView = VIEW_HISTORY;

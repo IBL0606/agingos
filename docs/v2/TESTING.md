@@ -225,3 +225,32 @@ Suggested capture commands:
 
 NO_EVIDENCE in this container:
 - Browser screenshot/UI capture only.
+
+
+## Fixpack-A (MUST-A1) verification checks
+
+### CHECK-A-01 — Active worklist excludes CLOSED by default
+Command evidence target:
+- Open `services/console/alarms.html` and verify default button is `Aktiv arbeidsliste (OPEN + ACK)`.
+- Verify list rendering for active view filters status to `OPEN` + `ACK` only.
+
+### CHECK-A-02 — History remains available as explicit view
+Command evidence target:
+- In Console, switch to `Historikk (CLOSED)` and verify only `CLOSED` rows are shown.
+
+### CHECK-A-03 — Sorting controls support status, last_seen, title
+Command evidence target:
+- Verify sorting control options include status, last_seen, title.
+
+### CHECK-A-04 — R-002 local night trigger + day no-trigger
+Command:
+- `pytest -q backend/tests/rules/test_r002_front_door_open_at_night_unit.py`
+Expected:
+- test for local-night trigger PASS
+- test for local-day no-trigger PASS
+
+### CHECK-A-05 — R-002 March regression around 05:55 UTC
+Command:
+- `pytest -q backend/tests/rules/test_r002_front_door_open_at_night_unit.py -k regression_march_0555utc`
+Expected:
+- PASS (no deviation)

@@ -1,0 +1,18 @@
+
+==================================== ERRORS ====================================
+_ ERROR collecting backend/tests/rules/test_r002_front_door_open_at_night_unit.py _
+backend/tests/rules/test_r002_front_door_open_at_night_unit.py:6: in <module>
+    from services.rules.r002 import eval_r002_front_door_open_at_night
+backend/services/rules/r002.py:7: in <module>
+    from models.db_event import EventDB
+backend/models/__init__.py:3: in <module>
+    from models.db_event import EventDB  # noqa: F401
+backend/models/db_event.py:3: in <module>
+    from db import Base
+backend/db.py:8: in <module>
+    raise RuntimeError("DATABASE_URL is not set")
+E   RuntimeError: DATABASE_URL is not set
+=========================== short test summary info ============================
+ERROR backend/tests/rules/test_r002_front_door_open_at_night_unit.py - Runtim...
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 1.02s
