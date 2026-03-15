@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Regler</title>
+  <link rel="stylesheet" href="./console_shared.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div id="shell"></div>
+    <div id="app"></div>
+  </div>
+  <script src="./console_shared.js"></script>
+  <script>
+    pageShell('rules.html', 'Regler');
+    const app = document.getElementById('app');
+
+    function truthText(t) {
+      if (!t || t === 'FULLY_EVALUATED') return 'Full vurdering';
+      if (t === 'NOT_EVALUATED') return 'Ikke vurdert: mangler nok historikk';
+      if (t === 'WEAK_BASIS') return 'Datagrunnlaget er for svakt til full vurdering';
+      if (t === 'DEFAULT_PROFILE') return 'Bruker standard nattvindu, ikke personlig boligprofil';
+      return t;
+    }
+
+    function stateLabel(rule, truth) {
+      if (!rule.enabled_in_scheduler) return 'Ikke aktiv i scheduler';
+      if (!rule.is_enabled) return 'Skrudd av i regelregister';
+      if (!truth) return 'Aktiv, men runtime-status er ikke tilgjengelig';
+      return truthText(truth.evaluation_truth);
+    }
+
+    function findingsLink(ruleId) {
+      return `./alarms.html?rule_id=${encodeURIComponent(ruleId)}`;
+    }
+
+    (async () => {
+      const cache = loadCache('rules');
+      const [rulesRes, devRes] = await Promise.all([
+        apiTry('/v1/rules'),
+        apiTry('/v1/deviations?limit=500'),
+      ]);
+
+      const rules = rulesRes.ok ? rulesRes.data : (cache?.data?.rules || []);
+      const devs = devRes.ok ? devRes.data : (cache?.data?.devs || []);
+      if (rulesRes.ok || devRes.ok) saveCache('rules', { rules, devs });
+
+      const byRule = {};
+      devs.forEach((d) => {
+        const rid = d.rule_id || 'ukjent';
+        byRule[rid] = byRule[rid] || [];
+        byRule[rid].push(d);
+      });
+
+      app.innerHTML = `
+        ${failSoftBlock(cache)}
+        <div class="card">
+          <h2>Regeloversikt</h2>
+          <div class="muted">Viser hva hver regel ser etter, tilgjengelig runtime-status, og funn knyttet til regelen.</div>
+        </div>
+        <div class="card">
+          <table>
+            <thead>
+              <tr>
+                <th>Rule ID</th>
+                <th>Navn</th>
+                <th>Forklaring</th>
+                <th>Status</th>
+                <th>Funn</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rules.map((r) => {
+                const truth = r.runtime_status || null;
+                const ruleId = r.rule_id || r.name || 'ukjent';
+                const findings = byRule[ruleId] || [];
+                const openN = findings.filter((f) => f.status === 'OPEN' || f.status === 'ACK').length;
+                const closedN = findings.filter((f) => f.status === 'CLOSED').length;
+                return `<tr>
+                  <td><b>${esc(ruleId)}</b></td>
+                  <td>${esc(r.display_name || r.name || ruleId)}</td>
+                  <td>
+                    ${esc(r.human_explanation || 'Ingen menneskelig forklaring tilgjengelig.')}
+                    ${truth?.basis_summary ? `<div class="small muted" style="margin-top:4px">Datagrunnlag: ${esc(truth.basis_summary)}</div>` : ''}
+                  </td>
+                  <td>
+                    ${esc(stateLabel(r, truth))}
+                    ${truth?.gating_reason ? `<div class="small muted">Årsak: ${esc(truth.gating_reason)}</div>` : ''}
+                  </td>
+                  <td>
+                    <div class="small">Aktive: ${openN} · Historikk: ${closedN}</div>
+                    <a href="${findingsLink(ruleId)}">Åpne funn for denne regelen</a>
+                  </td>
+                </tr>`;
+              }).join('') || '<tr><td colspan="5" class="muted">Ingen regler tilgjengelig.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      `;
+    })();
+  </script>
+</body>
+</html>

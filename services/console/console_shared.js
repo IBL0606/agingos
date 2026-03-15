@@ -6,6 +6,7 @@ const CACHE_PREFIX = 'agingos_cache_';
 const NAV = [
   ['index.html', 'Oversikt'],
   ['events.html', 'Hendelser'],
+  ['rules.html', 'Regler'],
   ['alarms.html', 'Varsler'],
   ['anomalies.html', 'Mulige avvik'],
   ['proposals.html', 'Anbefalinger'],

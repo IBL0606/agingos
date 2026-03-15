@@ -44,11 +44,42 @@
       return t;
     }
 
-    function eventsLink(window, room) {
+    function pickCategory(d) {
+      const ev = d.evidence || {};
+      return ev.category || ev.event_category || ev.primary_category || '';
+    }
+
+    function deriveWindow(d) {
+      const ev = d.evidence || {};
+      const win = d.window || {};
+      const since = win.since || ev.since || ev.window_since || d.started_at || d.timestamp || '';
+      const until = win.until || ev.until || ev.window_until || d.last_seen_at || '';
+      return { since, until };
+    }
+
+    function deriveRoom(d) {
+      const ev = d.evidence || {};
+      return ev.room || ev.room_id || '';
+    }
+
+    function exactEvidencePossible(d) {
+      const ids = Array.isArray(d.evidence_event_ids) ? d.evidence_event_ids : [];
+      if (ids.length) return true;
+      const evIds = Array.isArray(d.evidence?.event_ids) ? d.evidence.event_ids : [];
+      return evIds.length > 0;
+    }
+
+    function eventsLink(d) {
       const q = new URLSearchParams();
+      const room = deriveRoom(d);
+      const category = pickCategory(d);
+      const window = deriveWindow(d);
       if (room && room !== 'Ukjent rom') q.set('room', room);
-      if (window?.since) q.set('since', window.since);
-      if (window?.until) q.set('until', window.until);
+      if (category) q.set('category', category);
+      if (window.since) q.set('since', window.since);
+      if (window.until) q.set('until', window.until);
+      q.set('auto', '1');
+      q.set('stream_id', streamId());
       return './events.html?' + q.toString();
     }
 
@@ -93,10 +124,13 @@
         apiTry('/rules/evaluation-truth'),
       ]);
 
-      const devs = devRes.ok ? devRes.data : (cache?.data?.devs || []);
+      const devsRaw = devRes.ok ? devRes.data : (cache?.data?.devs || []);
+      const qp = new URLSearchParams(location.search);
+      const selectedRule = qp.get('rule_id') || '';
+      const devs = selectedRule ? devsRaw.filter((d) => (d.rule_id || '') === selectedRule) : devsRaw;
       const pack = packRes.ok ? packRes.data : (cache?.data?.pack || []);
       const truth = truthRes.ok ? truthRes.data : (cache?.data?.truth || { rules: [] });
-      if (devRes.ok || packRes.ok || truthRes.ok) saveCache('alarms', { devs, pack, truth });
+      if (devRes.ok || packRes.ok || truthRes.ok) saveCache('alarms', { devs: devsRaw, pack, truth });
 
       const fallback = ['R-001', 'R-002', 'R-003', 'R-004', 'R-005', 'R-006', 'R-007', 'R-008', 'R-009', 'R-010'];
       const rules = (Array.isArray(pack) ? pack : []).map((r) => r.rule_id || r.id).filter(Boolean);
@@ -106,6 +140,7 @@
 
       app.innerHTML = `
         ${failSoftBlock(cache)}
+        ${selectedRule ? `<div class="card"><b>Filter:</b> viser kun funn for regel ${esc(selectedRule)}. <a href="./alarms.html">Fjern filter</a></div>` : ''}
 
         <div class="card">
           <h2>Pilotregelpakke</h2>
@@ -169,7 +204,7 @@
       function renderRows(rows) {
         tb.innerHTML = rows.map((d) => {
         const ev = d.evidence || {};
-        const room = ev.room || ev.room_id || 'Ukjent rom';
+        const room = deriveRoom(d) || 'Ukjent rom';
         const normal = ev.baseline ?? ev.expected ?? 'Mangler sammenlignbar historikk for denne perioden.';
         const observed = ev.observed ?? ev.current ?? 'Mangler observasjon i grunnlaget.';
         const diff = ev.delta ?? ev.diff ?? 'Forskjellen kan ikke tallfestes sikkert ennå.';
@@ -211,7 +246,8 @@
               <div class="actions">
                 <button class="btn secondary" onclick="patchStatus(${d.deviation_id}, 'ACK')">Marker som sett</button>
                 <button class="btn secondary" onclick="patchStatus(${d.deviation_id}, 'CLOSED')">Marker som ferdig</button>
-                <a href="${eventsLink(d.window, room)}">Se hendelser i samme tidsrom</a>
+                <a href="${eventsLink(d)}">Se relevant datagrunnlag i hendelser</a>
+                <div class="small muted">${exactEvidencePossible(d) ? 'Eksakt trigger-event finnes i grunnlaget, men visningen bruker fortsatt filter på scope/tid/rom/kategori.' : 'Eksakt trigger-event er ikke bevist; viser relevant datagrunnlag for samme scope/tidsvindu/rom/kategori.'}</div>
               </div>
             </td>
           </tr>

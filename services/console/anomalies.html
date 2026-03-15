@@ -79,7 +79,15 @@
             ? 'Systemet la merke til en endring som bør følges med på.'
             : 'Systemet la merke til en liten endring som foreløpig virker begrenset.';
 
-        const eventsUrl = `./events.html?room=${encodeURIComponent(room)}&since=${encodeURIComponent(a.start_ts || '')}`;
+        const category = (a.reasons || []).map((r) => (r && (r.category || r.event_category)) || '').find(Boolean) || '';
+        const params = new URLSearchParams();
+        params.set('room', room);
+        if (a.start_ts) params.set('since', a.start_ts);
+        if (a.end_ts) params.set('until', a.end_ts);
+        if (category) params.set('category', category);
+        params.set('auto', '1');
+        params.set('stream_id', streamId());
+        const eventsUrl = './events.html?' + params.toString();
 
         return `
           <div class="card">
@@ -96,6 +104,7 @@
               <a href="${eventsUrl}">Åpne relevante hendelser</a>
               ${matchingDeviation ? '<a href="./alarms.html">Åpne tilhørende varsel</a>' : ''}
             </div>
+            <div class="small muted" style="margin-top:6px">Eksakt trigger-event er ikke bevist; viser relevant datagrunnlag for samme scope/tidsvindu/rom/kategori.</div>
 
             <div style="margin-top:10px">${devDetails(a)}</div>
           </div>

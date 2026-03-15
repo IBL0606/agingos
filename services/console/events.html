@@ -65,7 +65,9 @@
 
     (async () => {
       const cache = loadCache('events');
-      const res = await apiTry('/v1/events?limit=1000&stream_id=prod');
+      const qp = new URLSearchParams(location.search);
+      const qpStream = qp.get('stream_id') || streamId();
+      const res = await apiTry('/v1/events?limit=1000&stream_id=' + encodeURIComponent(qpStream));
       const rows = res.ok ? res.data : (cache?.data || []);
       if (res.ok) saveCache('events', rows);
 
@@ -91,6 +93,7 @@
               <input id="limit" type="number" value="100" min="1" max="1000" style="width:90px" />
             </label>
             <button class="btn" id="apply">Oppdater visning</button>
+            <span class="chip">Stream: ${esc(qpStream)}</span>
           </div>
         </div>
 
@@ -106,11 +109,11 @@
         </div>
       `;
 
-      const qp = new URLSearchParams(location.search);
       const qpRoom = qp.get('room') || '';
-      const qpType = qp.get('type') || '';
+      const qpType = qp.get('type') || qp.get('category') || '';
       const qpSince = qp.get('since');
       const qpUntil = qp.get('until');
+      const qpAuto = qp.get('auto') === '1';
 
       const rooms = [...new Set(rows.map(roomOf).filter(Boolean))].sort();
       document.getElementById('room').innerHTML = '<option value="">Alle</option>' + rooms.map((r) => `<option>${esc(r)}</option>`).join('');
@@ -153,6 +156,7 @@
 
         document.getElementById('summary').innerHTML = `
           <div class="card">
+            ${qpAuto ? '<div class="notice small">Auto-filter aktivert fra forklaring/drilldown-lenke.</div>' : ''}
             <h2>Oppsummering</h2>
             <div>Aktive rom i valgt periode: ${activeRooms.join(', ') || 'Ingen'}</div>
             <div>Mest aktivitet: ${sorted[0]?.[0] || '—'}</div>
