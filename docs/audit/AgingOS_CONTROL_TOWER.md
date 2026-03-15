@@ -583,3 +583,50 @@ Evidence path:
 
 Status note:
 - CHECK-A-01..CHECK-A-05 intended to be proven from this verification pack.
+
+### Fixpack-C — MUST-C1 Baseline-gating i regler — READY FOR MERGE — 2026-03-15
+Link: https://github.com/IBL0606/agingos/pull/46
+Branch: pr-46-fixpack-c
+Status: READY FOR MERGE
+
+Scope:
+- Truthful gating for pilot rules with explicit classification:
+  - baseline_dependent
+  - profile_dependent
+  - independent
+- Baseline/profile-weak rules do not emit normal full-confidence alarms
+- Console alarms UI shows explicit operator truth for weak / not evaluated / default profile
+- Smoke updated to respect runtime truth for R-001 instead of assuming always-fully-evaluable baseline behavior
+- /rules/evaluation-truth hardened for fresh/CI schema without hard dependency on optional subjects table
+
+Checks:
+- CHECK-C-01: PASS
+- CHECK-C-02: PASS
+- CHECK-C-03: PASS
+- CHECK-C-04: PASS
+- CHECK-C-05: PASS
+- CHECK-C-06: PASS
+
+Verification:
+- pytest: backend/tests/rules/test_rule_truth_gating_unit.py
+- pytest: backend/tests/test_rules_scope_resolution_unit.py
+- compileall: backend/routes/rules.py backend/services/rules/gating.py backend/services/rule_engine.py
+- CI green after:
+  - baseline_model_status schema-safe gating fix
+  - smoke truth-aware R-001 assertion update
+  - /rules/evaluation-truth scope fallback hardening
+
+Changed files:
+- backend/config/rule_config.py
+- backend/config/rules.yaml
+- backend/routes/rules.py
+- backend/services/rule_engine.py
+- backend/services/rules/gating.py
+- backend/tests/rules/test_rule_truth_gating_unit.py
+- backend/tests/test_rules_scope_resolution_unit.py
+- services/console/alarms.html
+- examples/scripts/smoke_test.sh
+
+Notes:
+- docs/v2 not yet updated in this PR; follow-up doc sync still needed so docs remain 100% aligned with runtime truth model.
+- No anomaly-engine redesign; scope kept to truthful gating + operator visibility + CI/runtime hardening.
