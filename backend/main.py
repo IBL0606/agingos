@@ -445,65 +445,64 @@ def _weekly_truth_payload(scope: "AuthScope", stream_id: str = "prod") -> dict:
         db.rollback()
         payload["sources"]["deviations"] = {"available": False, "error": str(e)}
 
-        from services.scheduler import ANOMALIES_RUNNER_STATUS
+    from services.scheduler import ANOMALIES_RUNNER_STATUS
 
-        rs = dict(ANOMALIES_RUNNER_STATUS)
-        has_recent_run = bool(rs.get("last_ok_at") or rs.get("last_run_at"))
-        payload["analysis_running"] = {
-            "status": "YES" if has_recent_run else "NO",
-            "evidence": [
-                f"last_ok_at={rs.get('last_ok_at')}",
-                f"last_run_at={rs.get('last_run_at')}",
-                f"last_error_at={rs.get('last_error_at')}",
-            ],
-        }
-        if not has_recent_run:
-            deficits.append(
-                {
-                    "key": "analysis_runner_not_proven",
-                    "have": 0,
-                    "need": 1,
-                    "detail": "Mangler bevis på nylig analysekjøring i denne prosessen.",
-                }
-            )
+    rs = dict(ANOMALIES_RUNNER_STATUS)
+    has_recent_run = bool(rs.get("last_ok_at") or rs.get("last_run_at"))
+    payload["analysis_running"] = {
+        "status": "YES" if has_recent_run else "NO",
+        "evidence": [
+            f"last_ok_at={rs.get('last_ok_at')}",
+            f"last_run_at={rs.get('last_run_at')}",
+            f"last_error_at={rs.get('last_error_at')}",
+        ],
+    }
+    if not has_recent_run:
+        deficits.append(
+            {
+                "key": "analysis_runner_not_proven",
+                "have": 0,
+                "need": 1,
+                "detail": "Mangler bevis på nylig analysekjøring i denne prosessen.",
+            }
+        )
 
-        baseline_latest = payload.get("sources", {}).get("baseline", {}).get("latest", {})
-        baseline_ok = bool(baseline_latest) and bool(baseline_latest.get("baseline_ready"))
-        payload["history_basis_ready"] = {
-            "status": "YES" if baseline_ok else "NO",
-            "evidence": [
-                f"baseline_ready={baseline_latest.get('baseline_ready')}",
-                f"days_with_data={baseline_latest.get('days_with_data')}",
-                f"min_days_required={baseline_latest.get('min_days_required')}",
-                f"room_bucket_supported={baseline_latest.get('room_bucket_supported')}",
-                f"room_bucket_rows={baseline_latest.get('room_bucket_rows')}",
-            ],
-        }
+    baseline_latest = payload.get("sources", {}).get("baseline", {}).get("latest", {})
+    baseline_ok = bool(baseline_latest) and bool(baseline_latest.get("baseline_ready"))
+    payload["history_basis_ready"] = {
+        "status": "YES" if baseline_ok else "NO",
+        "evidence": [
+            f"baseline_ready={baseline_latest.get('baseline_ready')}",
+            f"days_with_data={baseline_latest.get('days_with_data')}",
+            f"min_days_required={baseline_latest.get('min_days_required')}",
+            f"room_bucket_supported={baseline_latest.get('room_bucket_supported')}",
+            f"room_bucket_rows={baseline_latest.get('room_bucket_rows')}",
+        ],
+    }
 
-        payload["summary"] = {
-            "events_7d": int(payload["sources"].get("events", {}).get("events_7d", 0) or 0),
-            "deviations_open": int(payload["sources"].get("deviations", {}).get("deviations_open", 0) or 0),
-            "deviations_seen_7d": int(payload["sources"].get("deviations", {}).get("deviations_seen_7d", 0) or 0),
-            "anomalies_7d": int(payload["sources"].get("anomalies", {}).get("anomalies_7d", 0) or 0),
-            "proposals_updated_7d": int(payload["sources"].get("proposals", {}).get("proposals_updated_7d", 0) or 0),
-        }
+    payload["summary"] = {
+        "events_7d": int(payload["sources"].get("events", {}).get("events_7d", 0) or 0),
+        "deviations_open": int(payload["sources"].get("deviations", {}).get("deviations_open", 0) or 0),
+        "deviations_seen_7d": int(payload["sources"].get("deviations", {}).get("deviations_seen_7d", 0) or 0),
+        "anomalies_7d": int(payload["sources"].get("anomalies", {}).get("anomalies_7d", 0) or 0),
+        "proposals_updated_7d": int(payload["sources"].get("proposals", {}).get("proposals_updated_7d", 0) or 0),
+    }
 
-        payload["basis"]["metrics"] = {
-            "deficit_count": len(deficits),
-            "events_available": bool(payload["sources"].get("events", {}).get("available")),
-            "baseline_available": bool(payload["sources"].get("baseline", {}).get("available")),
-        }
+    payload["basis"]["metrics"] = {
+        "deficit_count": len(deficits),
+        "events_available": bool(payload["sources"].get("events", {}).get("available")),
+        "baseline_available": bool(payload["sources"].get("baseline", {}).get("available")),
+    }
 
-        if len(deficits) == 0:
-            payload["basis"]["status"] = "READY"
-            payload["basis"]["message"] = "Grunnlaget er klart: minimumskravene er oppfylt."
-        else:
-            payload["basis"]["status"] = "WEAK"
-            payload["basis"]["message"] = f"Grunnlaget er fortsatt svakt: {len(deficits)} konkrete mangler må lukkes."
+    if len(deficits) == 0:
+        payload["basis"]["status"] = "READY"
+        payload["basis"]["message"] = "Grunnlaget er klart: minimumskravene er oppfylt."
+    else:
+        payload["basis"]["status"] = "WEAK"
+        payload["basis"]["message"] = f"Grunnlaget er fortsatt svakt: {len(deficits)} konkrete mangler må lukkes."
 
-        return payload
-    finally:
-        db.close()
+    db.close()
+    return payload
 
 
 
