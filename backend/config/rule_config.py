@@ -55,6 +55,25 @@ class RuleConfig:
     def rule_params(self, rule_id: str) -> Dict[str, Any]:
         return dict(self.rule(rule_id).get("params", {}))
 
+    def rule_evaluation_mode(self, rule_id: str) -> str:
+        r = self.rule(rule_id)
+        mode = str(r.get("evaluation_mode", "independent")).strip().lower()
+        if mode in {"baseline_dependent", "profile_dependent", "independent"}:
+            return mode
+        return "independent"
+
+    def rule_requires_baseline(self, rule_id: str) -> bool:
+        r = self.rule(rule_id)
+        if "requires_baseline" in r:
+            return bool(r.get("requires_baseline"))
+        return self.rule_evaluation_mode(rule_id) == "baseline_dependent"
+
+    def rule_requires_profile(self, rule_id: str) -> bool:
+        r = self.rule(rule_id)
+        if "requires_profile" in r:
+            return bool(r.get("requires_profile"))
+        return self.rule_evaluation_mode(rule_id) == "profile_dependent"
+
 
 _cached: Optional[RuleConfig] = None
 

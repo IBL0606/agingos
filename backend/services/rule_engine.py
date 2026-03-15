@@ -13,6 +13,7 @@ from schemas.deviation_v1 import DeviationV1
 
 from services.rules.registry import RULE_REGISTRY
 from services.rules.context import RuleContext
+from services.rules.gating import build_rule_truth
 
 logger = logging.getLogger("rule_engine")
 
@@ -33,6 +34,15 @@ def _call_rule(
     """Adapter: supports both legacy rule signatures and RuleContext-based rules."""
     cfg = load_rule_config()
     params = cfg.rule_params(rule_id)
+    rule_truth = build_rule_truth(
+        cfg,
+        rule_id,
+        db=db,
+        org_id=org_id,
+        home_id=home_id,
+        subject_id=subject_id,
+    )
+
     ctx = RuleContext(
         session=db,
         since=since,
@@ -44,13 +54,26 @@ def _call_rule(
         subject_id=subject_id,
         subject_key=subject_key,
     )
+
+    if rule_truth.get("evaluation_truth") in {"NOT_EVALUATED", "WEAK_BASIS"}:
+        return []
+
     fn = spec.eval_fn
     try:
         # New style: fn(ctx)
-        return fn(ctx)  # type: ignore[misc]
+        devs = fn(ctx)  # type: ignore[misc]
     except TypeError:
         # Legacy: fn(db, since, until, now)
-        return fn(db, since=since, until=until, now=now)  # type: ignore[misc]
+        devs = fn(db, since=since, until=until, now=now)  # type: ignore[misc]
+
+    for d in devs:
+        ev = d.evidence if isinstance(d.evidence, dict) else {"event_ids": d.evidence}
+        if not isinstance(ev, dict):
+            ev = {"event_ids": []}
+        ev.update({k: v for k, v in rule_truth.items() if v is not None})
+        d.evidence = ev
+
+    return devs
 
 
 # ---------------------------------------------------------------------------

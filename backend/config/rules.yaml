@@ -6,6 +6,15 @@ rules:
     enabled_in_scheduler: true
     lookback_minutes: 180
     expire_after_minutes: 360
+    evaluation_mode: baseline_dependent
+    requires_baseline: true
+    requires_profile: false
+    min_days_with_data: 3
+    params:
+      motion_categories:
+      - presence
+      - motion
+      motion_on_value: 'on'
   R-002:
     enabled_in_scheduler: true
     lookback_minutes: 240
@@ -13,20 +22,46 @@ rules:
     params:
       allowed_entity_ids:
       - binary_sensor.inngangsdor_contact
+    evaluation_mode: profile_dependent
+    requires_baseline: false
+    requires_profile: true
+    profile_mode: default_window
+    uses_default_profile_when_missing: true
   R-003:
     enabled_in_scheduler: true
     lookback_minutes: 240
     expire_after_minutes: 720
+    evaluation_mode: independent
+    requires_baseline: false
+    requires_profile: false
   R-004:
     enabled_in_scheduler: true
+    evaluation_mode: independent
+    requires_baseline: false
+    requires_profile: false
   R-005:
     enabled_in_scheduler: true
+    evaluation_mode: baseline_dependent
+    requires_baseline: true
+    requires_profile: false
+    min_days_with_data: 3
   R-006:
     enabled_in_scheduler: true
+    evaluation_mode: baseline_dependent
+    requires_baseline: true
+    requires_profile: false
+    min_days_with_data: 3
   R-007:
     enabled_in_scheduler: true
+    evaluation_mode: baseline_dependent
+    requires_baseline: true
+    requires_profile: false
+    min_days_with_data: 3
   R-008:
     enabled_in_scheduler: true
+    evaluation_mode: independent
+    requires_baseline: false
+    requires_profile: false
   R-009:
     enabled_in_scheduler: true
     params:
@@ -34,18 +69,14 @@ rules:
       liveness_categories:
       - ha_snapshot
       max_age_minutes: 75
+    evaluation_mode: independent
+    requires_baseline: false
+    requires_profile: false
   R-010:
     enabled_in_scheduler: true
+    evaluation_mode: independent
+    requires_baseline: false
+    requires_profile: false
 scheduler:
   interval_minutes: 5
   default_subject_key: default
-R-002:
-  params:
-    allowed_entity_ids:
-    - binary_sensor.inngangsdor_contact
-R-001:
-  params:
-    motion_categories:
-    - presence
-    - motion
-    motion_on_value: 'on'

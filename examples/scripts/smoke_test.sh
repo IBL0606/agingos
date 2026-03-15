@@ -177,17 +177,27 @@ echo
 
 
 # 6) GET /deviations/evaluate (R-001 boundary test, until is exclusive)
-echo "[6/8] GET /deviations/evaluate (R-001, until eksklusiv)"
+echo "[6/8] GET /deviations/evaluate (R-001, until eksklusiv + truth-gating aware)"
 
-# Window ends exactly at the event timestamp -> event NOT included -> expect 1 deviation (R-001)
+truth_json="$(curl -sS "${API_KEY_HEADER[@]}" "$BASE_URL/rules/evaluation-truth" || true)"
+r001_truth="$(echo "$truth_json" | jq -r '.rules[]? | select(.rule_id=="R-001") | .evaluation_truth' 2>/dev/null || true)"
+r001_reason="$(echo "$truth_json" | jq -r '.rules[]? | select(.rule_id=="R-001") | (.basis_summary // .gating_reason // "")' 2>/dev/null || true)"
+
+# Window A ends exactly at motion timestamp -> motion at 10:00:00 is NOT included.
 dev_a="$(curl -sS "${API_KEY_HEADER[@]}" "$BASE_URL/deviations/evaluate?since=2025-12-15T08:00:00Z&until=2025-12-15T10:00:00Z" || true)"
-echo "$dev_a" | jq -e 'type=="array" and (map(.rule_id) | index("R-001") != null)' >/dev/null \
-  || fail "/deviations/evaluate expected R-001 present for window [08:00,10:00)"
-
-# Window ends 1 second after event timestamp -> event included -> expect 0 deviations
+# Window B includes the 10:00:00 motion event.
 dev_b="$(curl -sS "${API_KEY_HEADER[@]}" "$BASE_URL/deviations/evaluate?since=2025-12-15T08:00:00Z&until=2025-12-15T10:00:01Z" || true)"
-echo "$dev_b" | jq -e 'type=="array" and (map(.rule_id) | index("R-001") == null)' >/dev/null \
-  || fail "/deviations/evaluate expected NO R-001 for window [08:00,10:00:01)"
+
+if [[ "$r001_truth" == "WEAK_BASIS" || "$r001_truth" == "NOT_EVALUATED" ]]; then
+  # Truthful gating: baseline-dependent R-001 is suppressed from normal evaluation.
+  echo "INFO: R-001 gating active ($r001_truth)${r001_reason:+ - $r001_reason}"
+  echo "$dev_a" | jq -e 'type=="array" and (map(.rule_id) | index("R-001") == null)' >/dev/null     || fail "/deviations/evaluate expected NO R-001 for window [08:00,10:00) when gating is $r001_truth"
+  echo "$dev_b" | jq -e 'type=="array" and (map(.rule_id) | index("R-001") == null)' >/dev/null     || fail "/deviations/evaluate expected NO R-001 for window [08:00,10:00:01) when gating is $r001_truth"
+else
+  # Fully evaluated path keeps historical boundary contract.
+  echo "$dev_a" | jq -e 'type=="array" and (map(.rule_id) | index("R-001") != null)' >/dev/null     || fail "/deviations/evaluate expected R-001 present for window [08:00,10:00)"
+  echo "$dev_b" | jq -e 'type=="array" and (map(.rule_id) | index("R-001") == null)' >/dev/null     || fail "/deviations/evaluate expected NO R-001 for window [08:00,10:00:01)"
+fi
 
 echo "OK"
 echo
